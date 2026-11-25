@@ -179,7 +179,7 @@ test("plain Enter and Cmd+Enter on a blank brief do not start", async () => {
   expect(fake.start).not.toHaveBeenCalled()
 })
 
-test("Start is blocked for a blank brief and while a save is in flight, with no reason text", async () => {
+test("Start is blocked for a blank brief only, never while typing, with no reason text", async () => {
   vi.useFakeTimers()
   await mount(fakeDrafts())
   expect(startBlocked()).toBe(false)
@@ -189,11 +189,19 @@ test("Start is blocked for a blank brief and while a save is in flight, with no 
   expect(startReason()).toBeNull()
   expect(screen.queryByText("Write a brief to start.")).toBeNull()
   typeBrief("Something")
-  expect(startBlocked()).toBe(true)
-  expect(startReason()).toBeNull()
-  expect(screen.queryByText("Saving the draft...")).toBeNull()
-  await wait(800)
   expect(startBlocked()).toBe(false)
+  expect(startReason()).toBeNull()
+  expect(screen.getByRole("status").textContent).toBe("")
+})
+
+test("Start flushes a pending debounce before it starts", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  await mount(fake)
+  typeBrief("last words")
+  await act(async () => fireEvent.click(startButton()))
+  expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ brief: "last words" }))
+  expect(fake.start).toHaveBeenCalledWith("c1")
 })
 
 test("Cmd+Enter does nothing while Start is blocked, and a click on blocked Start does not start", async () => {
@@ -584,10 +592,10 @@ test("a failed save shows Not saved and retries", async () => {
   await mount(fake)
   typeBrief("Mine")
   await wait(800)
-  expect(screen.getByText("Not saved")).toBeTruthy()
+  expect(screen.getByText("Not saved, retrying")).toBeTruthy()
   await wait(5000)
   expect(fake.save).toHaveBeenCalledTimes(2)
-  expect(screen.queryByText("Not saved")).toBeNull()
+  expect(screen.queryByText("Not saved, retrying")).toBeNull()
   expect(fake.stored.brief).toBe("Mine")
 })
 
@@ -779,7 +787,7 @@ describe("History", () => {
     expect(screen.getByText("1 image missing")).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
     expect(document.activeElement).toBe(brief())
-    expect(screen.getByText("Saved")).toBeTruthy()
+    expect(screen.getByRole("status").textContent).toBe("")
     await wait(800)
     expect(fake.save).not.toHaveBeenCalled()
     typeBrief("more")
@@ -787,17 +795,14 @@ describe("History", () => {
     expect(fake.save).toHaveBeenCalledWith({ id: "c1", brief: "more", revision: 10 })
   })
 
-  test("Restore stays disabled while a save is pending and enables once it ends", async () => {
+  test("Restore stays enabled while the person types", async () => {
     vi.useFakeTimers()
     const pickHistory = vi.fn<PickChatHistory>(async () => pickResult())
     await mountPhone(fakeDrafts(), pickHistory)
     typeBrief("typing")
     await openPopup()
-    expect(restore().disabled).toBe(true)
-    expect(screen.getByText("Saving…")).toBeTruthy()
-    await wait(800)
     expect(restore().disabled).toBe(false)
-    expect(pickHistory).not.toHaveBeenCalled()
+    expect(screen.queryByText("Saving…")).toBeNull()
   })
 
   test("a revision conflict closes the popup and raises the banner, brief unchanged", async () => {

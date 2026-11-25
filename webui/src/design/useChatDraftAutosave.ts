@@ -70,7 +70,6 @@ export function useChatDraftAutosave({
   })
   const changedKeys = () =>
     SETTING_KEYS.filter((k) => latestSettings.current[k] !== server.current.settings[k])
-  const dirty = () => latest.current !== server.current.text || changedKeys().length > 0
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const phase = useRef<Phase>("editing")
@@ -96,6 +95,8 @@ export function useChatDraftAutosave({
       return
     }
     let res: Awaited<ReturnType<typeof drafts.save>>
+    // A retry keeps the steady failure state until a save works.
+    setStatus((was) => (was === "unsaved" ? was : "saving"))
     try {
       res = await drafts.save({
         id: initial.id,
@@ -111,7 +112,7 @@ export function useChatDraftAutosave({
     if (res.kind === "ok") {
       Object.assign(s, { revision: res.draft.revision, text, settings: sent })
       setFacts(res.draft)
-      setStatus(dirty() ? "saving" : "saved")
+      setStatus("saved")
     } else if (res.kind === "conflict") {
       blocked.current = true
       setBanner(true)
@@ -225,7 +226,6 @@ export function useChatDraftAutosave({
   }, [status])
 
   const touched = () => {
-    if (!blocked.current && dirty()) setStatus("saving")
     clearTimeout(timer.current)
     timer.current = setTimeout(flush, AUTOSAVE_MS)
   }
@@ -259,6 +259,8 @@ export function useChatDraftAutosave({
     if (phase.current !== "editing" || starting) return
     setStarting(true)
     try {
+      // Stop-gap until Start carries the edit: Start no longer waits for a pending debounce.
+      flush()
       await chain.current
       const res = await drafts.start(initial.id)
       if (res.kind === "started") {

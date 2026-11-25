@@ -3,6 +3,7 @@ import type { ReactNode, RefObject } from "react"
 import { HistoryButton } from "../history/HistoryButton"
 import { MascotToggle } from "../shell/MascotToggle"
 import { DraftIcon } from "../shell/SidebarRows"
+import { SaveIndicator } from "./SaveIndicator"
 
 export const field = {
   fontSize: "16px",
@@ -88,16 +89,7 @@ export function DraftHeader({
         </chakra.button>
         <Box flex="1" />
         <HistoryButton onClick={onHistory} />
-        {status !== "none" && (
-          <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
-            {status === "saved" && (
-              <chakra.span aria-hidden color="tone.done.fg">
-                ✓{" "}
-              </chakra.span>
-            )}
-            {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
-          </Text>
-        )}
+        <SaveIndicator status={status} />
         {menu}
       </Box>
       <Box

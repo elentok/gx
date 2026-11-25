@@ -349,7 +349,7 @@ function DraftForm({
         {history.open && (
           <HistoryHost
             list="design-drafts"
-            pending={status === "saving" || imgs.uploading > 0}
+            pending={imgs.uploading > 0}
             listHistory={listHistory}
             onRestore={history.restore}
             onClose={history.hide}

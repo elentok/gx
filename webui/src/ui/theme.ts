@@ -83,6 +83,7 @@ export const themeConfig = defineConfig({
         "30%": { transform: "translateY(-2px)", opacity: 1 },
       },
       taskPulse: { "50%": { opacity: 0.35 } },
+      saveFadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
       inboxDrop: {
         "0%": { transform: "translateY(-3px)", opacity: 0 },
         "30%": { opacity: 1 },

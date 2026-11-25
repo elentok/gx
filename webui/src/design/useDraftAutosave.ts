@@ -125,12 +125,16 @@ export function useDraftAutosave({
     setGone(true)
   }
 
+  /** A request starts: "saving", except that a retry keeps the steady "unsaved" until a save works. */
+  const beginSaving = () => setStatus((was) => (was === "unsaved" ? was : "saving"))
+
   /** Saves the prompt; false when it did not settle. */
   const persistText = async () => {
     const s = server.current
     const idea = latest.current.idea
     if (idea === s.text) return true
     let res: Awaited<ReturnType<typeof drafts.save>>
+    beginSaving()
     try {
       res = await drafts.save({ id: s.id, idea, revision: s.revision })
     } catch {
@@ -161,6 +165,7 @@ export function useDraftAutosave({
     let res: Awaited<ReturnType<typeof drafts.saveFields>>
     // Only the field the person changed, so an outside change to the other one is never written back.
     const had: { slug: string; project: string } = JSON.parse(s.target)
+    beginSaving()
     try {
       res = await drafts.saveFields({
         id: s.id,
@@ -330,9 +335,6 @@ export function useDraftAutosave({
     const next = { ...draft, ...p }
     setDraft(next)
     latest.current = next
-    const s = server.current
-    const dirty = next.idea !== s.text || (targetKey(next) !== s.target && !slugProblem(next.slug))
-    if (!blocked.current && dirty) setStatus("saving")
     clearTimeout(timer.current)
     timer.current = setTimeout(flush, AUTOSAVE_MS)
   }

@@ -42,6 +42,7 @@ import { DraftBanner } from "./DraftBanner"
 import { DraftFooter } from "./DraftFooter"
 import { useDraftMenu } from "./useDraftMenu"
 import { field } from "./DraftHeader"
+import { SaveIndicator } from "./SaveIndicator"
 import { useChatDraftAutosave } from "./useChatDraftAutosave"
 import { REMOVED_NOTE, useLeaveGone } from "./useDraftLifecycle"
 
@@ -176,7 +177,7 @@ function ChatDraftForm({
     : imgs.failed
       ? "Remove or retry the failed images."
       : undefined
-  const blocker = !brief.trim() || !!startReason || status === "saving"
+  const blocker = !brief.trim() || !!startReason
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   // The mascot toggle leads this header, so the shell drops its floating one.
@@ -290,11 +291,7 @@ function ChatDraftForm({
             <LuPencil size={14} />
           </chakra.button>
           <HistoryButton onClick={history.show} />
-          {status !== "none" && (
-            <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
-              {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
-            </Text>
-          )}
+          <SaveIndicator status={status} />
           {draftMenu.menu}
         </Box>
         <ChatDraftCrumb
@@ -308,7 +305,7 @@ function ChatDraftForm({
         {history.open && (
           <HistoryHost
             list="chat-drafts"
-            pending={status === "saving" || imgs.uploading > 0}
+            pending={imgs.uploading > 0}
             listHistory={listHistory}
             onRestore={history.restore}
             onClose={history.hide}

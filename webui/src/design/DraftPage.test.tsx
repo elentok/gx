@@ -261,13 +261,13 @@ test("typing saves after 800 ms with the revision and only the prompt", async ()
   const fake = fakeDrafts()
   await mount(fake)
   type("Prompt", "hello")
-  expect(screen.getByText("Saving...")).toBeTruthy()
+  expect(screen.getByRole("status").textContent).toBe("")
   await wait(799)
   expect(fake.save).not.toHaveBeenCalled()
+  expect(screen.getByRole("status").textContent).toBe("")
   await wait(1)
   expect(fake.save).toHaveBeenCalledWith({ id: "d1", idea: "hello", revision: 3 })
   expect(fake.saveFields).not.toHaveBeenCalled()
-  expect(screen.getByText(/Saved/)).toBeTruthy()
 })
 
 test("a slug or project goes through saveFields, never the text save, and moves the title", async () => {
@@ -371,7 +371,7 @@ test("a failed save shows Not saved, keeps one fallback by draft id and the next
   await mount(fake)
   type("Prompt", "kept")
   await wait(800)
-  expect(screen.getByText("Not saved")).toBeTruthy()
+  expect(screen.getByText("Not saved, retrying")).toBeTruthy()
   type("Prompt", "kept more")
   await wait(5000)
   expect(Object.keys(JSON.parse(localStorage.getItem(UNSAVED_KEY) ?? "{}"))).toEqual(["d1"])
@@ -830,7 +830,7 @@ describe("History", () => {
     )
     expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
     expect(document.activeElement).toBe(prompt())
-    expect(screen.getByText(/Saved/)).toBeTruthy()
+    expect(screen.getByRole("status").textContent).toBe("")
     await wait(800)
     expect(fake.save).not.toHaveBeenCalled()
     type("Prompt", "more")
@@ -838,17 +838,14 @@ describe("History", () => {
     expect(fake.save).toHaveBeenCalledWith({ id: "d1", idea: "more", revision: 10 })
   })
 
-  test("Restore stays disabled while a save is pending and enables once it ends", async () => {
+  test("Restore stays enabled while the person types", async () => {
     vi.useFakeTimers()
     const pickHistory = vi.fn<PickDesignHistory>(async () => pickResult())
     await mount(fakeDrafts(), { ...phone, pickHistory })
     type("Prompt", "typing")
     await openPopup()
-    expect(restore().disabled).toBe(true)
-    expect(screen.getByText("Saving…")).toBeTruthy()
-    await wait(800)
     expect(restore().disabled).toBe(false)
-    expect(pickHistory).not.toHaveBeenCalled()
+    expect(screen.queryByText("Saving…")).toBeNull()
   })
 
   test("a revision conflict closes the popup and raises the banner, text unchanged", async () => {
