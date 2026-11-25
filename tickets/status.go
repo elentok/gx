@@ -196,7 +196,10 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.UnreleasedBlockers) > 0 || len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
+	// A Merge ticket exists only after the epic's own tickets ran, so the
+	// epic-level hold must not stop it: it lands the epic on the blocker's branch.
+	epicHeld := len(e.UnreleasedBlockers) > 0 && t.Type != string(schema.TypeMerge)
+	if epicHeld || len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base

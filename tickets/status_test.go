@@ -183,6 +183,13 @@ func TestEpic_RenderedStatus_HeldByEpicBlocker(t *testing.T) {
 	}
 }
 
+func TestEpic_RenderedStatus_MergeTicketIsNotHeldByEpicBlocker(t *testing.T) {
+	epic := Epic{UnreleasedBlockers: []string{"a"}, Tickets: []Ticket{{Number: 2, Status: "open", Type: "merge"}}}
+	if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusOpen {
+		t.Errorf("RenderedStatus = %v, want open", got)
+	}
+}
+
 func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{{Number: 1}}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
