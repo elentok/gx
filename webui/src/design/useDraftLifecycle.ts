@@ -9,6 +9,8 @@ import type { DraftAutosave } from "./useDraftAutosave"
 
 /** The note the Epics page shows after a draft vanished. */
 export const REMOVED_NOTE = "This draft was removed."
+/** The route state of a page opened right after its chat was created. */
+export const CREATING_STATE = { creating: true }
 const LEASE_MS = 30_000
 
 const designPath = (address: string) => designHref(address).slice(1)

@@ -154,7 +154,7 @@ test("Start posts the draft and goes to the new chat", async () => {
   const fake = fakeDrafts()
   await mount(fake)
   await clickStart()
-  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(fake.start).toHaveBeenCalledWith("c1", undefined)
   expect(where()).toBe("/agents/sess-9 creating")
 })
 
@@ -162,7 +162,7 @@ test("Cmd+Enter in the brief starts the chat", async () => {
   const fake = fakeDrafts()
   await mount(fake)
   await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
-  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(fake.start).toHaveBeenCalledWith("c1", undefined)
   expect(where()).toBe("/agents/sess-9 creating")
 })
 
@@ -170,7 +170,7 @@ test("Ctrl+Enter in the brief starts the chat", async () => {
   const fake = fakeDrafts()
   await mount(fake)
   await act(async () => fireEvent.keyDown(brief(), { key: "Enter", ctrlKey: true }))
-  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(fake.start).toHaveBeenCalledWith("c1", undefined)
 })
 
 test("plain Enter and Cmd+Enter on a blank brief do not start", async () => {

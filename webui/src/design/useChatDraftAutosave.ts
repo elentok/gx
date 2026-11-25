@@ -37,8 +37,11 @@ const settingsOf = (d: ChatDraft): ChatSettings => ({
   dir: d.dir,
 })
 
-/** `editing` saves; `finished` is Remove, or a gone draft, having taken the draft over. */
-type Phase = "editing" | "finished"
+/**
+ * `editing` saves; `starting` is a Start in flight, which saves nothing; `finished` is Remove, or a
+ * gone draft, having taken the draft over.
+ */
+type Phase = "editing" | "starting" | "finished"
 
 /**
  * The open chat draft's brief and settings and their autosave: 800 ms after an edit it saves the
@@ -73,8 +76,7 @@ export function useChatDraftAutosave({
     SETTING_KEYS.filter((k) => latestSettings.current[k] !== server.current.settings[k])
   const dirty = () => latest.current !== server.current.text || changedKeys().length > 0
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  // The ref twin of `starting`, and a count of Starts so a save sent before one can be told apart.
-  const startingNow = useRef(false)
+  // A count of Starts, so a save sent before one can be told apart from one sent after.
   const startGen = useRef(0)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const phase = useRef<Phase>("editing")
@@ -90,7 +92,7 @@ export function useChatDraftAutosave({
 
   /** Saves the brief; false when it did not settle. */
   const persist = async () => {
-    if (phase.current !== "editing" || startingNow.current) return
+    if (phase.current !== "editing") return
     const s = server.current
     const text = latest.current
     const sent = { ...latestSettings.current }
@@ -129,7 +131,7 @@ export function useChatDraftAutosave({
 
   const flush = () => {
     clearTimeout(timer.current)
-    if (phase.current === "finished" || blocked.current || startingNow.current) return
+    if (phase.current !== "editing" || blocked.current) return
     chain.current = chain.current.then(persist).catch(() => setStatus("unsaved"))
   }
 
@@ -208,7 +210,7 @@ export function useChatDraftAutosave({
         .then((res) => {
           if (phase.current === "finished") return
           if (res.kind === "ok") setFacts((was) => ({ ...res.draft, brief: was.brief }))
-          else if (res.kind === "gone" && !startingNow.current)
+          else if (res.kind === "gone" && phase.current !== "starting")
             latestFns.current.leaveGone(res.started)
         })
         .catch(() => {})
@@ -264,7 +266,7 @@ export function useChatDraftAutosave({
 
   /** Starts the chat: `onStarted` gets its session id. A failure keeps the draft and the page. */
   const start = async (onStarted: (session: string) => void) => {
-    if (phase.current !== "editing" || startingNow.current || blocked.current) return
+    if (phase.current !== "editing" || blocked.current) return
     clearTimeout(timer.current)
     // Start carries the latest edit and sends no revision: a save of this page in flight would
     // otherwise make the server refuse it. Late answers of such a save are dropped by `startGen`.
@@ -275,11 +277,15 @@ export function useChatDraftAutosave({
         }
       : undefined
     startGen.current++
-    startingNow.current = true
+    phase.current = "starting"
     setStarting(true)
-    let refreshed = false
+    // Back to editing, unless Remove or a gone draft finished the page meanwhile.
+    const endStart = () => {
+      if (phase.current === "starting") phase.current = "editing"
+      setStarting(false)
+    }
     try {
-      const res = await (edit ? drafts.start(initial.id, edit) : drafts.start(initial.id))
+      const res = await drafts.start(initial.id, edit)
       if (res.kind === "started") {
         phase.current = "finished"
         clearTimeout(timer.current)
@@ -297,18 +303,16 @@ export function useChatDraftAutosave({
           settings: settingsOf(again.draft),
         })
         setFacts((was) => ({ ...again.draft, brief: was.brief }))
-        refreshed = true
+        // Words typed during Start save against the re-read revision.
+        endStart()
+        if (dirty()) flush()
+        else setStatus("saved")
       } else if (again.kind === "gone") leaveGone(again.started)
     } catch (e) {
       setStartError(e instanceof Error ? e.message : "Start failed")
     } finally {
-      startingNow.current = false
-      setStarting(false)
+      endStart()
     }
-    // Words typed during Start save against the re-read revision.
-    if (!refreshed) return
-    if (dirty()) flush()
-    else setStatus("saved")
   }
 
   return {

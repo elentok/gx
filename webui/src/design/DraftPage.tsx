@@ -61,13 +61,20 @@ const realDrafts: DraftsClient = {
   removeImage: removeDraftImage,
 }
 
-/** The Start blocker's tooltip text. The empty prompt and empty slug block with no text. */
-function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined {
-  if (!draft.idea.trim() || !draft.slug.trim()) return undefined
-  const problem = slugProblem(draft.slug)
-  if (problem) return problem
-  if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
-  if (imgs.uploading) return "Wait for the upload to finish"
+/** Whether Start is blocked, and the tooltip text. The empty prompt and empty slug block with no text. */
+function startBlocker(
+  draft: Fields,
+  imgs: DraftImagesState,
+): { blocked: boolean; reason?: string } {
+  if (!draft.idea.trim() || !draft.slug.trim()) return { blocked: true }
+  const reason =
+    slugProblem(draft.slug) ||
+    (imgs.failed
+      ? `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
+      : imgs.uploading
+        ? "Wait for the upload to finish"
+        : undefined)
+  return { blocked: !!reason, reason }
 }
 
 const PLACEHOLDER = "What is the problem? Who hits it? What does done look like?"
@@ -277,8 +284,7 @@ function DraftForm({
     { immediate: true },
   )
 
-  const reason = startBlocker(draft, imgs)
-  const blocked = !draft.idea.trim() || !draft.slug.trim() || !!reason
+  const { blocked, reason } = startBlocker(draft, imgs)
   const submit = (e: FormEvent) => {
     e.preventDefault()
     // Start uses aria-disabled, so Enter in the slug field still submits the form.

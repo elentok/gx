@@ -44,7 +44,7 @@ import { useDraftMenu } from "./useDraftMenu"
 import { field } from "./DraftHeader"
 import { SaveIndicator } from "./SaveIndicator"
 import { useChatDraftAutosave } from "./useChatDraftAutosave"
-import { REMOVED_NOTE, useLeaveGone } from "./useDraftLifecycle"
+import { CREATING_STATE, REMOVED_NOTE, useLeaveGone } from "./useDraftLifecycle"
 
 const CodeEditor = lazy(() => import("../ui/expandable-text/CodeEditor"))
 
@@ -71,7 +71,7 @@ export function ChatDraftPage({
 }: PageProps) {
   const params = useParams()
   const id = props.id ?? params.id ?? ""
-  const leaveGone = useLeaveGone(agentPath, { creating: true })
+  const leaveGone = useLeaveGone(agentPath, CREATING_STATE)
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<ChatDraft | null>()
   // The client is fixed for the page's life, so the read uses the latest of them without re-running.
@@ -140,7 +140,7 @@ function ChatDraftForm({
   listHistory?: ListHistory
 }) {
   const navigate = useNavigate()
-  const leaveGone = useLeaveGone(agentPath, { creating: true })
+  const leaveGone = useLeaveGone(agentPath, CREATING_STATE)
   const {
     facts,
     brief,
@@ -177,7 +177,7 @@ function ChatDraftForm({
     : imgs.failed
       ? "Remove or retry the failed images."
       : undefined
-  const blocker = !brief.trim() || !!startReason
+  const startBlocked = !brief.trim() || !!startReason || banner || starting
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   // The mascot toggle leads this header, so the shell drops its floating one.
@@ -224,8 +224,8 @@ function ChatDraftForm({
   })
 
   const startNow = () => {
-    if (blocker || banner || starting) return
-    void start((session) => navigate(agentPath(session), { state: { creating: true } }))
+    if (startBlocked) return
+    void start((session) => navigate(agentPath(session), { state: CREATING_STATE }))
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -402,7 +402,7 @@ function ChatDraftForm({
           startLabel="Start chat"
           canAttach
           startReason={startReason}
-          startDisabled={blocker || banner || starting}
+          startDisabled={startBlocked}
           pending={starting}
           onAttach={() => fileInput.current?.click()}
           onRemove={draftMenu.remove}
