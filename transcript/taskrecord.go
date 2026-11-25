@@ -72,8 +72,12 @@ type TaskRecord struct {
 	AwaitingTurnEnd bool
 
 	// Details by kind; zero values are absent.
-	Command  string
-	ExitCode *int
+	Command string
+	// Prompt and SubagentType are an Agent or Task call's input.prompt and
+	// input.subagent_type.
+	Prompt       string
+	SubagentType string
+	ExitCode     *int
 	// OutputPath is a shell's output file, as the launch result or the final
 	// notification names it; withShellOutputs reads a shell's, subagentFilePath
 	// a subagent's.

@@ -7,6 +7,8 @@ const (
 	SubagentStatusRunning = "running"
 	SubagentStatusDone    = "done"
 	SubagentStatusStopped = "stopped"
+	// SubagentStatusNotAvailable is a call whose file is gone.
+	SubagentStatusNotAvailable = "not_available"
 )
 
 // Reasons a subagent's page has no content, on SessionSubagent.Unavailable.

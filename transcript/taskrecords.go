@@ -139,6 +139,7 @@ func scanTaskRecords(path string, keepSidechain bool) (taskScan, error) {
 				case "Agent", "Task":
 					r.Kind = TaskKindSubagent
 					r.CallID = id
+					r.Prompt, r.SubagentType = u.Prompt, u.SubagentType
 				default:
 					if u.RunInBackground {
 						r.Kind = TaskKindShell
@@ -306,6 +307,8 @@ func usableOutputPath(p string) string {
 
 type taskUse struct {
 	toolUseInput
+	Prompt          string `json:"prompt"`
+	SubagentType    string `json:"subagent_type"`
 	name            string
 	RunInBackground bool `json:"run_in_background"`
 }

@@ -96,6 +96,23 @@ func TestReadTaskRecords_AsyncSubagent(t *testing.T) {
 	}
 }
 
+func TestReadTaskRecords_AgentCallCarriesPromptAndSubagentType(t *testing.T) {
+	t.Parallel()
+	input := `{"description":"explore","prompt":"look around","subagent_type":"Explore"}`
+	r := readRecords(t, namedUseLine("Agent", "a1", t0, input))[0]
+	if r.Prompt != "look around" || r.SubagentType != "Explore" {
+		t.Errorf("Agent: prompt %q type %q", r.Prompt, r.SubagentType)
+	}
+	r = readRecords(t, namedUseLine("Task", "a2", t0, input))[0]
+	if r.Prompt != "look around" || r.SubagentType != "Explore" {
+		t.Errorf("Task: prompt %q type %q", r.Prompt, r.SubagentType)
+	}
+	r = readRecords(t, namedUseLine("Bash", "b1", t0, `{"command":"ls","prompt":"x"}`))[0]
+	if r.Prompt != "" || r.SubagentType != "" {
+		t.Errorf("Bash: prompt %q type %q", r.Prompt, r.SubagentType)
+	}
+}
+
 func TestReadTaskRecords_SubagentDirectoryOutputPathIsNoPath(t *testing.T) {
 	t.Parallel()
 	r := readRecords(t,

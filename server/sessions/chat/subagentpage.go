@@ -37,13 +37,16 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		rec = transcript.TaskRecord{Kind: transcript.TaskKindSubagent, CallID: callID}
 	}
 	ref, ok := c.claudeSubagent(rec, path)
-	if !ok {
-		http.Error(w, noSuchSubagent, http.StatusNotFound)
-		return
+	var snap Snapshot
+	if ok {
+		snap, err = c.subagentPages.Read(ref.Path, kind, false, c.subagentLoader(dir))
 	}
-	snap, err := c.subagentPages.Read(ref.Path, kind, false, c.subagentLoader(dir))
-	if os.IsNotExist(err) {
-		http.Error(w, noSuchSubagent, http.StatusNotFound)
+	if !ok || os.IsNotExist(err) {
+		if !inParent {
+			http.Error(w, noSuchSubagent, http.StatusNotFound)
+			return
+		}
+		wire.WriteJSON(w, c.missingSubagentPage(id, meta, rec))
 		return
 	}
 	if err != nil {
@@ -92,6 +95,24 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		out.Current, out.Others = currentCalls(snap.InFlight)
 	}
 	wire.WriteJSON(w, out)
+}
+
+// missingSubagentPage answers a call the parent holds but whose file is
+// missing: the header comes from the parent's call alone. resolveTask decides
+// whether the call still counts as running, so the file is only late.
+func (c *Chat) missingSubagentPage(id string, meta Meta, rec transcript.TaskRecord) wire.SessionChatResponse {
+	head := &subagent.SessionSubagent{
+		CallID: rec.CallID, RootSessionID: id, Title: rec.Label, Type: rec.SubagentType,
+		Prompt: rec.Prompt, Status: subagent.SubagentStatusRunning,
+		Unavailable: subagent.SubagentUnavailableStarting,
+	}
+	if resolveTask(rec, meta, c.clock()).finished {
+		head.Status, head.Unavailable = subagent.SubagentStatusNotAvailable, subagent.SubagentUnavailableGone
+	}
+	return wire.SessionChatResponse{
+		ConversationID: meta.ConversationID, Questions: []wire.QuestionCard{},
+		Messages: []wire.SessionChatMessage{}, Subagent: head,
+	}
 }
 
 func recordOfCall(records []transcript.TaskRecord, callID string) (transcript.TaskRecord, bool) {

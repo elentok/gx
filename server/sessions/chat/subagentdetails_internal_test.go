@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/subagent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -173,6 +174,41 @@ func TestRead_RunningForegroundSubagentTakesDetailsFromItsMetaFile(t *testing.T)
 	got := f.agent(t)
 	if got.Tokens != 150 || got.Model != "claude-x" || got.ToolCalls != 1 {
 		t.Fatalf("row = %+v", got)
+	}
+}
+
+func TestSubagentPage_MissingFileAnswersFromTheParentCall(t *testing.T) {
+	t.Parallel()
+	const long = 20 * time.Minute
+	call := func(ago time.Duration) string {
+		return strings.Replace(pageAgentCall(ago), `"prompt":"find foo"`, `"prompt":"find foo","subagent_type":"Explore"`, 1)
+	}
+	async := pageResult(long-time.Second, `{"status":"async_launched","agentId":"ag1","outputFile":"/x/tasks/"}`)
+	cases := []struct {
+		name        string
+		parent      []string
+		status      string
+		unavailable string
+	}{
+		{"foreground still running", []string{call(time.Minute)}, subagent.SubagentStatusRunning, subagent.SubagentUnavailableStarting},
+		{"foreground returned", []string{call(time.Minute), pageResult(10*time.Second, `{"status":"completed"}`)}, subagent.SubagentStatusNotAvailable, subagent.SubagentUnavailableGone},
+		{"background returned long ago", []string{call(long), async}, subagent.SubagentStatusRunning, subagent.SubagentUnavailableStarting},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := newPageFixture(t, false, tc.parent...)
+			h := f.page(t).Subagent
+			if h.Status != tc.status || h.Unavailable != tc.unavailable {
+				t.Fatalf("status %q unavailable %q; want %q %q", h.Status, h.Unavailable, tc.status, tc.unavailable)
+			}
+			if h.Title != "explore" || h.Type != "Explore" || h.Prompt != "find foo" || h.CallID != "a1" {
+				t.Errorf("header = %+v", h)
+			}
+			if h.Model != "" || h.Tokens != 0 || h.ToolCalls != 0 {
+				t.Errorf("details without a file: %+v", h)
+			}
+		})
 	}
 }
 

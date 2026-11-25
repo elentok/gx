@@ -11,9 +11,13 @@ export const SubagentStatusRunning = "running";
 export const SubagentStatusDone = "done";
 export const SubagentStatusStopped = "stopped";
 /**
+ * SubagentStatusNotAvailable is a call whose file is gone.
+ */
+export const SubagentStatusNotAvailable = "not_available";
+/**
  * Statuses of a SessionSubagent.
  */
-export type SubagentStatus = typeof SubagentStatusRunning | typeof SubagentStatusDone | typeof SubagentStatusStopped;
+export type SubagentStatus = typeof SubagentStatusRunning | typeof SubagentStatusDone | typeof SubagentStatusStopped | typeof SubagentStatusNotAvailable;
 export const SubagentUnavailableStarting = "starting";
 export const SubagentUnavailableGone = "gone";
 export const SubagentUnavailableCompressed = "compressed";
