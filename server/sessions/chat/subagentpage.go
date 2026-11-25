@@ -33,6 +33,10 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if kind == harness.Codex {
+		c.codexSubagentRead(w, id, dir, meta, parent.Records, callID)
+		return
+	}
 	if kind != harness.Claude {
 		http.Error(w, noSuchSubagent, http.StatusNotFound)
 		return

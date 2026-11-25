@@ -10,10 +10,16 @@ type codexChild struct {
 	Model string
 	// Tokens is the last cumulative total, never a sum of token_count lines.
 	Tokens int
+	// Role is the child's agent_role; empty for a null role.
+	Role string
 }
 
 func readCodexChild(path string) (codexChild, error) {
-	var out codexChild
+	meta, err := codexsession.ReadChildMeta(path)
+	if err != nil {
+		return codexChild{}, err
+	}
+	out := codexChild{Role: meta.AgentRole}
 	turn, ok, err := codexsession.ReadTurnModel(path)
 	if err != nil {
 		return codexChild{}, err
@@ -71,7 +77,7 @@ func (c *Chat) withCodexChildren(records []transcript.TaskRecord, meta Meta) []t
 		},
 		usable: func(d codexChild) bool { return d != (codexChild{}) },
 		merge: func(r *transcript.TaskRecord, d codexChild) {
-			r.Tokens = d.Tokens
+			r.Tokens, r.SubagentType = d.Tokens, d.Role
 			if d.Model != "" {
 				r.Model = d.Model
 			}
