@@ -64,7 +64,7 @@ function renderToast(toast: ToastOf, owner: typeof toaster) {
   // A toast with buttons is a raised card like the Dev popover, not a filled alert.
   return (
     <Toast.Root
-      width={{ md: actions ? "320px" : "sm" }}
+      width={{ sm: actions ? "320px" : "sm" }}
       {...(raised && {
         bg: "surface.raised",
         color: "text",
@@ -82,7 +82,7 @@ function renderToast(toast: ToastOf, owner: typeof toaster) {
         )}
         {toast.description && (
           // A long body scrolls inside the toast so the buttons stay on screen.
-          <Toast.Description maxH="40vh" overflowY="auto" overflowWrap="anywhere">
+          <Toast.Description maxH="30vh" overflowY="auto" overflowWrap="anywhere">
             {toast.description}
           </Toast.Description>
         )}
@@ -114,10 +114,10 @@ function renderToast(toast: ToastOf, owner: typeof toaster) {
 export function AppToaster() {
   return (
     <Portal>
-      <Toaster toaster={toaster} insetInline={{ mdDown: "4" }}>
+      <Toaster toaster={toaster} insetInline={{ smDown: "4" }}>
         {(toast) => renderToast(toast, toaster)}
       </Toaster>
-      <Toaster toaster={topToaster} insetInline={{ mdDown: "4" }}>
+      <Toaster toaster={topToaster} insetInline={{ smDown: "4" }}>
         {(toast) => renderToast(toast, topToaster)}
       </Toaster>
     </Portal>
