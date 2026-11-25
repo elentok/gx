@@ -29,16 +29,16 @@ function staleBanner(
   t: { firstSeq?: number | null; form: TicketDetail | null },
   refused: boolean,
 ): string | null {
-  if (refused) return CHANGED
   if (t.form && t.firstSeq !== undefined && detail.latest?.seq !== t.firstSeq) return CHANGED
-  if (offered) return null
+  // A refusal whose refetch still shows the same open round has no better reason than changed.
+  if (offered) return refused ? CHANGED : null
   if (t.form) return ELSEWHERE
   return detail.latest?.outcome === "open" ? ON_TICKET_PAGE : ELSEWHERE
 }
 
 // Where a person answers one open question. Opened from the ticket page it sits on top of it, so
-// leaving goes back one entry; opened cold (deep link, reload, push tap) there is no ticket entry
-// below it, so leaving replaces this one.
+// leaving goes back one entry (the ticket page marks that with fromTicket state); opened any other
+// way (deep link, reload, push tap) the entry below is not the ticket, so leaving replaces this one.
 export function AnswerPage({
   address,
   fetchDetail,
@@ -48,7 +48,7 @@ export function AnswerPage({
 }) {
   const conn = useConnectionContext()
   const navigate = useNavigate()
-  const openedCold = useLocation().key === "default"
+  const fromTicket = !!(useLocation().state as { fromTicket?: boolean } | null)?.fromTicket
   const { detail, notFound, source, refetch } = useTicketDetail(address, conn, fetchDetail)
   useDetailReady({ detail, notFound, source })
 
@@ -57,7 +57,7 @@ export function AnswerPage({
   const device = useDevice()
   const compact = keyboardOpen && device !== "desktop"
 
-  const leave = () => (openedCold ? navigate(ticketPath(address), { replace: true }) : navigate(-1))
+  const leave = () => (fromTicket ? navigate(-1) : navigate(ticketPath(address), { replace: true }))
 
   // The round the form loaded. firstSeq comes from the first network detail only: the cached copy
   // may hold an older question, and a page opened on a replaced question is a fresh form.

@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, RouterProvider, useParams } from "react-router"
+import { createMemoryRouter, RouterProvider, useParams, type InitialEntry } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import canned from "../canned-detail.json"
 import { ConnectionContext, type Connection } from "../connection"
@@ -49,7 +49,7 @@ function AnswerRoute({ fetchDetail }: { fetchDetail: FetchDetail }) {
 }
 
 function renderAnswer(
-  entries: string[],
+  entries: InitialEntry[],
   fetchDetail: FetchDetail = async () => ({ kind: "ok", detail }),
   device?: Device,
 ) {
@@ -72,6 +72,8 @@ function renderAnswer(
 
 const answerUrl = `/answer/${ADDRESS}`
 const ticketUrl = `/t/${ADDRESS}`
+// The entry the ticket card's "Answer question" button pushes.
+const answerFromTicket = { pathname: answerUrl, state: { fromTicket: true } }
 const sendButton = () => screen.getByRole("button", { name: "Send answer" }) as HTMLButtonElement
 
 test("renders the header, the question once, earlier rounds collapsed and only Send in the footer", async () => {
@@ -100,7 +102,7 @@ test("Send is disabled until there is a pick or text, then posts the form's body
 })
 
 test("from [ticket, answer] a send goes back one entry and leaves a sent record", async () => {
-  const router = renderAnswer([ticketUrl, answerUrl])
+  const router = renderAnswer([ticketUrl, answerFromTicket])
   await screen.findByText("THE AGENT ASKS")
   fireEvent.change(screen.getByLabelText(`Answer to question ${detail.latest!.seq}`), {
     target: { value: "yes" },
@@ -112,10 +114,30 @@ test("from [ticket, answer] a send goes back one entry and leaves a sent record"
 })
 
 test("from [ticket, answer] ← Ticket goes back one entry", async () => {
-  const router = renderAnswer([ticketUrl, answerUrl])
+  const router = renderAnswer([ticketUrl, answerFromTicket])
   fireEvent.click(await screen.findByRole("link", { name: "← Ticket" }))
   expect(await screen.findByText(/ticket page/)).toBeTruthy()
   expect(router.state.historyAction).toBe("POP")
+})
+
+test("a push tap while the app is open replaces the entry on ← Ticket and on a send", async () => {
+  const router = renderAnswer([ticketUrl])
+  await act(() => router.navigate(answerUrl))
+  fireEvent.click(await screen.findByRole("link", { name: "← Ticket" }))
+  expect(await screen.findByText(/ticket page/)).toBeTruthy()
+  expect(router.state.location.pathname).toBe(ticketUrl)
+  expect(router.state.historyAction).toBe("REPLACE")
+  cleanup()
+
+  const second = renderAnswer([ticketUrl])
+  await act(() => second.navigate(answerUrl))
+  await screen.findByText("THE AGENT ASKS")
+  fireEvent.change(screen.getByLabelText(`Answer to question ${detail.latest!.seq}`), {
+    target: { value: "yes" },
+  })
+  fireEvent.click(sendButton())
+  expect(await screen.findByText("ticket page sent:delivered")).toBeTruthy()
+  expect(second.state.historyAction).toBe("REPLACE")
 })
 
 test("on a deep link ← Ticket and a send replace the entry with the ticket page", async () => {
@@ -280,6 +302,29 @@ test("a stale refusal refetches and shows the changed banner", async () => {
     await screen.findByText("This question changed. Back to ticket to see the new one."),
   ).toBeTruthy()
   expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
+})
+
+test("a stale refusal after the question was answered elsewhere shows answered elsewhere", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("x")
+  served = round(detail.latest!.seq, "answered", "tok-9")
+  post.mockResolvedValue({ refused: true, reason: "stale", message: "Question changed." })
+  fireEvent.click(sendButton())
+  expect(await screen.findByText("This question was answered elsewhere")).toBeTruthy()
+  expect(screen.queryByText(/This question changed/)).toBeNull()
+})
+
+test("a stale refusal after the question was replaced shows the changed banner", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("x")
+  served = round(detail.latest!.seq + 1, "open", "tok-2")
+  post.mockResolvedValue({ refused: true, reason: "stale", message: "Question changed." })
+  fireEvent.click(sendButton())
+  expect(
+    await screen.findByText("This question changed. Back to ticket to see the new one."),
+  ).toBeTruthy()
 })
 
 test("a ticket with no open question shows answered elsewhere and Back to ticket, no form", async () => {

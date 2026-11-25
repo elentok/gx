@@ -51,7 +51,10 @@ export function AskedCard({
         onDone={onDone}
         onStale={onStale}
         leading={
-          <Button emphasis="main" onClick={() => navigate(answerPath(detail.address))}>
+          <Button
+            emphasis="main"
+            onClick={() => navigate(answerPath(detail.address), { state: { fromTicket: true } })}
+          >
             Answer question
           </Button>
         }
