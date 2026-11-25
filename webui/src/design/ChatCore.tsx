@@ -383,7 +383,13 @@ export function WorkingRow({
 
 // The messages scroll alone. They open at the newest one and follow the content as it grows (a new message,
 // streamed text, a folded tool run, an image that loads) until the reader scrolls up.
-function ChatScroller({ children }: { children: ReactNode }) {
+function ChatScroller({
+  children,
+  topAnchor = false,
+}: {
+  children: ReactNode
+  topAnchor?: boolean
+}) {
   const el = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
@@ -433,7 +439,7 @@ function ChatScroller({ children }: { children: ReactNode }) {
     >
       <Box ref={inner} flex="1 0 auto" display="flex" flexDirection="column" gap="3">
         {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
-        <Box flex="1" aria-hidden />
+        {!topAnchor && <Box flex="1" aria-hidden />}
         {children}
       </Box>
     </Box>
@@ -505,7 +511,10 @@ export function ChatMessages({
   head,
   tail,
   end,
+  topAnchor = false,
 }: {
+  /** A short log starts under the header, not at the bottom (the subagent page has no composer). */
+  topAnchor?: boolean
   chat: SessionChatResponse
   /** The first entry of the log, above the messages. */
   head?: ReactNode
@@ -545,7 +554,7 @@ export function ChatMessages({
   const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
   return (
     <>
-      <ChatScroller key={windowKey}>
+      <ChatScroller key={windowKey} topAnchor={topAnchor}>
         {head}
         {messages.length === 0 && (
           <CodexNotices

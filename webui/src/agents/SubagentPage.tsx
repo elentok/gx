@@ -286,6 +286,7 @@ export function SubagentPage({
               busy={running}
               sessionId={session.id}
               showTools
+              topAnchor
               head={prompt}
               tail={result}
               working={<WorkingRow current={chat.current} others={chat.others} />}
