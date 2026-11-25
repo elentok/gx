@@ -13,6 +13,9 @@ import (
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
+// resumeBesideAnswerLabel names Resume when the person could answer instead.
+const resumeBesideAnswerLabel = "Resume without answering"
+
 // actionInfo looks up each action's label and tooltip.
 func actionInfo(actions []string) map[string]wire.ActionInfo {
 	out := make(map[string]wire.ActionInfo, len(actions))
@@ -20,6 +23,10 @@ func actionInfo(actions []string) map[string]wire.ActionInfo {
 		if v, ok := schema.VerbOfWord(a); ok {
 			out[a] = wire.ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
 		}
+	}
+	if info, ok := out[wire.ActionResume]; ok && slices.Contains(actions, wire.ActionAnswer) {
+		info.Label = resumeBesideAnswerLabel
+		out[wire.ActionResume] = info
 	}
 	return out
 }
@@ -88,8 +95,11 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	if t.Status == schema.StatusDone && !ref.Ticket.Commitless {
 		applyViewDiff(&d.ViewDiff, s.viewDiffOf(ref.Addr.Project, epics, ref.Epic))
 	}
+	rounds := ticketlog.Rounds(evs)
+	openQuestion := len(rounds) > 0 && rounds[len(rounds)-1].End == nil
 	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
-	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {
+	// An open question's live agent can also be blocked at a prompt.
+	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane || openQuestion {
 		if d.Permission, err = s.PermissionCard(ref.Addr); err != nil {
 			return wire.TicketDetail{}, err
 		}
@@ -103,7 +113,6 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	if rec := ticketlog.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
 		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
-	rounds := ticketlog.Rounds(evs)
 	if d.Actions, err = s.DetailFor(ref.Addr.String(), t, rounds, d.Permission); err != nil {
 		return wire.TicketDetail{}, err
 	}
@@ -339,7 +348,7 @@ func detailRound(r ticketlog.PauseRound, full bool) wire.DetailRound {
 		return out
 	}
 	if r.End.Type == ticketlog.EventPauseAnswer {
-		out.Answer = &wire.DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
+		out.Answer = &wire.DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note, How: r.End.How}
 		if r.End.Huh {
 			// A choice question's Huh? logs no text; the history shows what the agent heard.
 			out.Answer.Text = wire.HuhMessage

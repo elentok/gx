@@ -320,6 +320,7 @@ export interface DetailAnswer {
   choice?: string;
   text?: string;
   note?: string;
+  how?: string; // ticketlog.How*: a recovery verb also logs an answer
 }
 /**
  * DetailRecommendation is what an investigate agent left on a paused ticket: its

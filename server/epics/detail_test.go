@@ -2,9 +2,11 @@ package epics_test
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -41,6 +43,59 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	d, err = h.Client.Reads.Detail(context.Background(), answerAddr)
 	if want := []string{wire.ActionAnswer, wire.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("gone agent actions = %v, %v; want %v", d.Actions, err, want)
+	}
+	if got := d.ActionInfo[wire.ActionResume].Label; got != "Resume without answering" {
+		t.Errorf("resume label beside answer = %q", got)
+	}
+	if got, want := d.ActionInfo[wire.ActionResume].Tooltip, schema.VerbResume.Tooltip(); got != want {
+		t.Errorf("resume tooltip = %q, want the verb's %q", got, want)
+	}
+}
+
+func TestDetail_AnswerCarriesHow(t *testing.T) {
+	t.Parallel()
+	for _, how := range []string{ticketlog.HowAnswer, ticketlog.HowResume} {
+		t.Run(how, func(t *testing.T) {
+			t.Parallel()
+			h, ticketPath, _ := startWaitingRestartFake(t, 0)
+			waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+			pauseWithQuestion(t, ticketPath, optionsBlock)
+			ev := ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, Question: 1, Source: "web", Choice: "b", How: how}
+			if how == ticketlog.HowResume {
+				ev.Choice = "resume"
+			}
+			if _, err := ticketlog.AppendLog(ticketPath, ev); err != nil {
+				t.Fatal(err)
+			}
+			d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
+			if err != nil || d.Latest == nil || d.Latest.Answer == nil {
+				t.Fatalf("detail = %+v, %v", d, err)
+			}
+			if d.Latest.Answer.How != how {
+				t.Errorf("how = %q, want %q", d.Latest.Answer.How, how)
+			}
+		})
+	}
+}
+
+func TestDetail_OpenQuestionLoadsPermissionCard(t *testing.T) {
+	t.Parallel()
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	pauseWithQuestion(t, ticketPath, optionsBlock)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
+	if err != nil || d.Permission != nil {
+		t.Fatalf("without a prompt: permission = %+v, %v", d.Permission, err)
+	}
+	fake.SetPending("epic-a-iter-01", &agentrunner.Pending{
+		ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "List files",
+	})
+	d, err = h.Client.Reads.Detail(context.Background(), answerAddr)
+	if err != nil || d.Permission == nil || d.Permission.RequestID != "req-1" {
+		t.Fatalf("blocked at a prompt: permission = %+v, %v", d.Permission, err)
+	}
+	if want := []string{wire.ActionApprove, wire.ActionAnswer}; !slices.Equal(d.Actions, want) {
+		t.Errorf("actions = %v, want %v", d.Actions, want)
 	}
 }
 

@@ -83,6 +83,7 @@ type DetailAnswer struct {
 	Choice string `json:"choice,omitempty"`
 	Text   string `json:"text,omitempty"`
 	Note   string `json:"note,omitempty"`
+	How    string `json:"how,omitempty"` // ticketlog.How*: a recovery verb also logs an answer
 }
 
 // DetailRecommendation is what an investigate agent left on a paused ticket: its
