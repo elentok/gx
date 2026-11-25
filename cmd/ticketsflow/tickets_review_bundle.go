@@ -74,6 +74,18 @@ type diffChunk struct {
 	n    int
 }
 
+// reviewTrunk names the branch the review diff is taken against: the repo's
+// default branch, then main, then master, whichever exists locally.
+func reviewTrunk(root string) string {
+	def := git.RemoteDefaultBranch(root)
+	for _, b := range []string{def, "main", "master"} {
+		if _, err := git.RevParse(root, "refs/heads/"+b); err == nil {
+			return b
+		}
+	}
+	return def
+}
+
 func runTicketsReviewBundle(d Deps, cwd, arg, outDir string, w io.Writer) error {
 	projectDir, project, name, err := resolveEpicTarget(d.dirs(), cwd, arg)
 	if err != nil {
@@ -84,9 +96,10 @@ func runTicketsReviewBundle(d Deps, cwd, arg, outDir string, w io.Writer) error 
 		return err
 	}
 	env := d.Env.Env
-	base, err := git.MergeBase(root, "main", "HEAD")
+	trunk := reviewTrunk(root)
+	base, err := git.MergeBase(root, trunk, "HEAD")
 	if err != nil || base == "" {
-		return fmt.Errorf("cannot resolve the merge-base of main and HEAD: %v", err)
+		return fmt.Errorf("cannot resolve the merge-base of %s and HEAD: %v", trunk, err)
 	}
 	names, _, err := git.Run(root, env, "diff", "--name-only", base+"...HEAD")
 	if err != nil {
