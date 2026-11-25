@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.52.1 - 2026-11-25
+
+- Added epic-level blockers to the web UI, TUI and CLI. An epic can now show a Waiting state ("Waiting on A") on the Epic page stats line, the sidebar, the jump palette and the TUI Queue header. A "not moving" hint shows when the blocking epic is not progressing, and a Cycle state is now reachable. The Epic page has a "Blocked by" chip row with links and removal, and a blocker picker with a toggle. The picker shows a cycle refusal as a sentence. An error chip's x removes a stale blocker entry. Added `POST /v1/epics/blocker` and `gx server epics blocker`. The schedule Reason now names the blocker epic for a ticket held by its epic. A Merge ticket can run while its epic's blocker is unmerged.
+- Changed epic blocker data to one blocker list on the summary, list row and detail. This replaces `blocked_by_epics` on the wire. Tickets now refuse cross-epic blockers, and external and widened blockers are gone from the index wire and ticket rows. The cross-epic resolver is deleted and only the epic-level hold stays.
+- Added chat draft and Design draft page fixes. Start on a chat draft applies an optional edit under the draft lock, sends the latest edit and ignores late save answers. The Start footer holds buttons only, with the reason in a tooltip. A blocked Start opens its tooltip on hover and tap, and the Start state is simpler. A floppy-disk save indicator shows on both draft pages. A starting-chat loader shows after Start. There is no save check after a history pick or "load theirs". Remove confirms, Send reasons and the glossary use chat wording, and an unknown agent shows "Agent not found" wording.
+- Changed the web UI to truncate the Working row with an ellipsis.
+- Added the epic-waiting fixture scenario and a Playwright flow for the Waiting epic. The deadlock fixture is now a real cycle. The e2e flows for the draft flow fixes are updated and extended, with a test for the mixed chats-and-agents bulk remove line.
+- Changed docs: documented epic-level `blocked_by` and the Waiting term, and wrote the epic-dependency-ux spec after review grilling.
+- Changed tests and housekeeping: moved the epic-waiting scenario out of `gxfixture/spec`, brought `server/epics` under the sizeguard limits, fixed a flow 75 match so it only reads the notice strip, and fixed typecheck, lint, test and size-limit failures after a rebase onto main.
+
 ## v0.52.0 - 2026-11-25
 
 - Added a dedicated answer page at `/answer/<address>` for questions from epics, cleanup and pause flows. It sends the answer and returns to the ticket page. It keeps your draft, and it shows clear states when the question is stale, refused, answered elsewhere or not answerable. A needs-answer push tap opens this page and replaces the history entry. On a phone, the header clears the sidebar button and hides while the keyboard is open. A stale pick is kept, and the page resets on an in-place route change. The sent state drops the outer frame and mutes earlier rounds.
