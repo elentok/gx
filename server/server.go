@@ -593,7 +593,7 @@ func New(cfg Config) (*Server, error) {
 			if err != nil || res.Refused {
 				return diff.SessionRef{}, false
 			}
-			ref := diff.SessionRef{Dir: meta.Dir, Stepped: meta.IsStepped()}
+			ref := diff.SessionRef{Dir: meta.Dir, Name: meta.Name, Stepped: meta.IsStepped()}
 			if strings.HasPrefix(id, queue.AgentIDPrefix) {
 				ref.RunTicket = meta.RunTicket
 			}

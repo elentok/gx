@@ -763,10 +763,15 @@ export type DiffNo = typeof DiffNoWorktree | typeof DiffNoDiff;
 /**
  * DiffWorktree answers GET /v1/diff/worktree. The page calls files, patch and
  * blob with BaseSHA and SnapshotSHA. Reason is set, and every other field
- * empty, when the target has nothing to show.
+ * empty except TargetLabel, when the target has nothing to show.
  */
 export interface DiffWorktree {
   reason?: string;
+  /**
+   * TargetLabel names the target for the page: the chat name, the Design's
+   * map name or the ticket address. It falls back to the target id.
+   */
+  target_label?: string;
   /**
    * BaseSHA is the merge-base of HEAD with trunk; BaseLabel is "<trunk>@<short sha>".
    */

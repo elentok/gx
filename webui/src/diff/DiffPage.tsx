@@ -576,7 +576,7 @@ export function DiffPage({
 
   const noRange = !worktree && !!url.epic && !first && !second
   const fresh = canFetch ? loaded : undefined
-  const targetName = worktree?.id ?? ""
+  const targetName = answer?.target_label || (worktree?.id ?? "")
   const worktreeFailed = !!worktree && !!worktreeFetch && "failed" in worktreeFetch
   // A worktree call that failed has no files to show, whatever an older answer left behind.
   const { notice, files, invalid } = noticeOf(

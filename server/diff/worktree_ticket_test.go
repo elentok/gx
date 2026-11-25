@@ -104,6 +104,9 @@ func TestWorktreeTicketTrackedRunUsesItsOwnBase(t *testing.T) {
 	if got.Reason != "" || got.BaseSHA != r.root || got.BaseLabel != "epic@"+r.root[:7] {
 		t.Fatalf("worktree = %+v, want base %s labelled epic@", got, r.root)
 	}
+	if got.TargetLabel != "proj:epic/01" {
+		t.Errorf("target_label = %q, want the ticket address", got.TargetLabel)
+	}
 	if files := filePaths(t, r.h, got); !files["a.txt"] || !files["work01.txt"] {
 		t.Errorf("files = %v, want the commit below the feature tip and the iteration's own", files)
 	}

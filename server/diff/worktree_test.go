@@ -214,3 +214,24 @@ func TestWorktreeEmptyStates(t *testing.T) {
 		t.Errorf("a malformed target err = %v, want 400", err)
 	}
 }
+
+func TestWorktreeTargetLabel(t *testing.T) {
+	t.Parallel()
+	h, _, wt, _ := worktreeRepo(t, "feature")
+	res, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{
+		Project: project, Dir: wt, Harness: string(agentfake.HarnessKind), Name: "my chat",
+	})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	for target, want := range map[string]string{
+		"chat:" + res.Session.ID: "my chat",
+		"chat:nope":              "nope",
+		"design:epic":            "epic",
+		"ticket:proj:epic/01":    "proj:epic/01",
+	} {
+		if got := worktree(t, h, target).TargetLabel; got != want {
+			t.Errorf("%s target_label = %q, want %q", target, got, want)
+		}
+	}
+}

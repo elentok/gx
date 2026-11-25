@@ -113,9 +113,12 @@ const (
 
 // DiffWorktree answers GET /v1/diff/worktree. The page calls files, patch and
 // blob with BaseSHA and SnapshotSHA. Reason is set, and every other field
-// empty, when the target has nothing to show.
+// empty except TargetLabel, when the target has nothing to show.
 type DiffWorktree struct {
 	Reason string `json:"reason,omitempty"`
+	// TargetLabel names the target for the page: the chat name, the Design's
+	// map name or the ticket address. It falls back to the target id.
+	TargetLabel string `json:"target_label,omitempty"`
 	// BaseSHA is the merge-base of HEAD with trunk; BaseLabel is "<trunk>@<short sha>".
 	BaseSHA   string `json:"base_sha,omitempty"`
 	BaseLabel string `json:"base_label,omitempty"`

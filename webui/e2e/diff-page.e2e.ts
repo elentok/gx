@@ -497,7 +497,9 @@ test("Worktree diff targets", async ({ page, start }) => {
   await test.step("a chat: the chip, the tree, story 42 and a read-only worktree", async () => {
     const before = worktreeState(wt.chat.path)
     await openWorktree(page, `chat:${wt.chat.id}`)
-    await expect(chip).toHaveText(new RegExp(`^Worktree · ${wt.chat.id} since main@[0-9a-f]{7}$`))
+    await expect(chip).toHaveText(
+      new RegExp(`^Worktree · (?!${wt.chat.id} )\\S.* since main@[0-9a-f]{7}$`),
+    )
     await expect(baseRef(page)).toHaveCount(0)
     await expect(tipRef(page)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Edit refs" })).toHaveCount(0)
@@ -528,7 +530,7 @@ test("Worktree diff targets", async ({ page, start }) => {
     await expect(treeFile(page, "src/added.txt")).toHaveCount(0)
 
     await page.reload()
-    await expect(chip).toHaveText(new RegExp(`^Worktree · ${wt.chat.id} since main@`))
+    await expect(chip).toHaveText(new RegExp(`^Worktree · (?!${wt.chat.id} )\\S.* since main@`))
     await expect(treeFiles(page)).toHaveCount(5)
 
     // Reading the worktree leaves its status and index alone.
@@ -615,7 +617,7 @@ test("Worktree diff edge states", async ({ page, start }) => {
     const url = new URL("/v1/diff/worktree?project=demo&target=chat:no-such-chat", page.url())
     const res = await page.request.get(url.href)
     expect(res.status()).toBeLessThan(500)
-    expect(await res.json()).toEqual({ reason: "no_worktree" })
+    expect(await res.json()).toEqual({ reason: "no_worktree", target_label: "no-such-chat" })
   })
 
   await test.step("a clean worktree has no changes", async () => {
@@ -659,13 +661,13 @@ test("Worktree diff from the Show diff action", async ({ page, start }) => {
 
   await showDiff(wt.ticket.id!)
   await expect(page.getByTestId("range-chip")).toHaveText(
-    new RegExp(`^Worktree · ${wt.ticket.id} since wtd-claimed-impl@[0-9a-f]{7}$`),
+    new RegExp(`^Worktree · ${wt.ticket.address} since wtd-claimed-impl@[0-9a-f]{7}$`),
   )
   await expect(treeFile(page, "work/wtd-claimed-impl.txt")).toBeVisible()
 
   await showDiff(wt.fix_agent.id!)
   await expect(page.getByTestId("range-chip")).toHaveText(
-    new RegExp(`^Worktree · ${wt.fix_agent.id} since main@[0-9a-f]{7}$`),
+    new RegExp(`^Worktree · (?!${wt.fix_agent.id} )\\S.* since main@[0-9a-f]{7}$`),
   )
   await expect(treeFile(page, WT_MODIFIED)).toBeVisible()
 })

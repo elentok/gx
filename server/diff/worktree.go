@@ -17,6 +17,8 @@ import (
 // SessionRef is what the Worktree route needs of a chat.
 type SessionRef struct {
 	Dir string
+	// Name is the chat's name; may be empty.
+	Name string
 	// Stepped is true for a session that runs a Flow (a Design or Triage
 	// session): its entity gets no Show diff.
 	Stepped bool
@@ -50,12 +52,13 @@ func (d *Diff) Worktree(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "target must be <kind>:<id>", http.StatusBadRequest)
 		return
 	}
+	targetLabel := d.targetLabel(kind, id)
 	tg, reason := d.resolveTarget(project, repo, kind, id)
 	if reason == "" && !sameRepo(repo, tg.dir) {
 		reason = wire.DiffNoWorktree
 	}
 	if reason != "" {
-		wire.WriteJSON(w, wire.DiffWorktree{Reason: reason})
+		wire.WriteJSON(w, wire.DiffWorktree{Reason: reason, TargetLabel: targetLabel})
 		return
 	}
 	out, err := d.snapshot(project, repo, tg)
@@ -63,7 +66,25 @@ func (d *Diff) Worktree(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	out.TargetLabel = targetLabel
 	wire.WriteJSON(w, out)
+}
+
+// targetLabel is the name the page shows for a target: a chat's name, else the id.
+// A Design's id is its map name and a ticket's id is its address.
+func (d *Diff) targetLabel(kind, id string) string {
+	if kind == "chat" && d.lookups.Session != nil {
+		if ref, ok := d.lookups.Session(id); ok {
+			// A Queue agent is named by the ticket it works on.
+			if ref.RunTicket != "" {
+				return ref.RunTicket
+			}
+			if ref.Name != "" {
+				return ref.Name
+			}
+		}
+	}
+	return id
 }
 
 // target is a resolved worktree. An empty base means the trunk merge-base.

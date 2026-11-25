@@ -721,6 +721,35 @@ test("worktree mode: a no-worktree reason shows an empty state naming the target
   expect(fetchCommits).not.toHaveBeenCalled()
 })
 
+test("worktree mode: the chip and the empty state show the target label, not the id", async () => {
+  const chat = "/diff?project=p&worktree=chat:abc123&base=x&tip=y"
+  render(
+    chat,
+    vi.fn<FetchDiffFiles>(async () => named("a.go")),
+    undefined,
+    undefined,
+    {
+      diffWorktree: async () => ({ ...snap(1), target_label: "my chat" }),
+      diffCommits: async () => ({ commits: [], truncated: false }),
+    },
+  )
+  const chip = await screen.findByTestId("range-chip")
+  expect(chip.textContent).toBe("Worktree · my chat since main@base1")
+  cleanup()
+  render(
+    chat,
+    vi.fn<FetchDiffFiles>(async () => named("a.go")),
+    undefined,
+    undefined,
+    {
+      diffWorktree: async () => ({ reason: "no_worktree", target_label: "my chat" }),
+    },
+  )
+  const notice = await screen.findByTestId("notice")
+  expect(notice.textContent).toContain("my chat")
+  expect(notice.textContent).not.toContain("abc123")
+})
+
 test("worktree mode: focus calls the worktree route again and the files follow the new SHAs", async () => {
   let n = 1
   const fetchWorktree = vi.fn<FetchDiffWorktree>(async () => snap(n))
