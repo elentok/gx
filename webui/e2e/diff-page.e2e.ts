@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process"
-import { writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { createHash } from "node:crypto"
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { join, resolve } from "node:path"
 import type { Page } from "@playwright/test"
 import { expect, test } from "./fixture"
 
@@ -456,4 +457,215 @@ test("Diff page", async ({ page, start }) => {
   await editRefs(page)
   await expect(baseRef(page)).toBeEditable()
   await expect(tipRef(page)).toBeEditable()
+})
+
+// The names are the constants of testutil/gxfixture/spec/worktreediff.go, documented in CATALOG.md.
+const WT_MODIFIED = "src/mod.txt"
+const WT_RENAMED = "src/renamed.txt"
+const WT_DELETED = "src/gone.txt"
+const WT_NEW = "notes/new.txt"
+const WT_IGNORED = "debug.log"
+const WT_PNG = "shot.png"
+
+const openWorktree = (page: Page, target: string) =>
+  go(page, `#/diff?project=demo&worktree=${target}`)
+const treeFile = (page: Page, path: string) =>
+  page.locator(`[data-testid="tree-file"][data-path="${path}"]`)
+const git = (dir: string, ...args: string[]) => execFileSync("git", ["-C", dir, ...args]).toString()
+const hasNoSidewaysScroll = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
+
+/** What a read of the worktree must leave alone: its status, its index file and the lock beside it. */
+function worktreeState(dir: string) {
+  const index = resolve(dir, git(dir, "rev-parse", "--git-path", "index").trim())
+  return {
+    status: git(dir, "status", "--porcelain"),
+    mtime: statSync(index).mtimeMs,
+    sha: createHash("sha256").update(readFileSync(index)).digest("hex"),
+    locked: existsSync(`${index}.lock`),
+  }
+}
+
+test("Worktree diff targets", async ({ page, start }) => {
+  await page.setViewportSize({ width: 1200, height: 900 })
+  const fixture = await start("worktree-diff", { reloads: 1 })
+  const wt = fixture.worktreeDiff!
+  const chip = chipOf(page)
+  const disclosure = page.getByTestId("commits-disclosure")
+  const uncommitted = disclosure.getByRole("button", { name: /Uncommitted changes/ })
+
+  await test.step("a chat: the chip, the tree, story 42 and a read-only worktree", async () => {
+    const before = worktreeState(wt.chat.path)
+    await openWorktree(page, `chat:${wt.chat.id}`)
+    await expect(chip).toHaveText(new RegExp(`^Worktree · ${wt.chat.id} since main@[0-9a-f]{7}$`))
+    await expect(baseRef(page)).toHaveCount(0)
+    await expect(tipRef(page)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Edit refs" })).toHaveCount(0)
+    for (const path of ["src/added.txt", WT_MODIFIED, WT_RENAMED, WT_DELETED, WT_NEW, WT_PNG])
+      await expect(treeFile(page, path)).toBeVisible()
+    await expect(treeFile(page, WT_IGNORED)).toHaveCount(0)
+    await expect(treeFile(page, WT_NEW).getByTestId("file-dot")).toHaveAttribute(
+      "data-tone",
+      "done",
+    )
+    await expect(treeFile(page, WT_DELETED).getByTestId("file-dot")).toHaveAttribute(
+      "data-tone",
+      "waiting",
+    )
+
+    // Story 42: a renamed path line, a deleted row's dot (above) and an image body.
+    await treeFile(page, WT_RENAMED).click()
+    await expect(page.getByTestId("file-path")).toHaveText("src/old.txt → src/renamed.txt")
+    await treeFile(page, WT_PNG).click()
+    await expect(page.getByTestId("diff-area")).toHaveAttribute("data-file", WT_PNG)
+    await expect(page.getByTestId("image-after")).toBeVisible()
+
+    await disclosure.getByRole("button", { name: /^\d+ commits?$/ }).click()
+    await expect(disclosure.getByRole("button").last()).toHaveText(/Uncommitted changes$/)
+    await uncommitted.click()
+    await expect(page).toHaveURL(/commits=uncommitted/)
+    await expect(treeFiles(page)).toHaveCount(5)
+    await expect(treeFile(page, "src/added.txt")).toHaveCount(0)
+
+    await page.reload()
+    await expect(chip).toHaveText(new RegExp(`^Worktree · ${wt.chat.id} since main@`))
+    await expect(treeFiles(page)).toHaveCount(5)
+
+    // Reading the worktree leaves its status and index alone.
+    expect(worktreeState(wt.chat.path)).toEqual(before)
+  })
+
+  await test.step("a Design and a claimed ticket", async () => {
+    await openWorktree(page, `design:${wt.design.address!.slice("demo:".length)}`)
+    await expect(chip).toContainText("Worktree · wtd since main@")
+    await expect(baseRef(page)).toHaveCount(0)
+    await expect(treeFile(page, WT_MODIFIED)).toBeVisible()
+    await expect(treeFile(page, "work/wtd.txt")).toBeVisible()
+
+    await openWorktree(page, `ticket:${wt.ticket.address}`)
+    await expect(chip).toHaveText(
+      new RegExp(`^Worktree · ${wt.ticket.address} since wtd-claimed-impl@[0-9a-f]{7}$`),
+    )
+    await expect(baseRef(page)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Edit refs" })).toHaveCount(0)
+    await expect(treeFile(page, "work/wtd-claimed-impl.txt")).toBeVisible()
+    await expect(treeFile(page, WT_MODIFIED)).toBeVisible()
+    await disclosure.getByRole("button", { name: /^\d+ commits?$/ }).click()
+    await expect(disclosure.getByRole("button").last()).toHaveText(/Uncommitted changes$/)
+    await uncommitted.click()
+    await expect(treeFiles(page)).toHaveCount(1)
+    await expect(treeFile(page, WT_MODIFIED)).toBeVisible()
+  })
+
+  await test.step("390 px: the claimed ticket fits", async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openWorktree(page, `ticket:${wt.ticket.address}`)
+    await expect(page.getByRole("tab", { name: "Files" })).toHaveAttribute("aria-selected", "true")
+    await expect(page.getByRole("tab", { name: "Diff" })).toBeVisible()
+    await expect(chip).toBeVisible()
+    await expect(disclosure).toBeVisible()
+    await expect(treeFiles(page).first()).toBeVisible()
+    await expect.poll(() => hasNoSidewaysScroll(page)).toBe(true)
+    const box = await chip.boundingBox()
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+  })
+})
+
+test("Worktree diff edge states", async ({ page, start }) => {
+  await page.setViewportSize({ width: 1200, height: 900 })
+  const fixture = await start("worktree-diff", {})
+  const wt = fixture.worktreeDiff!
+  const chip = chipOf(page)
+  const notice = page.getByTestId("notice")
+
+  await test.step("a paused ticket's base: tracked run, blocker, feature branch", async () => {
+    await openWorktree(page, `ticket:${wt.paused_run.address}`)
+    await expect(chip).toHaveText(
+      new RegExp(`^Worktree · ${wt.paused_run.address} since wtd-ask-impl@[0-9a-f]{7}$`),
+    )
+    await expect(treeFiles(page).first()).toBeVisible()
+
+    await openWorktree(page, `ticket:${wt.paused_stacked.address}`)
+    await expect(chip).toHaveText(
+      new RegExp(
+        `^Worktree · ${wt.paused_stacked.address} since demo:wtd-pstack-impl/01@[0-9a-f]{7}$`,
+      ),
+    )
+    await expect(baseRef(page)).toHaveCount(0)
+    // A stacked ticket hides its blocker's commits.
+    await expect(treeFile(page, "work/wtd-pstack-impl-02.txt")).toBeVisible()
+    await expect(treeFile(page, "work/wtd-pstack-impl-01.txt")).toHaveCount(0)
+
+    await openWorktree(page, `ticket:${wt.paused_feature.address}`)
+    await expect(chip).toHaveText(
+      new RegExp(
+        `^Worktree · ${wt.paused_feature.address} since ${wt.feature_branch}@[0-9a-f]{7}$`,
+      ),
+    )
+  })
+
+  await test.step("a ticket with no worktree and a missing chat show the empty state", async () => {
+    await openWorktree(page, `ticket:${wt.unclaimed}`)
+    await expect(notice).toHaveAttribute("data-kind", "no-worktree")
+    await expect(notice).toContainText(wt.unclaimed)
+    await expect(baseRef(page)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Edit refs" })).toHaveCount(0)
+    await expect(treeFiles(page)).toHaveCount(0)
+
+    const url = new URL("/v1/diff/worktree?project=demo&target=chat:no-such-chat", page.url())
+    const res = await page.request.get(url.href)
+    expect(res.status()).toBeLessThan(500)
+    expect(await res.json()).toEqual({ reason: "no_worktree" })
+  })
+
+  await test.step("a clean worktree has no changes", async () => {
+    await openWorktree(page, `chat:${wt.clean.id}`)
+    await expect(notice).toHaveAttribute("data-kind", "no-changes")
+    await expect(notice).toHaveText(/No changes since main@[0-9a-f]{7}/)
+  })
+
+  await test.step("untracked files left out give a notice and keep the tracked changes", async () => {
+    await openWorktree(page, `chat:${wt.capped.id}`)
+    const skipped = page.locator('[data-testid="notice"][data-kind="untracked-skipped"]')
+    await expect(skipped).toContainText(
+      /Untracked files not shown \(\d+\)\. Add them to \.gitignore or commit them\./,
+    )
+    const capped = (await skipped.textContent())!.match(/\((\d+)\)/)![1]
+    await expect(treeFile(page, "src/capped.txt")).toBeVisible()
+
+    await openWorktree(page, `chat:${wt.oversize.id}`)
+    await expect(skipped).toContainText(
+      "Untracked files not shown (1). Add them to .gitignore or commit them.",
+    )
+    expect(capped).not.toBe("1")
+    await expect(treeFile(page, "big/small.txt")).toBeVisible()
+    await expect(treeFile(page, "big/huge.txt")).toHaveCount(0)
+  })
+})
+
+test("Worktree diff from the Show diff action", async ({ page, start }) => {
+  await page.setViewportSize({ width: 1200, height: 900 })
+  const fixture = await start("worktree-diff", {})
+  const wt = fixture.worktreeDiff!
+  const showDiff = async (id: string) => {
+    await go(page, `#/agents/${id}`)
+    await page.locator("header").getByRole("button", { name: "More actions", exact: true }).click()
+    await page
+      .getByRole("menu", { name: "More actions" })
+      .getByRole("menuitem", { name: "Show diff" })
+      .click()
+    await expect(page.getByTestId("range-chip")).toBeVisible()
+  }
+
+  await showDiff(wt.ticket.id!)
+  await expect(page.getByTestId("range-chip")).toHaveText(
+    new RegExp(`^Worktree · ${wt.ticket.id} since wtd-claimed-impl@[0-9a-f]{7}$`),
+  )
+  await expect(treeFile(page, "work/wtd-claimed-impl.txt")).toBeVisible()
+
+  await showDiff(wt.fix_agent.id!)
+  await expect(page.getByTestId("range-chip")).toHaveText(
+    new RegExp(`^Worktree · ${wt.fix_agent.id} since main@[0-9a-f]{7}$`),
+  )
+  await expect(treeFile(page, WT_MODIFIED)).toBeVisible()
 })

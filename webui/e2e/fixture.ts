@@ -107,6 +107,15 @@ export interface WorktreeDiff {
   fix_agent: WorktreeTarget
   clone: WorktreeTarget
   unclaimed: string
+  capped: WorktreeTarget
+  oversize: WorktreeTarget
+  clean: WorktreeTarget
+  paused_run: WorktreeTarget
+  paused_stacked: WorktreeTarget
+  paused_blocker_branch: string
+  paused_feature: WorktreeTarget
+  feature_branch: string
+  triage: WorktreeTarget
 }
 
 export interface Fixture {

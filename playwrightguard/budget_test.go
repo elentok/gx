@@ -91,7 +91,10 @@ import (
 // Waiting epic flow (+1): the real blocked-by-cycle refusal, the event stream moving the page, a reload-free hash
 // navigation between Epic pages and the sidebar and cards reading one server state need a real server and browser;
 // EpicPage.test.tsx covers the chips and picker alone.
-const maxFlows = 166
+// Worktree diff flows (+3): the real worktree on disk (status and index left untouched, the committed and uncommitted
+// files, the stacked and paused bases), the server's snapshot and the Show diff action over the browser need a real
+// fixture server; DiffPage.test.tsx and the server tests cover each piece alone.
+const maxFlows = 169
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
