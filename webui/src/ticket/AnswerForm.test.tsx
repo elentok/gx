@@ -9,8 +9,12 @@ import { system } from "../ui/theme"
 import { AppToaster } from "../ui/toaster"
 import type { AnswerBody, PostAnswer } from "./answer"
 import { AnswerForm } from "./AnswerForm"
+import { clearDrafts } from "./draft"
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  clearDrafts()
+})
 
 const EXPAND = "Open the note in a large editor"
 

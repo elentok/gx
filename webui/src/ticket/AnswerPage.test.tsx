@@ -8,7 +8,9 @@ import { renderThemed } from "../ui/render"
 import { AnswerPage } from "./AnswerPage"
 import type { AnswerBody } from "./answer"
 import type { FetchDetail } from "./detail"
+import { clearDrafts } from "./draft"
 import { clearSents, useSent } from "./sent"
+import { writePageCache } from "../pageCache"
 
 const post = vi.fn<(b: AnswerBody) => Promise<unknown>>()
 vi.mock("./answer", async (orig) => ({
@@ -20,6 +22,9 @@ beforeEach(() => {
   post.mockReset()
   post.mockResolvedValue({ outcome: "delivered" })
   clearSents()
+  clearDrafts()
+  handlers.clear()
+  sessionStorage.clear()
 })
 afterEach(cleanup)
 
@@ -125,6 +130,192 @@ test("on a deep link ← Ticket and a send replace the entry with the ticket pag
   fireEvent.click(sendButton())
   expect(await screen.findByText("ticket page sent:delivered")).toBeTruthy()
   expect(second.state.historyAction).toBe("REPLACE")
+})
+
+// A detail the test can swap, and a connection event that makes the page refetch it.
+let served: TicketDetail = detail
+const handlers = new Set<(a: string | undefined, type: string) => void>()
+const changeTicket = (next: TicketDetail) => {
+  served = next
+  for (const h of handlers) h(ADDRESS, "changed")
+}
+const liveConn = {
+  ...fakeConn,
+  onEvent: (h: never) => {
+    handlers.add(h)
+    return () => handlers.delete(h)
+  },
+}
+const fetchServed: FetchDetail = async () => ({ kind: "ok", detail: served })
+const round = (seq: number, outcome: string, state: string): TicketDetail => ({
+  ...detail,
+  state,
+  latest: { ...detail.latest!, seq, outcome },
+  actions: outcome === "open" ? detail.actions : [],
+})
+const typeAnswer = (v: string) =>
+  fireEvent.change(screen.getByLabelText(`Answer to question ${detail.latest!.seq}`), {
+    target: { value: v },
+  })
+const backButton = () => screen.getByRole("button", { name: "Back to ticket" })
+
+function renderLive(entries: string[], initial: TicketDetail = detail) {
+  served = initial
+  const router = createMemoryRouter(
+    [
+      { path: "/t/*", element: <TicketStub /> },
+      { path: "/answer/*", element: <AnswerRoute fetchDetail={fetchServed} /> },
+    ],
+    { initialEntries: entries, initialIndex: entries.length - 1 },
+  )
+  renderThemed(
+    <ConnectionContext.Provider value={liveConn as unknown as Connection}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  )
+  return router
+}
+
+test("leaving and coming back keeps the text and the note", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("use postgres")
+  fireEvent.click(screen.getByRole("button", { name: `Note on question ${detail.latest!.seq}` }))
+  fireEvent.change(screen.getByLabelText(`Note text for question ${detail.latest!.seq}`), {
+    target: { value: "mind the lock" },
+  })
+  fireEvent.click(screen.getByRole("link", { name: "← Ticket" }))
+  await screen.findByText(/ticket page/)
+  cleanup()
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  expect(
+    (screen.getByLabelText(`Answer to question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("use postgres")
+  expect(
+    (screen.getByLabelText(`Note text for question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("mind the lock")
+})
+
+test("a send clears the draft", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("yes")
+  fireEvent.click(sendButton())
+  await screen.findByText("ticket page sent:delivered")
+  cleanup()
+  renderLive([answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  expect(
+    (screen.getByLabelText(`Answer to question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("")
+})
+
+test("a page opened on a replaced question is a fresh form with the note kept and no banner", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("old text")
+  fireEvent.click(screen.getByRole("button", { name: `Note on question ${detail.latest!.seq}` }))
+  fireEvent.change(screen.getByLabelText(`Note text for question ${detail.latest!.seq}`), {
+    target: { value: "keep me" },
+  })
+  fireEvent.click(screen.getByRole("link", { name: "← Ticket" }))
+  await screen.findByText(/ticket page/)
+  cleanup()
+  const next = round(detail.latest!.seq + 1, "open", "tok-2")
+  renderLive([ticketUrl, answerUrl], next)
+  await screen.findByText("THE AGENT ASKS")
+  expect(screen.queryByRole("status")).toBeNull()
+  const seq = next.latest!.seq
+  expect((screen.getByLabelText(`Answer to question ${seq}`) as HTMLTextAreaElement).value).toBe("")
+  expect(
+    (screen.getByLabelText(`Note text for question ${seq}`) as HTMLTextAreaElement).value,
+  ).toBe("keep me")
+})
+
+test("answered elsewhere while open: banner, typed text stays, only Back to ticket", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("half typed")
+  changeTicket(round(detail.latest!.seq, "answered", "tok-9"))
+  expect(await screen.findByText("This question was answered elsewhere")).toBeTruthy()
+  expect(
+    (screen.getByLabelText(`Answer to question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("half typed")
+  expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
+  fireEvent.click(backButton())
+  expect(await screen.findByText(/ticket page/)).toBeTruthy()
+})
+
+test("a new question while open shows the changed banner and keeps the old question", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("half typed")
+  changeTicket(round(detail.latest!.seq + 1, "open", "tok-2"))
+  expect(
+    await screen.findByText("This question changed. Back to ticket to see the new one."),
+  ).toBeTruthy()
+  expect(
+    (screen.getByLabelText(`Answer to question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("half typed")
+  expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
+})
+
+test("a stale refusal refetches and shows the changed banner", async () => {
+  renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("x")
+  post.mockResolvedValue({ refused: true, reason: "stale", message: "Question changed." })
+  fireEvent.click(sendButton())
+  expect(
+    await screen.findByText("This question changed. Back to ticket to see the new one."),
+  ).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
+})
+
+test("a ticket with no open question shows answered elsewhere and Back to ticket, no form", async () => {
+  const router = renderLive([answerUrl], round(detail.latest!.seq, "answered", "tok-9"))
+  expect(await screen.findByText("This question was answered elsewhere")).toBeTruthy()
+  expect(screen.queryByRole("form", { name: "Answer" })).toBeNull()
+  fireEvent.click(backButton())
+  await screen.findByText(/ticket page/)
+  expect(router.state.historyAction).toBe("REPLACE")
+})
+
+test("an open gx-asked question says it is answered on the ticket page", async () => {
+  renderLive([answerUrl], { ...detail, actions: [] })
+  expect(await screen.findByText("This question is answered on the ticket page.")).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
+  expect(backButton()).toBeTruthy()
+})
+
+test("a cached first detail never makes a changed banner", async () => {
+  writePageCache("ticket", detail, ADDRESS)
+  const next = round(detail.latest!.seq + 1, "open", "tok-2")
+  renderAnswer([answerUrl], async () => ({ kind: "ok", detail: next }))
+  await screen.findByLabelText(`Answer to question ${next.latest!.seq}`)
+  expect(screen.queryByRole("status")).toBeNull()
+})
+
+test("agent-not-ready keeps the answer, shows the hint and stays on the page", async () => {
+  const router = renderLive([ticketUrl, answerUrl])
+  await screen.findByText("THE AGENT ASKS")
+  typeAnswer("go")
+  post.mockResolvedValue({ refused: true, reason: "agent-not-ready", message: "Agent waits." })
+  fireEvent.click(sendButton())
+  expect(
+    await screen.findByText(/Approve the agent's prompt first, then send again\./),
+  ).toBeTruthy()
+  expect(
+    (screen.getByLabelText(`Answer to question ${detail.latest!.seq}`) as HTMLTextAreaElement)
+      .value,
+  ).toBe("go")
+  expect(router.state.location.pathname).toBe(answerUrl)
 })
 
 test("a ticket that does not exist shows Ticket not found", async () => {
