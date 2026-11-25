@@ -552,6 +552,13 @@ export function ChatMessages({
   const limit = more.key === windowKey ? more.limit : CHAT_WINDOW
   const hiddenCount = Math.max(0, messages.length - limit)
   const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
+  const strip =
+    (busy && working) || (chat.tasks?.length ?? 0) > 0 ? (
+      <Box flexShrink="0" display="flex" flexDirection="column" gap="3">
+        {busy && working}
+        <TaskList tasks={chat.tasks} sessionId={sessionId} />
+      </Box>
+    ) : null
   return (
     <>
       <ChatScroller key={windowKey} topAnchor={topAnchor}>
@@ -583,14 +590,11 @@ export function ChatMessages({
         ))}
         {tail}
         {end}
+        {/* A top-anchored log keeps the strip right under the messages, not at the pane bottom. */}
+        {topAnchor && strip}
       </ChatScroller>
       {/* Outside the scroller: the Working row and tasks come and go without moving the messages. */}
-      {(busy && working) || (chat.tasks?.length ?? 0) > 0 ? (
-        <Box flexShrink="0" display="flex" flexDirection="column" gap="3">
-          {busy && working}
-          <TaskList tasks={chat.tasks} sessionId={sessionId} />
-        </Box>
-      ) : null}
+      {!topAnchor && strip}
     </>
   )
 }
