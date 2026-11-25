@@ -2,8 +2,10 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/subagent"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -596,6 +599,7 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 
 func newAgentsChatCmd(d Deps) *cobra.Command {
 	var jsonOut, archive bool
+	var callID string
 	cmd := &cobra.Command{
 		Use:   "chat <session>",
 		Short: "show a session's chat: the visible messages of its newest conversation",
@@ -605,29 +609,102 @@ func newAgentsChatCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runAgentsChat(c.Context(), cl, c.OutOrStdout(), jsonOut, archive, args[0])
+			return runAgentsChat(c.Context(), cl, c.OutOrStdout(), jsonOut, archive, callID, args[0])
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.Flags().BoolVar(&archive, "archive", false, "decode the session's archived Codex rollout (.jsonl.zst)")
+	cmd.Flags().StringVar(&callID, "subagent", "", "show one subagent's page, by its call id")
 	return cmd
 }
 
-func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, archive bool, id string) error {
+func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, archive bool, callID, id string) error {
 	ctx = ctxOrBackground(ctx)
 	read := cl.Sessions.Chat
 	if archive {
 		read = cl.Sessions.ChatArchive
 	}
+	if callID != "" {
+		read = func(ctx context.Context, id string) (wire.SessionChatResponse, error) {
+			return cl.Sessions.ChatSubagent(ctx, id, callID)
+		}
+	}
 	chat, err := read(ctx, id)
 	if err != nil {
+		var se *apiclient.StatusError
+		if errors.As(err, &se) && se.Code == http.StatusNotFound {
+			return errors.New(se.Body)
+		}
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
 		return cmdbase.EncodeProvenance(w, chat, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
+	if callID != "" {
+		return writeSubagentChat(w, chat)
+	}
 	for _, m := range chat.Messages {
 		if _, err := fmt.Fprintln(w, chatLine(m)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeSubagentChat prints a subagent page as text: the header line, the
+// prompt, one line per message, then the result or why there is none.
+func writeSubagentChat(w io.Writer, chat wire.SessionChatResponse) error {
+	var lines []string
+	if h := chat.Subagent; h != nil {
+		var parts []string
+		add := func(s string) {
+			if s != "" {
+				parts = append(parts, s)
+			}
+		}
+		add(h.Title)
+		add(h.Type)
+		add(h.Status)
+		add(h.Model)
+		switch {
+		case h.StartedAt != "" && h.EndedAt != "":
+			add(h.StartedAt + " – " + h.EndedAt)
+		default:
+			add(h.StartedAt)
+		}
+		if h.Tokens > 0 {
+			add(fmt.Sprintf("%d tokens", h.Tokens))
+		}
+		if h.ToolCalls > 0 {
+			add(fmt.Sprintf("%d tool calls", h.ToolCalls))
+		}
+		if len(parts) > 0 {
+			lines = append(lines, strings.Join(parts, " · "))
+		}
+		if h.Prompt != "" {
+			lines = append(lines, h.Prompt)
+		}
+	}
+	for _, m := range chat.Messages {
+		lines = append(lines, chatLine(m))
+	}
+	if h := chat.Subagent; h != nil {
+		switch {
+		case h.Unavailable == subagent.SubagentUnavailableStarting:
+			lines = append(lines, "Starting…")
+		case h.Unavailable != "":
+			lines = append(lines, "Transcript no longer available")
+			if h.Unavailable == subagent.SubagentUnavailableCompressed {
+				lines = append(lines, "The transcript file is compressed")
+			}
+		case chat.Archived:
+			lines = append(lines, "The parent session is archived: decode it from the chat page")
+		case h.Result != "":
+			lines = append(lines, h.Result)
+		}
+	}
+	for _, l := range lines {
+		if _, err := fmt.Fprintln(w, l); err != nil {
 			return err
 		}
 	}

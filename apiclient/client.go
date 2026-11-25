@@ -217,7 +217,20 @@ func (c *transport) get(ctx context.Context, path string, out any) error {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+		return &StatusError{Status: resp.Status, Code: resp.StatusCode, Path: path, Body: strings.TrimSpace(string(msg))}
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// StatusError is a non-200 answer to a GET. Body is the server's message, so a
+// caller can show it alone for a 404 that names what was missing.
+type StatusError struct {
+	Status string
+	Code   int
+	Path   string
+	Body   string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("server returned %s for %s: %s", e.Status, e.Path, e.Body)
 }

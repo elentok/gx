@@ -301,6 +301,13 @@ func (s *Sessions) Chat(ctx context.Context, id string) (wire.SessionChatRespons
 	return res, err
 }
 
+// ChatSubagent reads one subagent's page of a session, by its call id.
+func (s *Sessions) ChatSubagent(ctx context.Context, id, callID string) (wire.SessionChatResponse, error) {
+	var res wire.SessionChatResponse
+	err := s.t.get(ctx, "/v1/sessions/chat?session="+url.QueryEscape(id)+"&subagent="+url.QueryEscape(callID), &res)
+	return res, err
+}
+
 // ChatArchive decodes a session's archived rollout and reads its chat.
 func (s *Sessions) ChatArchive(ctx context.Context, id string) (wire.SessionChatResponse, error) {
 	var res wire.SessionChatResponse

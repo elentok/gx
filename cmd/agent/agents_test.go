@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/subagent"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -102,7 +103,7 @@ func TestAgentsChat_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsChat(ctx, h.Client, &out, true, false, res.Session.ID); err != nil {
+	if err := runAgentsChat(ctx, h.Client, &out, true, false, "", res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	var chat wire.SessionChatResponse
@@ -128,6 +129,82 @@ func TestAgentsChat_ListsAnImagesOnlyMessage(t *testing.T) {
 		if got := chatLine(c.msg); got != c.want {
 			t.Errorf("chatLine(%+v) = %q, want %q", c.msg, got, c.want)
 		}
+	}
+}
+
+func TestAgentsChat_SubagentTextOrder(t *testing.T) {
+	t.Parallel()
+	msgs := []wire.SessionChatMessage{{Role: "agent", Kind: "text", Text: "looked"}}
+	for _, c := range []struct {
+		name string
+		chat wire.SessionChatResponse
+		want []string
+	}{
+		{"finished claude", wire.SessionChatResponse{Messages: msgs, Subagent: &subagent.SessionSubagent{
+			Title: "Explore", Type: "Explore", Status: "done", Model: "opus", Tokens: 1200, ToolCalls: 3, Prompt: "find it", Result: "found it",
+		}}, []string{"Explore · Explore · done · opus · 1200 tokens · 3 tool calls", "find it", "agent\ttext\tlooked", "found it"}},
+		{"no empty parts", wire.SessionChatResponse{Subagent: &subagent.SessionSubagent{
+			Title: "Explore", Status: "done", Prompt: "find it", Result: "ok",
+		}}, []string{"Explore · done", "find it", "ok"}},
+		{"codex child", wire.SessionChatResponse{Subagent: &subagent.SessionSubagent{
+			Status: "done", Prompt: "Prompt not readable", Result: "ok",
+		}}, []string{"done", "Prompt not readable", "ok"}},
+		{"starting", wire.SessionChatResponse{Subagent: &subagent.SessionSubagent{
+			Title: "Explore", Status: "running", Unavailable: subagent.SubagentUnavailableStarting, Prompt: "find it",
+		}}, []string{"Explore · running", "find it", "Starting…"}},
+		{"gone", wire.SessionChatResponse{Subagent: &subagent.SessionSubagent{
+			Title: "Explore", Status: "not_available", Unavailable: subagent.SubagentUnavailableGone,
+		}}, []string{"Explore · not_available", "Transcript no longer available"}},
+		{"compressed", wire.SessionChatResponse{Subagent: &subagent.SessionSubagent{
+			Status: "not_available", Unavailable: subagent.SubagentUnavailableCompressed,
+		}}, []string{"not_available", "Transcript no longer available", "The transcript file is compressed"}},
+		{"archived parent", wire.SessionChatResponse{Archived: true, Subagent: &subagent.SessionSubagent{Status: "done"}},
+			[]string{"done", "The parent session is archived: decode it from the chat page"}},
+		{"unreadable parent", wire.SessionChatResponse{Unreadable: true}, nil},
+	} {
+		var out bytes.Buffer
+		if err := writeSubagentChat(&out, c.chat); err != nil {
+			t.Fatal(err)
+		}
+		want := strings.Join(c.want, "\n")
+		if want != "" {
+			want += "\n"
+		}
+		if out.String() != want {
+			t.Errorf("%s: output = %q, want %q", c.name, out.String(), want)
+		}
+	}
+}
+
+func TestAgentsChat_SubagentUnknownSessionPrintsTheBody(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	var out bytes.Buffer
+	err := runAgentsChat(context.Background(), h.Client, &out, false, false, "toolu_x", "no-such-session")
+	if err == nil || strings.Contains(err.Error(), "server returned") || strings.Contains(err.Error(), "is `gx server` running") {
+		t.Errorf("err = %v, want the 404 body alone", err)
+	}
+}
+
+func TestAgentsChat_SubagentJSONIsTheRoutesResponse(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	want, err := h.Client.Sessions.ChatSubagent(ctx, res.Session.ID, "toolu_x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsChat(ctx, h.Client, &out, true, false, "toolu_x", res.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	var got wire.SessionChatResponse
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.ConversationID != want.ConversationID || got.Unsupported != want.Unsupported {
+		t.Errorf("json = %s (%v), want %+v", out.String(), err, want)
 	}
 }
 
