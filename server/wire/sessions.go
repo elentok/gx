@@ -484,6 +484,7 @@ type SessionNext struct {
 type SessionTask struct {
 	Kind        string `json:"kind"`
 	Label       string `json:"label"`
+	CallID      string `json:"call_id,omitempty"`
 	StartedAt   string `json:"started_at"`
 	Finished    bool   `json:"finished,omitempty"`
 	FinishedAt  string `json:"finished_at,omitempty"`

@@ -250,14 +250,14 @@ func TestReadTasks_SubagentRows(t *testing.T) {
 		t.Parallel()
 		got := readTasks(t, append(subagentLines(), started)...)
 		r := got[0]
-		if len(got) != 1 || r.Kind != transcript.TaskKindSubagent || r.Label != "review" || r.ID != "th1" || r.Model != "gpt-x" || r.End != nil || !r.StartedAt.Equal(tasksT0.Add(time.Second)) {
+		if len(got) != 1 || r.Kind != transcript.TaskKindSubagent || r.Label != "review" || r.ID != "th1" || r.Model != "gpt-x" || r.End != nil || r.CallID != "sp1" || !r.StartedAt.Equal(tasksT0.Add(time.Second)) {
 			t.Errorf("got %+v", got)
 		}
 	})
 	t.Run("without a started event only label and time", func(t *testing.T) {
 		t.Parallel()
 		got := readTasks(t, subagentLines()...)
-		if got[0].ID != "" || got[0].Model != "" || got[0].Label != "review" {
+		if got[0].ID != "" || got[0].Model != "" || got[0].Label != "review" || got[0].CallID != "sp1" {
 			t.Errorf("got %+v", got[0])
 		}
 	})

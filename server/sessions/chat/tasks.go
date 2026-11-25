@@ -107,7 +107,7 @@ func taskOutcome(o string) string {
 func wireTask(s taskState) wire.SessionTask {
 	r := s.rec
 	t := wire.SessionTask{
-		Kind: r.Kind, Label: r.Label, StartedAt: r.StartedAt.Format(time.RFC3339),
+		Kind: r.Kind, Label: r.Label, CallID: r.CallID, StartedAt: r.StartedAt.Format(time.RFC3339),
 		Finished: s.finished, Outcome: s.outcome, NoDuration: s.noDuration,
 		Command: r.Command, ExitCode: r.ExitCode, OutputBytes: r.OutputBytes, LastLine: r.LastLine,
 		Model: r.Model, Tokens: r.Tokens, ToolCalls: r.ToolCalls, CurrentCall: r.CurrentCall,

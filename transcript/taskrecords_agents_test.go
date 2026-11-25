@@ -75,6 +75,9 @@ func TestReadTaskRecords_AsyncSubagent(t *testing.T) {
 	if r.Command != "" {
 		t.Errorf("the subagent prompt reached Command: %q", r.Command)
 	}
+	if r.CallID != "a1" {
+		t.Errorf("CallID = %q, want a1", r.CallID)
+	}
 	if r.End != nil {
 		t.Errorf("interim ended it: %+v", r.End)
 	}
@@ -104,10 +107,33 @@ func TestReadTaskRecords_SubagentDirectoryOutputPathIsNoPath(t *testing.T) {
 	}
 }
 
+func TestReadTaskRecords_LaunchResultWithoutToolUseHasNoCallID(t *testing.T) {
+	t.Parallel()
+	r := readRecords(t,
+		plainResultLine("a1", t1, false, "launched", `{"isAsync":true,"status":"async_launched","agentId":"ag1"}`),
+	)[0]
+	if r.CallID != "" || r.ID != "ag1" {
+		t.Errorf("rec = %+v", r)
+	}
+}
+
+func TestReadTaskRecords_ShellAndMonitorHaveNoCallID(t *testing.T) {
+	t.Parallel()
+	for _, r := range readRecords(t,
+		namedUseLine("Monitor", "m1", t0, `{"description":"watch","command":"tail -f x"}`),
+		namedUseLine("Bash", "b1", t0, `{"command":"ls","run_in_background":true}`),
+		namedUseLine("Bash", "b2", t0, `{"command":"ls"}`),
+	) {
+		if r.CallID != "" {
+			t.Errorf("%s record has CallID %q", r.Kind, r.CallID)
+		}
+	}
+}
+
 func TestReadTaskRecords_SyncAgentCall(t *testing.T) {
 	t.Parallel()
 	r := readRecords(t, namedUseLine("Agent", "a1", t0, agentInput))[0]
-	if r.Kind != TaskKindSubagent || r.Label != "explore" || r.End != nil || r.ID != "" {
+	if r.Kind != TaskKindSubagent || r.Label != "explore" || r.End != nil || r.ID != "" || r.CallID != "a1" {
 		t.Fatalf("open = %+v", r)
 	}
 	r = readRecords(t, namedUseLine("Agent", "a1", t0, agentInput), turnEndLine(t2))[0]

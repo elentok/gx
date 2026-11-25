@@ -94,6 +94,24 @@ func TestRead_SubagentDetailsFromOutputFileAndGrowthRefreshes(t *testing.T) {
 	}
 }
 
+func TestRead_SubagentRowCarriesCallIDAndOtherRowsDoNot(t *testing.T) {
+	t.Parallel()
+	f := newSubagentFixture(t, `{"status":"async_launched","agentId":"ag1","outputFile":"/x/tasks/"}`, "")
+	rows := f.chat(t, "/v1/sessions/chat").Tasks
+	subs := 0
+	for _, row := range rows {
+		switch {
+		case row.Kind == transcript.TaskKindSubagent && row.CallID == "a1":
+			subs++
+		case row.CallID != "":
+			t.Errorf("%s row has call id %q", row.Kind, row.CallID)
+		}
+	}
+	if subs != 1 {
+		t.Fatalf("subagent rows with call id a1 = %d, rows = %+v", subs, rows)
+	}
+}
+
 func TestRead_SubagentFallsBackToFileNextToTheParent(t *testing.T) {
 	t.Parallel()
 	f := newSubagentFixture(t, `{"status":"async_launched","agentId":"ag1","outputFile":"/x/tasks/"}`, "")

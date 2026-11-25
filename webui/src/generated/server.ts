@@ -3188,6 +3188,7 @@ export interface SessionNext {
 export interface SessionTask {
   kind: string;
   label: string;
+  call_id?: string;
   started_at: string;
   finished?: boolean;
   finished_at?: string;

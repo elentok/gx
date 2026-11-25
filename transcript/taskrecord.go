@@ -41,7 +41,10 @@ type TaskEnd struct {
 type TaskRecord struct {
 	Kind string
 	// ID is a subagent's agent id; empty while no line names it.
-	ID        string
+	ID string
+	// CallID is the tool_use id (Claude) or call_id (Codex) of the subagent
+	// call; empty for other kinds and for a launch result with no call line.
+	CallID    string
 	Label     string
 	StartedAt time.Time
 

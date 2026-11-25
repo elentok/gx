@@ -128,6 +128,7 @@ func scanTaskRecords(path string) (taskScan, error) {
 					r.Kind = TaskKindMonitor
 				case "Agent", "Task":
 					r.Kind = TaskKindSubagent
+					r.CallID = id
 				default:
 					if u.RunInBackground {
 						r.Kind = TaskKindShell

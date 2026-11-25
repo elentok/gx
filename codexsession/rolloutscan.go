@@ -250,7 +250,7 @@ func (s *scanner) task(line chatRolloutLine, ts time.Time) {
 				TaskName string `json:"task_name"`
 			}
 			_ = json.Unmarshal([]byte(p.Arguments), &a)
-			rec := &transcript.TaskRecord{Kind: transcript.TaskKindSubagent, Label: a.TaskName, StartedAt: ts}
+			rec := &transcript.TaskRecord{Kind: transcript.TaskKindSubagent, CallID: p.CallID, Label: a.TaskName, StartedAt: ts}
 			sub := &subagent{rec: rec}
 			s.subagents = append(s.subagents, sub)
 			s.spawns[p.CallID] = sub
