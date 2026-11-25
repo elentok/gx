@@ -25,7 +25,6 @@ import { RING_KIND, isLive, ringArc, ringProgress } from "../epics/ring"
 import { agentHref, chatDraftHref, designHref, draftHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
-import { waitingWords } from "../epic/waiting"
 import type { Kind, Tone } from "../ui/tone"
 
 export const NEEDS_YOU = "Needs you"
@@ -122,8 +121,7 @@ const isCard = (r: EpicListRow) =>
 
 export function cardStatus(r: EpicListRow): SidebarStatus {
   if (r.section === SectionNeedsYou) return { words: NEEDS_YOU, tone: "waiting" }
-  if (r.waiting_on_epic)
-    return { words: "Waiting", tone: "muted", title: waitingWords(r.blockers ?? []) }
+  if (r.waiting_on_epic) return { words: "Waiting", tone: "muted", title: r.status_words }
   if (isLive(r)) return { words: r.working_word || WORKING, tone: "running" }
   return { words: r.status_words ?? "", tone: "muted" }
 }

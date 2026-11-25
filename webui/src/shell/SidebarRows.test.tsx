@@ -280,6 +280,7 @@ test("a Waiting epic's status span carries the blocker title", async () => {
     name: "Held up",
     waiting_on_epic: true,
     blockers: [{ name: "A" }, { name: "B" }],
+    status_words: "Waiting on A and 1 more",
   })
   setup("desktop", "/", [waiting])
   const link = await body().findByRole("link", { name: /Held up/ })

@@ -57,12 +57,16 @@ const place = (
 describe("buildSidebar", () => {
   it("a Waiting epic reads Waiting, muted, with the blocker title, and sorts as idle", () => {
     const blockers = [{ name: "A" }, { name: "B" }]
-    const waiting = row("p:w", { waiting_on_epic: true, blockers, status_words: "Idle" })
+    const waiting = row("p:w", {
+      waiting_on_epic: true,
+      blockers,
+      status_words: "Waiting on gx:old/03 and 1 more",
+    })
     const s = buildSidebar({ ...base, rows: [waiting], sessions: [], placements: [] })
     expect(s.rows[0].status).toEqual({
       words: "Waiting",
       tone: "muted",
-      title: "Waiting on A and 1 more",
+      title: "Waiting on gx:old/03 and 1 more",
     })
     expect(s.rows[0].status.words).not.toBe(NEEDS_YOU)
     expect(s.rows[0].status.tone).not.toBe("running")

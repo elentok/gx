@@ -11,9 +11,11 @@ import {
 } from "../generated/server"
 
 // The line a Waiting epic shows: the first blocker's bare name, then a count of the rest.
-// The server sorts the list (not-moving first, then by name), so the first entry is the one to name.
+// The server sorts the list (invalid stored entries first, then not-moving, then by name), so the
+// first entry is the one to name. An invalid entry has no name, so it reads as its stored text.
 export function waitingWords(blockers: readonly EpicBlocker[]): string {
-  const first = blockers[0]?.name ?? ""
+  const head = blockers[0]
+  const first = (head?.invalid ? head.ref : head?.name) ?? ""
   const more = blockers.length - 1
   return more > 0 ? `Waiting on ${first} and ${more} more` : `Waiting on ${first}`
 }
@@ -43,7 +45,7 @@ export interface HintLine {
 // The reason a Waiting epic does not move, or null while its blocker is moving.
 // A Waiting blocker over a stalled epic names that deeper epic and its state.
 export function blockerHint(blockers: readonly EpicBlocker[]): HintLine | null {
-  const first = blockers[0]
+  const first = blockers.find((b) => !b.invalid)
   if (!first) return null
   const target = first.hint ?? first
   const name = target.name
