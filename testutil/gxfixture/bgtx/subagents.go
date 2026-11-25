@@ -185,8 +185,12 @@ func (b *Lines) subBackground(ago time.Duration) {
 // subNested is a subagent whose file has an open Agent call; the grandchild's
 // file sits flat beside it, its meta.json pointing into the parent subagent's file.
 func (b *Lines) subNested(ago time.Duration) {
-	child := []string{subAssistant("msg_n1", 1000, 70, toolUse(SubGrandchildCall, "Agent",
-		map[string]any{"description": SubGrandchildDesc, "subagent_type": "Explore", "prompt": SubGrandchildDesc + " and report back."}))}
+	// The task scan drops a line with no timestamp, and the nested call must be found in this file.
+	child := []string{subLine(map[string]any{"type": "assistant", "timestamp": b.when(ago).UTC().Format(time.RFC3339Nano),
+		"message": map[string]any{"id": "msg_n1", "model": model, "role": "assistant",
+			"content": []any{toolUse(SubGrandchildCall, "Agent",
+				map[string]any{"description": SubGrandchildDesc, "subagent_type": "Explore", "prompt": SubGrandchildDesc + " and report back."})},
+			"usage": map[string]any{"input_tokens": 1000, "output_tokens": 70}}})}
 	b.subagentCall(ago, SubNestedCall, SubNestedAgent, SubNestedDesc, false, child, SubNestedFileKey, SubNestedMetaKey)
 	b.subFiles(ago-sec, SubGrandchildAgent, meta{Description: SubGrandchildDesc, ToolUseID: SubGrandchildCall, SpawnDepth: 2, RequestShape: "foreground", ParentAgent: SubNestedAgent},
 		surveyFile(), SubGrandchildFileKey, SubGrandchildMetaKey)

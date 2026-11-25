@@ -94,7 +94,12 @@ import (
 // Worktree diff flows (+3): the real worktree on disk (status and index left untouched, the committed and uncommitted
 // files, the stacked and paused bases), the server's snapshot and the Show diff action over the browser need a real
 // fixture server; DiffPage.test.tsx and the server tests cover each piece alone.
-const maxFlows = 169
+//
+// Subagent page flow (+1): the chat read from fixture transcripts, meta.json files and rollouts to the page, the journey
+// across the Agents, Design and subagent pages with the browser Back button and a reload, a live file growth seen with
+// no reload and layout at 390px need a real server and browser; SubagentPage.test.tsx, AgentsPage.sessionView.test.tsx,
+// TaskList.test.tsx, ChatLog.test.tsx and the Go server tests cover each rule alone but cannot see them together.
+const maxFlows = 170
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

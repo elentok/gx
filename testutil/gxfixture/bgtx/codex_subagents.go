@@ -1,6 +1,7 @@
 package bgtx
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -115,7 +116,7 @@ func (b *Lines) codexChildLines(ago time.Duration, thread string, kind codexChil
 			"type": "function_call", "name": "spawn_agent", "call_id": CodexSubGrandcall,
 			"arguments": jsonLine(map[string]any{"task_name": "grandchild", "message": "Read the wire package."})}}))
 	}
-	return append(lines,
+	lines = append(lines,
 		jsonLine(map[string]any{"type": "event_msg", "payload": map[string]any{"type": "token_count", "info": map[string]any{
 			"total_token_usage":    map[string]any{"total_tokens": CodexChildTokens},
 			"last_token_usage":     map[string]any{"input_tokens": 1000, "total_tokens": CodexChildTokens},
@@ -123,4 +124,14 @@ func (b *Lines) codexChildLines(ago time.Duration, thread string, kind codexChil
 		}}}),
 		msg("assistant", CodexSubLast),
 	)
+	// The chat read finds the child's own lines by the ordinal each line carries.
+	for i, l := range lines {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(l), &m); err != nil {
+			panic(err)
+		}
+		m["ordinal"] = i
+		lines[i] = jsonLine(m)
+	}
+	return lines
 }
