@@ -10,17 +10,18 @@ import (
 func TestRead_SubagentOfAGoneParentIsNotAvailable(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name   string
-		fix    func(t *testing.T) *readFixture
-		reason string
+		name         string
+		fix          func(t *testing.T) *readFixture
+		reason       string
+		wantArchived bool
 	}{
-		{"claude transcript missing", newClaudeFixture, subagent.SubagentUnavailableGone},
-		{"codex with no rollout", newCodexFixture, subagent.SubagentUnavailableGone},
+		{"claude transcript missing", newClaudeFixture, subagent.SubagentUnavailableGone, false},
+		{"codex with no rollout", newCodexFixture, subagent.SubagentUnavailableGone, false},
 		{"codex with only an archive", func(t *testing.T) *readFixture {
 			f := newCodexFixture(t)
 			writeZstd(t, f.path, archivedRollout...)
 			return f
-		}, subagent.SubagentUnavailableCompressed},
+		}, subagent.SubagentUnavailableCompressed, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -30,6 +31,9 @@ func TestRead_SubagentOfAGoneParentIsNotAvailable(t *testing.T) {
 			got, err := decodeChat(body)
 			if err != nil || code != http.StatusOK || got.Subagent == nil {
 				t.Fatalf("= %d %q (%v)", code, body, err)
+			}
+			if got.Archived != tc.wantArchived {
+				t.Errorf("archived = %v, want %v", got.Archived, tc.wantArchived)
 			}
 			h := got.Subagent
 			if h.Status != subagent.SubagentStatusNotAvailable || h.Unavailable != tc.reason || h.CallID != "x" || h.RootSessionID != "s1" {

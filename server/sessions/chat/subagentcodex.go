@@ -50,13 +50,15 @@ func (c *Chat) codexSubagentRead(w http.ResponseWriter, id, dir string, meta Met
 	head := &subagent.SessionSubagent{
 		CallID: callID, RootSessionID: id, Title: rec.Label, Type: rec.SubagentType,
 		Model: rec.Model, Tokens: rec.Tokens,
-		Prompt: codexPromptUnreadable, Result: lastAgentText(snap.Msgs),
+		Prompt: codexPromptUnreadable,
 	}
 	switch {
 	case state.finished && rec.End != nil:
 		head.Status = subagent.SubagentStatusDone
+		head.Result = lastAgentText(snap.Msgs)
 	case state.finished:
 		head.Status = subagent.SubagentStatusStopped
+		head.Result = lastAgentText(snap.Msgs)
 	default:
 		head.Status = subagent.SubagentStatusRunning
 	}

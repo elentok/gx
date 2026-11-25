@@ -94,6 +94,11 @@ test("a stopped subagent mutes its last message and shows no handback label", ()
   expect(screen.queryByText("Result handed back to the parent")).toBeNull()
 })
 
+test("a running subagent shows no result card even when the wire carries a result", () => {
+  show(chat({ status: "running", result: "a message that is not a result" }))
+  expect(document.querySelector('[data-part="subagent-result"]')).toBeNull()
+})
+
 test("a stopped subagent without a last message has no result card", () => {
   show(chat({ status: "stopped" }))
   expect(document.querySelector('[data-part="subagent-result"]')).toBeNull()
@@ -209,11 +214,11 @@ test("A compressed child says reading is not supported yet and has no Decode but
   expect(screen.queryByRole("button", { name: "Decode" })).toBeNull()
 })
 
-const parentGone = (unavailable: string) =>
+const parentGone = (unavailable: string, archived = false) =>
   show(
     chat(
       { status: "not_available", unavailable, title: undefined, prompt: undefined },
-      { messages: [] },
+      { messages: [], archived },
     ),
   )
 
@@ -229,11 +234,17 @@ test("An unreadable parent shows only the note and the back link", () => {
 })
 
 test("An archived parent points to the chat page and never says not supported yet", () => {
-  parentGone("compressed")
+  parentGone("compressed", true)
   expect(screen.getByText(/parent session is archived/)).toBeTruthy()
   expect(screen.getByRole("link", { name: "chat page" }).getAttribute("href")).toBe("#/agents/s-a")
   expect(screen.queryByText(/not supported yet/)).toBeNull()
   expect(screen.queryByText("Prompt from the parent agent")).toBeNull()
+})
+
+test("A compressed child with a title is not mistaken for an archived parent", () => {
+  show(gone({ unavailable: "compressed", title: "Explore the repo" }))
+  expect(screen.queryByText(/parent session is archived/)).toBeNull()
+  expect(screen.getByRole("heading", { name: "Explore the repo" })).toBeTruthy()
 })
 
 test("A 404 shows the server's message and the back link", () => {

@@ -137,19 +137,14 @@ export function SubagentPage({
   const running = sub?.status === SubagentStatusRunning
   const now = useNow(running)
   if (!sub) return null
-  // The parent's own call is unreadable, so the header holds no title; a child's file holds one.
+  // An archived parent shares the reason "compressed" with a compressed child; the server's
+  // archived flag tells them apart. A plain gone parent has no title, a child's file holds one.
   if (
     sub.unavailable &&
     sub.unavailable !== SubagentUnavailableStarting &&
-    !sub.title &&
-    !sub.type
+    (chat.archived || (!sub.title && !sub.type))
   ) {
-    return (
-      <ParentGone
-        sessionId={session.id}
-        archived={sub.unavailable === SubagentUnavailableCompressed}
-      />
-    )
+    return <ParentGone sessionId={session.id} archived={!!chat.archived} />
   }
   const unavailable = sub.unavailable
   const title = sub.title ?? ""
@@ -181,39 +176,40 @@ export function SubagentPage({
       {sub.prompt ? sub.prompt : <Text color="text.dim">Prompt not readable</Text>}
     </Box>
   )
-  const result = sub.result ? (
-    done ? (
-      <Box
-        data-part="subagent-result"
-        borderWidth="1px"
-        borderColor="tone.done.fg"
-        borderRadius="lg"
-        p="3"
-        bg="tone.done.bg"
-        whiteSpace="pre-wrap"
-      >
-        <Text fontSize="xs" color="tone.done.fg">
-          Result handed back to the parent
-        </Text>
-        {sub.result}
-      </Box>
-    ) : (
-      <Box
-        data-part="subagent-result"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        p="3"
-        color="text.muted"
-        whiteSpace="pre-wrap"
-      >
-        <Text fontSize="xs" color="text.faint">
-          Last message of the stopped subagent
-        </Text>
-        {sub.result}
-      </Box>
-    )
-  ) : null
+  const result =
+    sub.result && (done || sub.status === SubagentStatusStopped) ? (
+      done ? (
+        <Box
+          data-part="subagent-result"
+          borderWidth="1px"
+          borderColor="tone.done.fg"
+          borderRadius="lg"
+          p="3"
+          bg="tone.done.bg"
+          whiteSpace="pre-wrap"
+        >
+          <Text fontSize="xs" color="tone.done.fg">
+            Result handed back to the parent
+          </Text>
+          {sub.result}
+        </Box>
+      ) : (
+        <Box
+          data-part="subagent-result"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="lg"
+          p="3"
+          color="text.muted"
+          whiteSpace="pre-wrap"
+        >
+          <Text fontSize="xs" color="text.faint">
+            Last message of the stopped subagent
+          </Text>
+          {sub.result}
+        </Box>
+      )
+    ) : null
 
   return (
     <Box display="flex" flexDirection="column" flex="1 1 auto" minH="0" gap="3">

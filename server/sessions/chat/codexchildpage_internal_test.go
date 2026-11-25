@@ -80,7 +80,7 @@ func TestCodexChild_PageCutsHistoryAndHidesThePrompt(t *testing.T) {
 		}
 	}
 	h := got.Subagent
-	if h.Prompt != "Prompt not readable" || h.Result != "child answer" || h.Type != "explorer" || h.Title != "rev" || h.ToolCalls != 0 {
+	if h.Prompt != "Prompt not readable" || h.Result != "" || h.Type != "explorer" || h.Title != "rev" || h.ToolCalls != 0 {
 		t.Errorf("header = %+v", h)
 	}
 	if h.Status != "running" || h.Model != "child-model" || h.Tokens != 77 {
@@ -106,18 +106,19 @@ func TestCodexChild_StatusFollowsTheEndRules(t *testing.T) {
 	wait := `{"timestamp":"` + nowStamp() + `","type":"response_item","payload":{"type":"function_call","name":"wait_agent","call_id":"w1","arguments":"{}"}}`
 	waitOut := `{"timestamp":"` + nowStamp() + `","type":"response_item","payload":{"type":"function_call_output","call_id":"w1","output":"{\"status\":{\"th1\":{\"completed\":\"done\"}}}"}}`
 	for _, tc := range []struct {
-		name  string
-		ago   time.Duration
-		extra []string
-		setup func(*readFixture)
-		want  string
+		name       string
+		ago        time.Duration
+		extra      []string
+		setup      func(*readFixture)
+		want       string
+		wantResult string
 	}{
-		{"spawn returned, no end signal", time.Minute, nil, nil, "running"},
-		{"completed event", time.Minute, []string{completedEvent()}, nil, "done"},
-		{"wait completion", time.Minute, []string{wait, waitOut}, nil, "done"},
-		{"exited session", time.Minute, nil, func(f *readFixture) { f.src.meta.Status.State = wire.SessionExited }, "stopped"},
-		{"new run", time.Minute, nil, func(f *readFixture) { f.src.meta.RunStartedAt = time.Now() }, "stopped"},
-		{"age-out", 3 * time.Hour, nil, nil, "stopped"},
+		{"spawn returned, no end signal", time.Minute, nil, nil, "running", ""},
+		{"completed event", time.Minute, []string{completedEvent()}, nil, "done", "child answer"},
+		{"wait completion", time.Minute, []string{wait, waitOut}, nil, "done", "child answer"},
+		{"exited session", time.Minute, nil, func(f *readFixture) { f.src.meta.Status.State = wire.SessionExited }, "stopped", "child answer"},
+		{"new run", time.Minute, nil, func(f *readFixture) { f.src.meta.RunStartedAt = time.Now() }, "stopped", "child answer"},
+		{"age-out", 3 * time.Hour, nil, nil, "stopped", "child answer"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -126,7 +127,7 @@ func TestCodexChild_StatusFollowsTheEndRules(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(p.f)
 			}
-			if h := p.read(t, "c1").Subagent; h.Status != tc.want || h.Result != "child answer" {
+			if h := p.read(t, "c1").Subagent; h.Status != tc.want || h.Result != tc.wantResult {
 				t.Errorf("header = %+v, want status %s", h, tc.want)
 			}
 		})
@@ -164,7 +165,7 @@ func TestCodexChild_MissingRollout(t *testing.T) {
 			t.Fatalf("first read = %+v, want starting", h)
 		}
 		writeLines(t, p.child, codexChildLines(`null`, false)...)
-		if h := p.read(t, "c1").Subagent; h.Unavailable != "" || h.Result != "child answer" {
+		if h := p.read(t, "c1").Subagent; h.Unavailable != "" || h.Prompt != "Prompt not readable" {
 			t.Errorf("second read = %+v, want the child's page", h)
 		}
 	})

@@ -160,6 +160,10 @@ func TestAgentsChat_SubagentTextOrder(t *testing.T) {
 		}}, []string{"not_available", "Transcript no longer available", "The transcript file is compressed"}},
 		{"archived parent", wire.SessionChatResponse{Archived: true, Subagent: &subagent.SessionSubagent{Status: "done"}},
 			[]string{"done", "The parent session is archived: decode it from the chat page"}},
+		// The shape writeParentGone sends for a parent that exists only as .jsonl.zst.
+		{"archived parent gone", wire.SessionChatResponse{Archived: true, Subagent: &subagent.SessionSubagent{
+			Status: "not_available", Unavailable: subagent.SubagentUnavailableCompressed,
+		}}, []string{"not_available", "Transcript no longer available", "The parent session is archived: decode it from the chat page"}},
 		{"unreadable parent", wire.SessionChatResponse{Unreadable: true}, nil},
 	} {
 		var out bytes.Buffer

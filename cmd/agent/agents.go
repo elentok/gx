@@ -694,7 +694,10 @@ func writeSubagentChat(w io.Writer, chat wire.SessionChatResponse) error {
 			lines = append(lines, "Starting…")
 		case h.Unavailable != "":
 			lines = append(lines, "Transcript no longer available")
-			if h.Unavailable == subagent.SubagentUnavailableCompressed {
+			switch {
+			case chat.Archived:
+				lines = append(lines, "The parent session is archived: decode it from the chat page")
+			case h.Unavailable == subagent.SubagentUnavailableCompressed:
 				lines = append(lines, "The transcript file is compressed")
 			}
 		case chat.Archived:

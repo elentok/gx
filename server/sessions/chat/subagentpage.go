@@ -124,12 +124,15 @@ func (c *Chat) writeParentGone(w http.ResponseWriter, id string, meta Meta, call
 		CallID: callID, RootSessionID: id,
 		Status: subagent.SubagentStatusNotAvailable, Unavailable: subagent.SubagentUnavailableGone,
 	}
-	if _, archived := c.codexArchive(id, meta); archived {
+	// Archived tells a compressed parent from a compressed child, which share
+	// the reason.
+	_, archived := c.codexArchive(id, meta)
+	if archived {
 		head.Unavailable = subagent.SubagentUnavailableCompressed
 	}
 	wire.WriteJSON(w, wire.SessionChatResponse{
 		ConversationID: meta.ConversationID, Questions: []wire.QuestionCard{},
-		Messages: []wire.SessionChatMessage{}, Subagent: head,
+		Messages: []wire.SessionChatMessage{}, Subagent: head, Archived: archived,
 	})
 }
 
