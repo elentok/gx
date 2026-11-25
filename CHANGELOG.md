@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.52.2 - 2026-11-25
+
+- Added a calmer Diff page and a "Worktree diff" mode. The Diff page can now show a worktree's uncommitted changes, plus an "Uncommitted changes" row, an untracked-file cap notice and empty states. Chat, Design, ticket and Queue agent targets all get a Worktree diff route (`SnapshotWorktree` on the server). Chat and ticket responses carry new availability fields.
+- Added a "Show diff" entity action to the menu and command palette, and "Show diff" rows in the jump flow.
+- Changed the Diff page layout. It now has one header bar with the range chip, counts and a Unified/Split toggle. The default is Unified, and the choice is remembered. The file tree uses the Saira font with status dots, and its filter only shows when needed. Panes scroll independently and the path line is sticky. A single collapsed commits row highlights the picked commit, and the open commits list sits in a card with a flipped caret and an "Uncommitted" count. The diff uses the gx theme variables, a mono font and 12.5px/19px lines.
+- Changed Diff page behaviour. It refetches on window focus and keeps your narrowing and selection. The diff stays on screen while a Worktree diff refetches. The page uses one resolved source and names the Worktree diff target instead of its id. There is a ref edit link, a Try again button and updated notices.
+- Fixed phone layout for the Diff page. Tabs are left-aligned, the Worktree chip wraps, and the range chip sits on its own row at the left edge.
+- Added the `worktree-diff` fixture scenario with seeded edge states, plus Playwright flows for Worktree diff, focus refetch, ref edit keys and Try again.
+- Changed docs and housekeeping: added the better-diff spec and the Worktree diff and Show diff glossary terms, with spec headings in verify-plan format. Fixed guard, chip test and raw-style guard failures after a rebase, and moved the worktree-diff fixture to `spec/wtd` and the ShowDiffDir test to `server/diff` to fit the size budgets.
+
 ## v0.52.1 - 2026-11-25
 
 - Added epic-level blockers to the web UI, TUI and CLI. An epic can now show a Waiting state ("Waiting on A") on the Epic page stats line, the sidebar, the jump palette and the TUI Queue header. A "not moving" hint shows when the blocking epic is not progressing, and a Cycle state is now reachable. The Epic page has a "Blocked by" chip row with links and removal, and a blocker picker with a toggle. The picker shows a cycle refusal as a sentence. An error chip's x removes a stale blocker entry. Added `POST /v1/epics/blocker` and `gx server epics blocker`. The schedule Reason now names the blocker epic for a ticket held by its epic. A Merge ticket can run while its epic's blocker is unmerged.
