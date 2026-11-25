@@ -12,7 +12,7 @@ export const draftPage = (page: Page) => ({
   saveStatus: page.locator("[data-save-shown]"),
 })
 
-/** A blocked Start's reason is its tooltip. Focus opens it; a hover cannot reach an `aria-disabled` Start. */
+/** A blocked Start's reason is its tooltip. Focus opens it, as do hover and tap. */
 export const startReason = async (page: Page, start: Locator) => {
   await start.focus()
   return page.getByRole("tooltip")

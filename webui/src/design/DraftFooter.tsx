@@ -1,8 +1,8 @@
 import { Box, Spinner, VisuallyHidden } from "@chakra-ui/react"
-import { useId, type MouseEvent } from "react"
+import { useId } from "react"
 import { LuTrash2 } from "react-icons/lu"
 import { Button } from "../ui/button/Button"
-import { TipPopup } from "../ui/info-tip/TipPopup"
+import { TipPopup, type TipTriggerProps } from "../ui/info-tip/TipPopup"
 import { AttachButton } from "./ComposerImages"
 
 interface Props {
@@ -18,8 +18,9 @@ interface Props {
   startLabel?: string
 }
 
-// `aria-disabled` keeps hover and tap alive, which the Button's `disabled` style would kill.
-const blockedLook = { "&[aria-disabled=true]": { opacity: 0.5, cursor: "default" } }
+// Chakra's `_disabled` also matches `aria-disabled`, and the Button sets `pointer-events: none`
+// there, so a blocked Start replaces it to keep pointer events on for hover and tap.
+const blockedLook = { opacity: 0.5, cursor: "default", pointerEvents: "auto" } as const
 
 /** The draft page's action bar: attach, remove and Start. */
 export function DraftFooter({
@@ -33,19 +34,21 @@ export function DraftFooter({
 }: Props) {
   const reasonId = useId()
   const reason = startDisabled ? startReason : undefined
-  const start = (tip?: object) => (
+  const start = (tip?: TipTriggerProps) => (
     <Button
       type="submit"
       tone="running"
       aria-disabled={startDisabled || undefined}
       aria-describedby={reason ? reasonId : undefined}
-      onClick={(e) => {
-        if (startDisabled) e.preventDefault()
-      }}
       whiteSpace="nowrap"
       flexShrink={0}
-      css={blockedLook}
+      _disabled={blockedLook}
       {...tip}
+      onClick={(e) => {
+        if (!startDisabled) return
+        e.preventDefault()
+        tip?.onClick()
+      }}
     >
       {pending && <Spinner size="sm" />}
       {startLabel}
@@ -70,17 +73,7 @@ export function DraftFooter({
       {reason ? (
         <>
           <VisuallyHidden id={reasonId}>{reason}</VisuallyHidden>
-          <TipPopup content={reason}>
-            {(tip) =>
-              start({
-                ...tip,
-                onClick: (e: MouseEvent) => {
-                  e.preventDefault()
-                  tip.onClick()
-                },
-              })
-            }
-          </TipPopup>
+          <TipPopup content={reason}>{start}</TipPopup>
         </>
       ) : (
         start()

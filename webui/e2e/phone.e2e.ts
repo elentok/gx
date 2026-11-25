@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import { PNG, sessions } from "./agentsKit"
-import { draftPage, startReason } from "./draftKit"
+import { draftPage } from "./draftKit"
 import { expect, nav, swipe, test } from "./fixture"
 
 // 375 px is below the wide layout's 62em breakpoint.
@@ -269,11 +269,12 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   await expect(d.remove).toHaveAccessibleName("Remove draft")
 
   // A blocked Start opens its reason (a name that is not a slug) as a tooltip.
-  // follow-ups/829: a tap cannot reach a blocked Start yet (pointer-events none), so focus opens it here.
   await d.prompt.fill("An idea for the tap.")
   await d.slug.fill("Bad Slug")
   await expect(d.start).toHaveAttribute("aria-disabled", "true")
-  await expect(await startReason(page, d.start)).toContainText("is not a slug")
+  // Playwright treats aria-disabled as not enabled, so `force` skips that wait; the click still hits by position.
+  await d.start.click({ force: true })
+  await expect(page.getByRole("tooltip")).toContainText("is not a slug")
   await d.slug.fill("")
   await d.prompt.fill("")
 
