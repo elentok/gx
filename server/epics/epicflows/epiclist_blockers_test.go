@@ -27,7 +27,16 @@ func oneTicket(status string) map[string]string {
 
 func listRows(t *testing.T, setup func(store string)) map[string]wire.EpicListRow {
 	t.Helper()
+	return listRowsAfter(t, setup, nil)
+}
+
+// listRowsAfter runs after on the started server before it lists the epics.
+func listRowsAfter(t *testing.T, setup func(store string), after func(h *servertest.Harness)) map[string]wire.EpicListRow {
+	t.Helper()
 	h, base := rigs.StartEpicDetail(t, setup)
+	if after != nil {
+		after(h)
+	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	byName := map[string]wire.EpicListRow{}
 	for _, r := range rigs.GetEpicList(t, code, body).Epics {
@@ -99,13 +108,19 @@ func TestEpicList_BlockersSortNotMovingFirstThenByName(t *testing.T) {
 
 func TestEpicList_BlockersHintNamesTheDeepestNotMovingEpic(t *testing.T) {
 	t.Parallel()
-	rows := listRows(t, func(store string) {
+	rows := listRowsAfter(t, func(store string) {
 		rigs.WriteEpicFiles(t, store, "stuck", openEpic, oneTicket("draft"))
 		rigs.WriteEpicFiles(t, store, "mid", blockedEpic("stuck"), oneTicket("open"))
 		rigs.WriteEpicFiles(t, store, "top", blockedEpic("mid"), oneTicket("open"))
 		rigs.WriteEpicFiles(t, store, "implemented", "---\nstatus: done\ncompleted_at: 2026-01-02T11:00:00Z\n---\n", oneTicket("done"))
 		rigs.WriteEpicFiles(t, store, "mid2", blockedEpic("implemented"), oneTicket("open"))
 		rigs.WriteEpicFiles(t, store, "top2", blockedEpic("mid2"), oneTicket("open"))
+		rigs.WriteEpicFiles(t, store, "top3", blockedEpic("implemented, mid2"), oneTicket("open"))
+	}, func(h *servertest.Harness) {
+		// Only a queued Waiting epic hands the hint on; mid2 stays unqueued.
+		if res, err := h.Client.Queue.Add(t.Context(), "proj:mid/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("queue add: %+v, %v", res, err)
+		}
 	})
 
 	top := rows["top"]
@@ -116,11 +131,32 @@ func TestEpicList_BlockersHintNamesTheDeepestNotMovingEpic(t *testing.T) {
 	if h == nil || h.Name != "stuck" || h.Address != "proj:stuck" || h.State != wire.EpicListPaused || h.Deadlocked {
 		t.Errorf("top hint = %+v, want stuck in state paused", h)
 	}
-	if got := rows["top2"].Blockers; len(got) != 1 || got[0].Hint != nil {
-		t.Errorf("top2 blockers = %+v, want one moving blocker with no hint", got)
+	// mid2 is Waiting but not queued, so it is itself the stuck epic: no hint.
+	if got := rows["top2"].Blockers; len(got) != 1 || got[0].Hint != nil || got[0].State != wire.EpicListReady {
+		t.Errorf("top2 blockers = %+v, want unqueued mid2 itself, no hint", got)
+	}
+	if got, want := blockerNames(rows["top3"].Blockers), []string{"mid2", "implemented"}; !slices.Equal(got, want) {
+		t.Errorf("top3 blockers = %v, want the unqueued blocker sorted as not moving: %v", got, want)
 	}
 	if got := rows["mid"].Blockers; len(got) != 1 || got[0].Hint != nil || got[0].State != wire.EpicListPaused {
 		t.Errorf("mid blockers = %+v, want stuck itself, no hint", got)
+	}
+}
+
+func TestEpicList_BlockersQueuedWaitingBlockerOverMovingEpicStaysMoving(t *testing.T) {
+	t.Parallel()
+	rows := listRowsAfter(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "implemented", "---\nstatus: done\ncompleted_at: 2026-01-02T11:00:00Z\n---\n", oneTicket("done"))
+		rigs.WriteEpicFiles(t, store, "mid", blockedEpic("implemented"), oneTicket("open"))
+		rigs.WriteEpicFiles(t, store, "top", blockedEpic("mid"), oneTicket("open"))
+	}, func(h *servertest.Harness) {
+		if res, err := h.Client.Queue.Add(t.Context(), "proj:mid/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("queue add: %+v, %v", res, err)
+		}
+	})
+	got := rows["top"].Blockers
+	if len(got) != 1 || got[0].Hint != nil || got[0].State != wire.EpicListQueued {
+		t.Errorf("top blockers = %+v, want queued waiting mid, moving, no hint", got)
 	}
 }
 

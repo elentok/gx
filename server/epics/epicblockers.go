@@ -43,12 +43,13 @@ func (w blockerWalk) hintOf(e tickets.Epic) wire.BlockerHint {
 }
 
 // notMoving reports whether e is stuck, and the deepest stuck epic behind it.
-// A Waiting epic is stuck only when one of its own blockers is, so the walk
-// follows UnreleasedBlockers; visited ends it on a hand-edited epic cycle.
+// A queued Waiting epic is stuck only when one of its own blockers is, so the
+// walk follows UnreleasedBlockers; visited ends it on a hand-edited epic cycle.
+// An unqueued one is stuck itself: its list state is Ready to queue.
 func (w blockerWalk) notMoving(e tickets.Epic, visited map[string]bool) (wire.BlockerHint, bool) {
 	visited[e.Name] = true
-	if StateOf(e) != StateWaiting {
-		h := w.hintOf(e)
+	h := w.hintOf(e)
+	if notMovingStates[h.State] || StateOf(e) != StateWaiting {
 		return h, notMovingStates[h.State]
 	}
 	for _, name := range e.UnreleasedBlockers {
