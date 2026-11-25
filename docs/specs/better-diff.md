@@ -148,7 +148,7 @@ Calmer page (stories 1 to 15, 18 to 22)
 - Checks: `gx brief -C webui playwright diff-page.e2e.ts <flow numbers>` exits 0. On the `missing-sha` shape, the commits-not-available notice has no "Reload" text. A forced failed load shows a "Try again" button that reloads the page data.
 - New flows to write: the focus refetch (dispatch a window focus after the fixture changes the range, once with the selected file still present and once after it was removed), the edit link keyboard rules, and the failed-load "Try again". These become implementation tickets.
 
-Colors and font (stories 16, 17)
+Colors and font (stories 16 to 17)
 - Flows: the `diff-page.e2e.ts` flow that today asserts "the code is 12px/18px", updated to 12.5px/19px. A new step asserts the diff line's computed font family equals the app's mono font, and the rendered added and deleted rows use the new tints. Look check: the Mock states `a-desktop-range` and `a-desktop-worktree`.
 - Checks: `rg '!important' webui/src/diff` finds nothing in the theme block. No step uses the `.diffs-host` selector.
 - New flows: none beyond the updated step.
@@ -158,16 +158,16 @@ Worktree diff (stories 23 to 27, 33 to 42)
 - Checks: after the page loads, `git -C <worktree> status --porcelain` equals its output before, the index file's mtime and sha are unchanged, and no `index.lock` exists. `curl` of the worktree route for a chat id that does not exist answers with the empty-state reason, not a 5xx.
 - New flows: all of the above. They become implementation tickets, with the scenario.
 
-Show diff action (stories 23 to 32)
+Show diff action (stories 28 to 32)
 - Flows: the registry rows step of the `jump.e2e.ts` flow (Cmd/Ctrl+P rows), extended. On a chat, a Design, a claimed ticket, a paused ticket, a done ticket and an epic, "Show diff" is in the palette's "This page" section and in the page's action menu, and running it opens the matching Diff page URL. The epic page and the done ticket keep their "View diff" links, which open the same URL.
 - Checks: the action is present on a claimed ticket and on a paused ticket with an iteration worktree. It is absent on a chat whose directory is a separate clone or not a git repo, on a ticket with no iteration worktree and no commits, on an epic with no range and on a Builder session. `registry.test.ts` passes.
 - New flows: the menu and palette steps above, in the existing flows.
 
-Mock states (stored mock `04-prototype-calmer-diff-page.html`, the look check for the stories above)
-- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, state `a-desktop-range`, 1280 px, scenario `epic-diff` (shape `merged`), parts: header, range, counts, view-toggle, left, commits-button, file-tree, diff-pane.
-- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, state `a-desktop-worktree`, 1280 px, scenario `worktree-diff` (a claimed ticket, new), parts: header, range, counts, view-toggle, left, commits-button, commits-list (open, ends with "Uncommitted changes"), file-tree, diff-pane.
-- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, state `a-phone-files`, 390 px, scenario `worktree-diff` (a claimed ticket, new), parts: header, range, counts, view-toggle, left, commits-button, file-tree.
-- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, state `a-phone-diff`, 390 px, scenario `epic-diff` (shape `merged`), parts: header, range, counts, view-toggle, diff-pane.
+**Mock states**
+- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, `a-desktop-range`, 1280 px, scenario `epic-diff` (shape `merged`), parts: header, range, counts, view-toggle, left, commits-button, file-tree, diff-pane.
+- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, `a-desktop-worktree`, 1280 px, scenario `worktree-diff` (a claimed ticket, new), parts: header, range, counts, view-toggle, left, commits-button, commits-list (open, ends with "Uncommitted changes"), file-tree, diff-pane.
+- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, `a-phone-files`, 390 px, scenario `worktree-diff` (a claimed ticket, new), parts: header, range, counts, view-toggle, left, commits-button, file-tree.
+- `$(gx tickets root)/better-diff/mocks/04-prototype-calmer-diff-page.html`, `a-phone-diff`, 390 px, scenario `epic-diff` (shape `merged`), parts: header, range, counts, view-toggle, diff-pane.
 
 ## Out of Scope
 
