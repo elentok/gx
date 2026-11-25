@@ -217,3 +217,135 @@ func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 		t.Errorf("recovery-applied = %+v, want only the first", got)
 	}
 }
+
+// waitingEpic is epic-a waiting on the done, unmerged epic "blocker": the
+// Waiting state. Ticket 01 is queued; extra tickets replace or add to it.
+func waitingEpic(t *testing.T, landing string, extra map[string]servertest.TicketOpts) (*servertest.Harness, string) {
+	t.Helper()
+	store := t.TempDir()
+	repo := testutil.TempRepo(t)
+	if landing != "" { // an on-done epic stacks on the blocker's branch
+		servertest.CommitOnBranch(t, repo, servertest.StackBlocker)
+	}
+	servertest.WriteCompleteEpic(t, store, "blocker")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{})
+	for id, opts := range extra {
+		servertest.WriteTicketWith(t, store, "proj", "epic-a", id, "first", opts)
+	}
+	servertest.WriteEpicBlockedBy(t, store, "proj", "epic-a", "blocker")
+	if err := servertest.WriteProjectRepo(store, "proj", repo, landing); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	if _, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil {
+		t.Fatal(err)
+	}
+	return h, store
+}
+
+// An epic that only waits on an unreleased blocker epic is not a deadlock: it
+// logs nothing, starts no recovery, keeps its queue place and runs no agent.
+func TestDeadlock_WaitingEpicLogsNothingAndStartsNoRecovery(t *testing.T) {
+	t.Parallel()
+	h, _ := waitingEpic(t, "", nil)
+	for range 3 {
+		h.Server.Scheduler().ClaimNext()
+	}
+	time.Sleep(200 * time.Millisecond) // negative wait: a deadlock event would show by now
+	if got := runLogOf(t, h, events.Deadlocked); len(got) != 0 {
+		t.Errorf("deadlocked events = %+v, want none", got)
+	}
+	if got := runLogOf(t, h, events.RecoveryApplied); len(got) != 0 {
+		t.Errorf("recovery-applied = %+v, want none", got)
+	}
+	if q := rigs.QueueAddresses(t, h); !slices.Contains(q, "proj:epic-a/01") {
+		t.Errorf("queue = %v, want proj:epic-a/01 kept", q)
+	}
+	if n := h.Server.Registry().CountRoot("proj:epic-a"); n != 0 {
+		t.Errorf("running sessions = %d, want 0", n)
+	}
+}
+
+// The blocker merging releases the waiting epic, which then starts by itself.
+func TestDeadlock_WaitingEpicStartsWhenBlockerReleases(t *testing.T) {
+	t.Parallel()
+	h, store := waitingEpic(t, "", nil)
+	h.Server.Scheduler().ClaimNext()
+	if err := tickets.StampEpicFields(filepath.Join(store, "proj", "blocker"), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	h.Server.Rescan()
+	h.Server.Scheduler().ClaimNext()
+	servertest.WaitStatus(t, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"), "claimed")
+	if got := runLogOf(t, h, events.Deadlocked); len(got) != 0 {
+		t.Errorf("deadlocked events = %+v, want none", got)
+	}
+}
+
+// Under the on-done policy a done blocker releases the epic without a merge.
+func TestDeadlock_WaitingEpicWithOnDoneBlockerReleases(t *testing.T) {
+	t.Parallel()
+	h, store := waitingEpic(t, `,"landing":"on-done"`, nil)
+	h.Server.Rescan()
+	h.Server.Scheduler().ClaimNext()
+	servertest.WaitStatus(t, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"), "claimed")
+	if got := runLogOf(t, h, events.Deadlocked); len(got) != 0 {
+		t.Errorf("deadlocked events = %+v, want none", got)
+	}
+}
+
+// A paused ticket in a waiting epic is still all-paused: a person can clear it.
+func TestDeadlock_PausedTicketBeatsWaiting(t *testing.T) {
+	t.Parallel()
+	h, _ := waitingEpic(t, "", nil)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
+	}
+	h.Server.Scheduler().ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+	h.Server.Scheduler().ClaimNext()
+	got := runLogOf(t, h, events.Deadlocked)
+	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
+		t.Errorf("deadlocked events = %+v, want one all-paused", got)
+	}
+}
+
+// A blocked cycle inside an epic that also waits on a blocker still deadlocks.
+func TestDeadlock_CycleStillDeadlocksWhileBlockerUnreleased(t *testing.T) {
+	t.Parallel()
+	h, _ := waitingEpic(t, "", map[string]servertest.TicketOpts{
+		"01": {BlockedBy: []string{"02"}},
+		"02": {BlockedBy: []string{"01"}},
+	})
+	h.Server.Scheduler().ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+	h.Server.Scheduler().ClaimNext()
+	got := runLogOf(t, h, events.Deadlocked)
+	if len(got) != 1 || got[0].Kind != string(events.BlockedCycle) {
+		t.Errorf("deadlocked events = %+v, want one blocked-cycle", got)
+	}
+}
+
+// Waiting forgets an earlier deadlock entry, so a later deadlock logs again.
+func TestDeadlock_LeavingCycleForgetsTheEntry(t *testing.T) {
+	t.Parallel()
+	h, store := waitingEpic(t, "", map[string]servertest.TicketOpts{
+		"01": {BlockedBy: []string{"02"}},
+		"02": {BlockedBy: []string{"01"}},
+	})
+	h.Server.Scheduler().ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) == 1 })
+
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{})
+	h.Server.Rescan()
+	h.Server.Scheduler().ClaimNext()
+	time.Sleep(200 * time.Millisecond) // negative wait: a second event would show by now
+	if got := runLogOf(t, h, events.Deadlocked); len(got) != 1 {
+		t.Fatalf("deadlocked events = %+v, want still one while Waiting", got)
+	}
+
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{Status: "error"})
+	h.Server.Rescan()
+	h.Server.Scheduler().ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) == 2 })
+}

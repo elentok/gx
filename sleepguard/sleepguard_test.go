@@ -81,7 +81,7 @@ var allowed = map[string]int{
 	"server/budget/limits_test.go":                                     2,
 	"server/configreload_chat_test.go":                                 2,
 	"server/lifecycle/configreload_test.go":                            3, // the third is a negative wait: a banner the Desktop switch dropped would show by now
-	"server/sched/deadlock_test.go":                                    2,
+	"server/sched/deadlock_test.go":                                    4, // two are negative waits: a deadlock event for a Waiting epic would show by now
 	"server/disk/diskhealth_test.go":                                   1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                                     3,
 	"server/disk/diskwatch_test.go":                                    3,

@@ -40,13 +40,19 @@ func (d *deadlocks) leave(root queue.RootRef) {
 
 // deadlockKind says how e is deadlocked: nothing schedulable and nothing
 // running while work remains. Paused tickets make it all-paused, since a person
-// can clear them; none makes it a blocked cycle.
+// can clear them; none makes it a blocked cycle. A Waiting epic is neither: it
+// only waits for an unreleased blocker epic.
 func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	switch epics.StateOf(e) {
 	case epics.StatePaused:
 		return events.AllPaused, true
 	case epics.StateCycle:
 		return events.BlockedCycle, true
+	case epics.StateWaiting:
+		// The blocker merging releases the epic with no person involved, so
+		// there is nothing to recover. Listed so a new state cannot slip past
+		// the default unnoticed.
+		return "", false
 	}
 	return "", false
 }
