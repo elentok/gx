@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 )
@@ -35,7 +36,7 @@ func proc(pid int, comm string, ticks uint64, mem uint64) syshealth.Process {
 	return syshealth.Process{PID: pid, PPID: 1, StartUnix: 1000, Comm: comm, CPUTicks: ticks, MemBytes: mem}
 }
 
-func health(t *testing.T, h *servertest.Harness, wait bool) wire.HealthReport {
+func health(t *testing.T, h *servertest.Harness, wait bool) ops.HealthReport {
 	t.Helper()
 	get := h.Client.Admin.Health
 	if wait {
@@ -48,7 +49,7 @@ func health(t *testing.T, h *servertest.Harness, wait bool) wire.HealthReport {
 	return rep
 }
 
-func labels(l wire.CauseList) []string {
+func labels(l ops.CauseList) []string {
 	out := []string{}
 	for _, r := range l.Rows {
 		out = append(out, r.Label)
@@ -138,7 +139,7 @@ func TestHealthProcs_TopThreeByCPUAndMemory(t *testing.T) {
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10), proc(11, "b", 200, 50), proc(12, "c", 100, 30),
 		proc(13, "d", 50, 70), proc(14, "e", 10, 60))
-	var rep wire.HealthReport
+	var rep ops.HealthReport
 	testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
 		rep = health(t, h, true)
 		return rep.CPU.State == wire.HealthStateNormal
@@ -163,7 +164,7 @@ func TestHealthProcs_FailingSourceGivesUnavailableAndMetersStillRead(t *testing.
 	t.Parallel()
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second})
 	h.Processes.Fail(syshealth.ErrUnavailable)
-	var rep wire.HealthReport
+	var rep ops.HealthReport
 	testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
 		rep = health(t, h, true)
 		return rep.CPU.State == wire.HealthStateNormal
@@ -171,7 +172,7 @@ func TestHealthProcs_FailingSourceGivesUnavailableAndMetersStillRead(t *testing.
 	if rep.CPU.State != wire.HealthStateNormal || rep.Memory.State != wire.HealthStateNormal {
 		t.Fatalf("meters = %s / %s, want normal", rep.CPU.State, rep.Memory.State)
 	}
-	if rep.Causes.CPU.Marker != wire.CauseMarkerUnavailable || rep.Causes.Memory.Marker != wire.CauseMarkerUnavailable {
+	if rep.Causes.CPU.Marker != ops.CauseMarkerUnavailable || rep.Causes.Memory.Marker != ops.CauseMarkerUnavailable {
 		t.Fatalf("causes = %+v, want unavailable on both", rep.Causes)
 	}
 }
@@ -183,11 +184,11 @@ func TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList(t *testing.T) {
 	h := startProcs(t, procTiming{delay: 150 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	first := health(t, h, false)
-	if first.Causes.CPU.Marker != wire.CauseMarkerReading || len(first.Causes.Memory.Rows) != 1 {
+	if first.Causes.CPU.Marker != ops.CauseMarkerReading || len(first.Causes.Memory.Rows) != 1 {
 		t.Fatalf("first call causes = %+v, want reading CPU and one memory row", first.Causes)
 	}
 	waited := health(t, h, true)
-	if waited.Causes.CPU.Marker != wire.CauseMarkerNone || !sameLabels(labels(waited.Causes.CPU), "a") {
+	if waited.Causes.CPU.Marker != ops.CauseMarkerNone || !sameLabels(labels(waited.Causes.CPU), "a") {
 		t.Fatalf("wait call cpu list = %+v, want [a]", waited.Causes.CPU)
 	}
 	if n := h.Processes.Reads(); n != 2 {
@@ -201,7 +202,7 @@ func TestHealthProcs_WaitOnAQuietServerBlocksForTheSecondRead(t *testing.T) {
 	h := startProcs(t, procTiming{delay: 20 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	rep := health(t, h, true)
-	if rep.Causes.CPU.Marker != wire.CauseMarkerNone || !sameLabels(labels(rep.Causes.CPU), "a") {
+	if rep.Causes.CPU.Marker != ops.CauseMarkerNone || !sameLabels(labels(rep.Causes.CPU), "a") {
 		t.Fatalf("cpu list = %+v, want [a]", rep.Causes.CPU)
 	}
 	if n := h.Processes.Reads(); n != 2 {
@@ -217,7 +218,7 @@ func TestHealthProcs_WaitReturnsUnavailableWhenTheSecondReadFails(t *testing.T) 
 	h.Processes.FailAfter(1, errors.New("boom"))
 	health(t, h, false)
 	rep := health(t, h, true)
-	if rep.Causes.CPU.Marker != wire.CauseMarkerUnavailable {
+	if rep.Causes.CPU.Marker != ops.CauseMarkerUnavailable {
 		t.Fatalf("cpu list = %+v, want unavailable", rep.Causes.CPU)
 	}
 }
@@ -240,7 +241,7 @@ func TestHealthProcs_WaitCapsAndAnswersReading(t *testing.T) {
 	if took := time.Since(start); took < waitCap {
 		t.Fatalf("wait returned after %v, want at least the cap %v", took, waitCap)
 	}
-	if rep.Causes.CPU.Marker != wire.CauseMarkerReading {
+	if rep.Causes.CPU.Marker != ops.CauseMarkerReading {
 		t.Fatalf("cpu list = %+v, want reading", rep.Causes.CPU)
 	}
 }

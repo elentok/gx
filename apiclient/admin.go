@@ -154,16 +154,16 @@ func (a *Admin) ChecksStatus(ctx context.Context, project string) (wire.ChecksSt
 }
 
 // Health is the machine's health: host, CPU, memory and every watched disk.
-func (a *Admin) Health(ctx context.Context) (wire.HealthReport, error) {
-	var rep wire.HealthReport
+func (a *Admin) Health(ctx context.Context) (ops.HealthReport, error) {
+	var rep ops.HealthReport
 	err := a.t.get(ctx, "/v1/health", &rep)
 	return rep, err
 }
 
 // HealthWait is Health with the `wait` option: a CPU list still reading is
 // held back until the server's second process read ends.
-func (a *Admin) HealthWait(ctx context.Context) (wire.HealthReport, error) {
-	var rep wire.HealthReport
+func (a *Admin) HealthWait(ctx context.Context) (ops.HealthReport, error) {
+	var rep ops.HealthReport
 	err := a.t.get(ctx, "/v1/health?wait", &rep)
 	return rep, err
 }

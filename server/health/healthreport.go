@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -23,7 +24,7 @@ func pressureName(level int) string {
 	return ""
 }
 
-func (s *Health) healthReport(ctx context.Context, wait bool) wire.HealthReport {
+func (s *Health) healthReport(ctx context.Context, wait bool) ops.HealthReport {
 	w := &s.healthW
 	w.mu.Lock()
 	h, l := w.health, w.latest
@@ -33,9 +34,9 @@ func (s *Health) healthReport(ctx context.Context, wait bool) wire.HealthReport 
 	cleanBelow := uint64(ds.CleanBelow)
 	statuses := s.disks.Statuses(false)
 	in := syshealthDisks(statuses, cleanBelow)
-	disks := make([]wire.HealthDisk, 0, len(statuses))
+	disks := make([]ops.HealthDisk, 0, len(statuses))
 	for i, d := range statuses {
-		disks = append(disks, wire.HealthDisk{ID: d.ID, Name: d.Name, FreeBytes: d.FreeBytes, TotalBytes: d.TotalBytes,
+		disks = append(disks, ops.HealthDisk{ID: d.ID, Name: d.Name, FreeBytes: d.FreeBytes, TotalBytes: d.TotalBytes,
 			State: wire.HealthState(in[i].State()), Held: d.Held, Projects: d.Projects, ReadAt: d.ReadAt})
 	}
 	worstID := ""
@@ -43,15 +44,15 @@ func (s *Health) healthReport(ctx context.Context, wait bool) wire.HealthReport 
 		worstID = statuses[worst].ID
 	}
 	host, _ := os.Hostname()
-	return wire.HealthReport{
+	return ops.HealthReport{
 		Host: host,
 		Time: time.Now(),
-		CPU: wire.CPUReport{Percent: l.cpuPct, Average: l.cpuAvg, Level: h.CPU.Level, State: h.CPU.State, Reason: h.CPU.Reason,
-			Thresholds: wire.HealthThresholds{High: syshealth.CPUHigh, Critical: syshealth.CPUCritical}, ReadAt: h.CPU.ReadAt},
-		Memory: wire.MemoryReport{Percent: l.memPct, UsedBytes: l.memUsed, TotalBytes: l.memTotal, Average: l.memAvg,
+		CPU: ops.CPUReport{Percent: l.cpuPct, Average: l.cpuAvg, Level: h.CPU.Level, State: h.CPU.State, Reason: h.CPU.Reason,
+			Thresholds: ops.HealthThresholds{High: syshealth.CPUHigh, Critical: syshealth.CPUCritical}, ReadAt: h.CPU.ReadAt},
+		Memory: ops.MemoryReport{Percent: l.memPct, UsedBytes: l.memUsed, TotalBytes: l.memTotal, Average: l.memAvg,
 			Pressure: pressureName(l.pressure), Level: h.Memory.Level, State: h.Memory.State, Reason: h.Memory.Reason,
-			Thresholds: wire.HealthThresholds{High: syshealth.MemHigh, Critical: syshealth.MemCritical}, ReadAt: h.Memory.ReadAt},
-		Disks: wire.DisksReport{WarnBelow: disk.SizeOrOff(ds.WarnBelow), CleanBelow: disk.SizeOrOff(ds.CleanBelow),
+			Thresholds: ops.HealthThresholds{High: syshealth.MemHigh, Critical: syshealth.MemCritical}, ReadAt: h.Memory.ReadAt},
+		Disks: ops.DisksReport{WarnBelow: disk.SizeOrOff(ds.WarnBelow), CleanBelow: disk.SizeOrOff(ds.CleanBelow),
 			State: h.Disk.State, Level: h.Disk.Level, Reason: h.Disk.Reason, WorstID: worstID, Disks: disks},
 		Causes: s.healthCauses(ctx, wait),
 	}

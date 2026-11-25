@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { HealthReport } from "../generated/server"
+import type { HealthReport } from "../generated/ops"
 import { readPageCache, writePageCache } from "../pageCache"
 import { fetchJson } from "../ticket/detail"
 

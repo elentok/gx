@@ -5,15 +5,14 @@ import { ConnectionContext, useConnectionState, type Connection } from "../conne
 import { postCleanDisk } from "../page/DiskStrips"
 import { Button } from "../ui/button/Button"
 import { refusalText, useWrite } from "../useWrite"
+import type { HealthReason, HealthState } from "../generated/server"
 import type {
   CauseList as CauseListData,
   CauseMarker,
   CauseRow,
   DisksReport,
   HealthDisk,
-  HealthReason,
-  HealthState,
-} from "../generated/server"
+} from "../generated/ops"
 import { ticketHref } from "../hrefs"
 import { STATE_COLOR } from "../ui/tray/stateColor"
 import { formatBytes } from "./formatBytes"

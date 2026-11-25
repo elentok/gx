@@ -1200,20 +1200,15 @@ export interface EpicListRow extends BackLink {
    */
   queueable: boolean;
   /**
-   * BlockedByEpics are the addresses of Blockers.
-   * Deprecated: transitional so the web fixtures keep type-checking; read
-   * Blockers. Removed with the fixtures' migration.
+   * BlockedByEpics is the addresses of Blockers. Deprecated: transitional so
+   * the web fixtures type-check; removed with them.
    */
   blocked_by_epics: string[];
   /**
-   * Blockers are the epics the epic waits on; see EpicBlocker. Optional so
-   * fixtures that do not carry it still type-check.
+   * Blockers is optional so fixtures without it type-check. WaitingOnEpic
+   * marks a Waiting epic, whose list State is only queued or ready.
    */
   blockers?: EpicBlocker[];
-  /**
-   * WaitingOnEpic is set when the epic is Waiting on an unreleased epic. Its
-   * list State is queued or ready, so the row has no other way to say so.
-   */
   waiting_on_epic?: boolean;
   /**
    * LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
@@ -1318,32 +1313,18 @@ export interface EpicListRow extends BackLink {
   unread?: boolean;
 }
 /**
- * EpicBlocker is one entry of an epic's blocked_by that has not released it.
- * The list is ordered invalid refs first, then not-moving blockers, then by
- * name; clients take entry 0 as "A".
+ * EpicBlocker is an unreleased entry of an epic's blocked_by, ordered invalid
+ * refs first, then not-moving, then by name; entry 0 is "A". Address, Name and
+ * State are empty for an Invalid entry, whose Ref is the stored token.
+ * Deadlocked is separate because a deadlocked epic's State is plain paused.
+ * Hint is the deepest not-moving epic behind a Waiting blocker, else nil.
  */
 export interface EpicBlocker {
-  /**
-   * Address, Name and State are the blocker's own, State being its Epics page
-   * state. All of Address, Name and State are empty for an Invalid entry.
-   */
   address?: string;
   name?: string;
   state?: EpicListState;
-  /**
-   * Deadlocked is set when the blocker is Deadlocked: its State is plain
-   * paused then, which cannot say so.
-   */
   deadlocked?: boolean;
-  /**
-   * Hint is the deepest not-moving epic behind a Waiting blocker; nil for a
-   * moving blocker and for one that is not moving itself.
-   */
   hint?: BlockerHint;
-  /**
-   * Invalid marks a stored blocked_by entry that names no whole epic of the
-   * project; Ref is that stored token.
-   */
   invalid?: boolean;
   ref?: string;
 }
@@ -1767,112 +1748,6 @@ export const PressureCritical = "critical";
  * Pressure names the macOS memory pressure level; the field is absent on Linux.
  */
 export type Pressure = typeof PressureNormal | typeof PressureWarn | typeof PressureCritical;
-/**
- * HealthThresholds are the average percents where a meter turns high and critical.
- */
-export interface HealthThresholds {
-  high: number /* float64 */;
-  critical: number /* float64 */;
-}
-/**
- * CPUReport is the CPU meter in the health route.
- */
-export interface CPUReport {
-  percent: number /* float64 */;
-  average: number /* float64 */;
-  level: number /* int */;
-  state: HealthState;
-  reason?: HealthReason;
-  thresholds: HealthThresholds;
-  read_at: string;
-}
-/**
- * MemoryReport is the memory meter in the health route.
- */
-export interface MemoryReport {
-  percent: number /* float64 */;
-  used_bytes: number /* uint64 */;
-  total_bytes: number /* uint64 */;
-  average: number /* float64 */;
-  pressure?: string;
-  level: number /* int */;
-  state: HealthState;
-  reason?: HealthReason;
-  thresholds: HealthThresholds;
-  read_at: string;
-}
-/**
- * HealthDisk is one watched disk in the health route.
- */
-export interface HealthDisk {
-  id: string;
-  name: string;
-  free_bytes: number /* uint64 */;
-  total_bytes: number /* uint64 */;
-  state: HealthState;
-  held: boolean;
-  projects: string[];
-  read_at: string;
-}
-/**
- * DisksReport is every watched disk with the disk thresholds as size strings.
- * State, Level and Reason are the disk meter the Tray's D bar shows; WorstID
- * is the disk that meter follows, empty when there are no disks.
- */
-export interface DisksReport {
-  warn_below: string;
-  clean_below: string;
-  state: HealthState;
-  level: number /* int */;
-  reason?: HealthReason;
-  worst_id?: string;
-  disks: HealthDisk[];
-}
-/**
- * CauseMarker replaces a cause list's rows: the process table is unavailable,
- * or the CPU list is waiting for its second read.
- */
-export const CauseMarkerNone = "";
-export const CauseMarkerReading = "reading";
-export const CauseMarkerUnavailable = "unavailable";
-export type CauseMarker = typeof CauseMarkerNone | typeof CauseMarkerReading | typeof CauseMarkerUnavailable;
-/**
- * CauseRow is one row of a cause list. CPU is a percent of the whole machine.
- */
-export interface CauseRow {
-  kind: string;
-  label: string;
-  busiest?: string;
-  ticket?: string;
-  cpu: number /* float64 */;
-  mem_bytes: number /* uint64 */;
-}
-/**
- * CauseList is the top rows of one list, or a marker in their place.
- */
-export interface CauseList {
-  marker?: CauseMarker;
-  rows: CauseRow[];
-}
-/**
- * HealthCauses are the top 3 by CPU and by memory.
- */
-export interface HealthCauses {
-  cpu: CauseList;
-  memory: CauseList;
-}
-/**
- * HealthReport is the health route's result. The meters are the watcher's
- * stored values; only the cause lists can cause a new process read.
- */
-export interface HealthReport {
-  host: string;
-  time: string;
-  cpu: CPUReport;
-  memory: MemoryReport;
-  disks: DisksReport;
-  causes: HealthCauses;
-}
 /**
  * HealthState is what a Tray meter shows.
  */

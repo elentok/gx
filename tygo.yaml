@@ -38,12 +38,13 @@ packages:
     enum_style: "union"
   - path: "github.com/elentok/gx/server/wire/ops"
     output_path: "webui/src/generated/ops.ts"
-    frontmatter: "import type { MapStep } from './server';"
+    frontmatter: "import type { HealthReason, HealthState, MapStep } from './server';"
     include_files:
       - chatdrafts.go
       - cleanup.go
       - designdrafts.go
       - drafthistory.go
+      - healthreport.go
       - hostedfiles.go
       - migrate.go
       - restart.go

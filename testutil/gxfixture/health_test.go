@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -26,9 +27,9 @@ func (r *running) setHealth(t *testing.T, value string) {
 }
 
 // waitHealth polls `gx server health --json` until ok holds.
-func (r *running) waitHealth(t *testing.T, what string, ok func(wire.HealthReport) bool) wire.HealthReport {
+func (r *running) waitHealth(t *testing.T, what string, ok func(ops.HealthReport) bool) ops.HealthReport {
 	t.Helper()
-	var rep wire.HealthReport
+	var rep ops.HealthReport
 	// Each check runs a gx subprocess, so it polls slowly.
 	shown := testutil.Poll(15*time.Second, 100*time.Millisecond, func() bool {
 		if err := json.Unmarshal([]byte(r.Gx(t, "server", "health", "--json")), &rep); err != nil {
@@ -47,7 +48,7 @@ func TestHealth_TheControlFilesSteerTheMeters(t *testing.T) {
 	defer r.Stop(t)
 
 	r.setHealth(t, "cpu=90 mem=85 pressure=warn")
-	rep := r.waitHealth(t, "busy values", func(h wire.HealthReport) bool {
+	rep := r.waitHealth(t, "busy values", func(h ops.HealthReport) bool {
 		return h.CPU.State != wire.HealthStateUnknown && h.CPU.Average > 80 && h.Memory.Average > 80
 	})
 	if rep.Memory.Pressure != wire.PressureWarn {
@@ -55,31 +56,31 @@ func TestHealth_TheControlFilesSteerTheMeters(t *testing.T) {
 	}
 
 	r.setHealth(t, "cpu=unavailable mem=85")
-	rep = r.waitHealth(t, "unavailable CPU", func(h wire.HealthReport) bool {
+	rep = r.waitHealth(t, "unavailable CPU", func(h ops.HealthReport) bool {
 		return h.CPU.State == wire.HealthStateUnknown && h.CPU.Reason == wire.HealthReasonUnavailable
 	})
 
 	r.SetDisk(t, "free", "8G/500G")
-	r.waitHealth(t, "8G free of 500G", func(h wire.HealthReport) bool {
+	r.waitHealth(t, "8G free of 500G", func(h ops.HealthReport) bool {
 		return len(h.Disks.Disks) == 1 && h.Disks.Disks[0].FreeBytes == 8_000_000_000 && h.Disks.Disks[0].TotalBytes == 500_000_000_000
 	})
 }
 
 // cpuRow is the first CPU cause row of kind, or false.
-func cpuRow(h wire.HealthReport, kind string) (wire.CauseRow, bool) {
+func cpuRow(h ops.HealthReport, kind string) (ops.CauseRow, bool) {
 	for _, row := range h.Causes.CPU.Rows {
 		if row.Kind == kind {
 			return row, true
 		}
 	}
-	return wire.CauseRow{}, false
+	return ops.CauseRow{}, false
 }
 
 // waitCauses polls with wait=true until the CPU list is out of its reading marker and ok holds.
-func (r *running) waitCauses(t *testing.T, what string, ok func(wire.HealthReport) bool) wire.HealthReport {
+func (r *running) waitCauses(t *testing.T, what string, ok func(ops.HealthReport) bool) ops.HealthReport {
 	t.Helper()
-	return r.waitHealth(t, what, func(h wire.HealthReport) bool {
-		return h.Causes.CPU.Marker == wire.CauseMarkerNone && ok(h)
+	return r.waitHealth(t, what, func(h ops.HealthReport) bool {
+		return h.Causes.CPU.Marker == ops.CauseMarkerNone && ok(h)
 	})
 }
 
@@ -88,7 +89,7 @@ func TestHealth_TheProcessTableNamesTheAgentByItsTicket(t *testing.T) {
 	defer r.Stop(t)
 
 	const addr = project + ":health-epic/01"
-	rep := r.waitCauses(t, "agent, process and other-users rows", func(h wire.HealthReport) bool {
+	rep := r.waitCauses(t, "agent, process and other-users rows", func(h ops.HealthReport) bool {
 		a, ok := cpuRow(h, "agent")
 		_, plain := cpuRow(h, "process")
 		_, other := cpuRow(h, "other-users")
@@ -114,7 +115,7 @@ func TestHealth_TheProcessTableNamesTheAgentByItsTicket(t *testing.T) {
 	if err := writeHealthFile(processes, led); err != nil {
 		t.Fatal(err)
 	}
-	r.waitCauses(t, "build.js leading", func(h wire.HealthReport) bool {
+	r.waitCauses(t, "build.js leading", func(h ops.HealthReport) bool {
 		rows := h.Causes.CPU.Rows
 		return len(rows) > 0 && rows[0].Kind == "process" && rows[0].Label == "build.js"
 	})
@@ -131,7 +132,7 @@ func TestHealth_EveryOtherScenarioStartsCalm(t *testing.T) {
 	if string(got) != calmHealth+"\n" {
 		t.Errorf("system = %q, want %q", got, calmHealth)
 	}
-	r.waitHealth(t, "the calm values", func(h wire.HealthReport) bool {
+	r.waitHealth(t, "the calm values", func(h ops.HealthReport) bool {
 		return h.CPU.State != wire.HealthStateUnknown && math.Abs(h.CPU.Average-20) < 0.01 && math.Abs(h.Memory.Average-50) < 0.01
 	})
 }

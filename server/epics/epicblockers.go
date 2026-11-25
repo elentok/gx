@@ -26,11 +26,18 @@ var notMovingStates = map[wire.EpicListState]bool{
 	wire.EpicListCIFailing: true, wire.EpicListPRTextFailed: true,
 }
 
-func (s *Epics) hintOf(project string, e tickets.Epic) wire.BlockerHint {
+// blockerWalk is the project view a blocker's state and walk read from.
+type blockerWalk struct {
+	s       *Epics
+	project string
+	byName  map[string]tickets.Epic
+}
+
+func (w blockerWalk) hintOf(e tickets.Epic) wire.BlockerHint {
 	return wire.BlockerHint{
-		Address:    queue.RootRef{Project: project, Epic: e.Name}.String(),
+		Address:    queue.RootRef{Project: w.project, Epic: e.Name}.String(),
 		Name:       e.Name,
-		State:      s.listStateOf(project, e),
+		State:      w.s.listStateOf(w.project, e),
 		Deadlocked: StateOf(e) == StateCycle,
 	}
 }
@@ -38,18 +45,18 @@ func (s *Epics) hintOf(project string, e tickets.Epic) wire.BlockerHint {
 // notMoving reports whether e is stuck, and the deepest stuck epic behind it.
 // A Waiting epic is stuck only when one of its own blockers is, so the walk
 // follows UnreleasedBlockers; visited ends it on a hand-edited epic cycle.
-func (s *Epics) notMoving(project string, e tickets.Epic, byName map[string]tickets.Epic, visited map[string]bool) (wire.BlockerHint, bool) {
+func (w blockerWalk) notMoving(e tickets.Epic, visited map[string]bool) (wire.BlockerHint, bool) {
 	visited[e.Name] = true
 	if StateOf(e) != StateWaiting {
-		h := s.hintOf(project, e)
+		h := w.hintOf(e)
 		return h, notMovingStates[h.State]
 	}
 	for _, name := range e.UnreleasedBlockers {
-		next, ok := byName[name]
+		next, ok := w.byName[name]
 		if !ok || visited[name] {
 			continue
 		}
-		if h, stuck := s.notMoving(project, next, byName, visited); stuck {
+		if h, stuck := w.notMoving(next, visited); stuck {
 			return h, true
 		}
 	}
@@ -62,6 +69,7 @@ func (s *Epics) blockersOf(project string, e tickets.Epic, byName map[string]tic
 	if e.IsMap {
 		return nil
 	}
+	walk := blockerWalk{s, project, byName}
 	var invalid, stuck, moving []wire.EpicBlocker
 	for _, ref := range e.InvalidBlockers {
 		invalid = append(invalid, wire.EpicBlocker{Invalid: true, Ref: ref})
@@ -72,8 +80,8 @@ func (s *Epics) blockersOf(project string, e tickets.Epic, byName map[string]tic
 			continue
 		}
 		entry := wire.EpicBlocker{Address: queue.RootRef{Project: project, Epic: name}.String(), Name: name}
-		h, notMoving := s.notMoving(project, b, byName, map[string]bool{e.Name: true})
-		own := s.hintOf(project, b)
+		h, notMoving := walk.notMoving(b, map[string]bool{e.Name: true})
+		own := walk.hintOf(b)
 		entry.State, entry.Deadlocked = own.State, own.Deadlocked
 		if !notMoving {
 			moving = append(moving, entry)

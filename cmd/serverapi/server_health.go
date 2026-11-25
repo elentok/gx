@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func newServerHealthCmd(d Deps) *cobra.Command {
@@ -65,10 +66,10 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		}
 		lines = append(lines, line)
 	}
-	lines = append(lines, causeLines("top by cpu", rep.Causes.CPU, func(r wire.CauseRow) string {
+	lines = append(lines, causeLines("top by cpu", rep.Causes.CPU, func(r ops.CauseRow) string {
 		return fmt.Sprintf("%.1f%%", r.CPU)
 	})...)
-	lines = append(lines, causeLines("top by memory", rep.Causes.Memory, func(r wire.CauseRow) string {
+	lines = append(lines, causeLines("top by memory", rep.Causes.Memory, func(r ops.CauseRow) string {
 		return config.ByteSize(r.MemBytes).String()
 	})...)
 	_, err = fmt.Fprintln(w, strings.Join(lines, "\n"))
@@ -76,11 +77,11 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 }
 
 // causeLines is one cause list; a marker takes the place of its rows.
-func causeLines(title string, list wire.CauseList, value func(wire.CauseRow) string) []string {
+func causeLines(title string, list ops.CauseList, value func(ops.CauseRow) string) []string {
 	switch list.Marker {
-	case wire.CauseMarkerReading:
+	case ops.CauseMarkerReading:
 		return []string{title + ": reading…"}
-	case wire.CauseMarkerUnavailable:
+	case ops.CauseMarkerUnavailable:
 		return []string{title + ": processes unavailable"}
 	}
 	lines := []string{title + ":"}

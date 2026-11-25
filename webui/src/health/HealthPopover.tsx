@@ -1,6 +1,7 @@
 import { Box, Spinner, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
-import type { Health, HealthReport } from "../generated/server"
+import type { Health } from "../generated/server"
+import type { HealthReport } from "../generated/ops"
 import { METERS } from "../ui/tray/meters"
 import { formatBytes, memoryBytesText } from "./formatBytes"
 import {

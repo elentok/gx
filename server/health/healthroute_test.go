@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 )
@@ -38,7 +39,7 @@ func startHealthRoute(t *testing.T, fake *servertest.FakeSystem) *servertest.Har
 	})
 }
 
-func healthDisk(r wire.HealthReport, id string) *wire.HealthDisk {
+func healthDisk(r ops.HealthReport, id string) *ops.HealthDisk {
 	for i := range r.Disks.Disks {
 		if r.Disks.Disks[i].ID == id {
 			return &r.Disks.Disks[i]
@@ -47,9 +48,9 @@ func healthDisk(r wire.HealthReport, id string) *wire.HealthDisk {
 	return nil
 }
 
-func healthRouteWhen(t *testing.T, h *servertest.Harness, what string, pred func(wire.HealthReport) bool) wire.HealthReport {
+func healthRouteWhen(t *testing.T, h *servertest.Harness, what string, pred func(ops.HealthReport) bool) ops.HealthReport {
 	t.Helper()
-	var last wire.HealthReport
+	var last ops.HealthReport
 	ok := testutil.Poll(10*time.Second, 5*time.Millisecond, func() bool {
 		var err error
 		if last, err = h.Client.Admin.Health(context.Background()); err != nil {
@@ -71,7 +72,7 @@ func TestHealthRoute_HostTimeCPUMemoryAndDisks(t *testing.T) {
 	h := startHealthRoute(t, fake)
 	host, _ := os.Hostname()
 
-	rep := healthRouteWhen(t, h, "known CPU and disk d1", func(r wire.HealthReport) bool {
+	rep := healthRouteWhen(t, h, "known CPU and disk d1", func(r ops.HealthReport) bool {
 		return r.CPU.State == wire.HealthStateNormal && healthDisk(r, "d1") != nil
 	})
 	if rep.Host != host {
@@ -97,12 +98,12 @@ func TestHealthRoute_PressureOnlyWhenTheSourceSetsIt(t *testing.T) {
 	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	h := startHealthRoute(t, fake)
-	rep := healthRouteWhen(t, h, "a memory reading", func(r wire.HealthReport) bool { return r.Memory.TotalBytes > 0 })
+	rep := healthRouteWhen(t, h, "a memory reading", func(r ops.HealthReport) bool { return r.Memory.TotalBytes > 0 })
 	if rep.Memory.Pressure != "" {
 		t.Errorf("pressure = %q, want none", rep.Memory.Pressure)
 	}
 	fake.SetPressure(syshealth.PressureWarn)
-	healthRouteWhen(t, h, "pressure warn", func(r wire.HealthReport) bool { return r.Memory.Pressure == wire.PressureWarn })
+	healthRouteWhen(t, h, "pressure warn", func(r ops.HealthReport) bool { return r.Memory.Pressure == wire.PressureWarn })
 }
 
 func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
@@ -110,7 +111,7 @@ func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
 	fake := servertest.NewFakeSystem()
 	fake.Fail(syshealth.ErrUnavailable)
 	h := startHealthRoute(t, fake)
-	rep := healthRouteWhen(t, h, "unavailable", func(r wire.HealthReport) bool { return r.CPU.Reason == wire.HealthReasonUnavailable })
+	rep := healthRouteWhen(t, h, "unavailable", func(r ops.HealthReport) bool { return r.CPU.Reason == wire.HealthReasonUnavailable })
 	if rep.Memory.State != wire.HealthStateUnknown || rep.Memory.Reason != wire.HealthReasonUnavailable {
 		t.Errorf("memory = %+v", rep.Memory)
 	}
@@ -127,7 +128,7 @@ func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
 	// d1 is small and normal, d2 is large and under the warn size.
 	r.Disks.PutSized(repo, "d1", "/vol1", 25*routeGB, 30*routeGB)
 	r.Disks.PutSized(goCache, "d2", "/vol2", 15*routeGB, 1000*routeGB)
-	rep := healthRouteWhen(t, r.H, "d2 as the worst disk", func(rep wire.HealthReport) bool { return rep.Disks.WorstID == "d2" })
+	rep := healthRouteWhen(t, r.H, "d2 as the worst disk", func(rep ops.HealthReport) bool { return rep.Disks.WorstID == "d2" })
 	if d := healthDisk(rep, "d2"); d.State != wire.HealthStateHigh {
 		t.Errorf("d2 = %+v, want high", d)
 	}
@@ -141,7 +142,7 @@ func TestHealthRoute_NoDisksMeterIsUnknownWithAReason(t *testing.T) {
 	r := servertest.StartDiskRig(t, nil, 20*routeGB, func(c *server.Config) {
 		c.FreeSpace = func(string) (wire.DiskReading, error) { return wire.DiskReading{}, errors.New("no disk") }
 	})
-	rep := healthRouteWhen(t, r.H, "an unknown disk meter", func(wire.HealthReport) bool { return true })
+	rep := healthRouteWhen(t, r.H, "an unknown disk meter", func(ops.HealthReport) bool { return true })
 	if rep.Disks.State != wire.HealthStateUnknown || rep.Disks.Reason == wire.HealthReasonNone || rep.Disks.WorstID != "" {
 		t.Errorf("disks = %+v, want unknown with a reason and no worst disk", rep.Disks)
 	}
