@@ -620,7 +620,7 @@ export function DiffPage({
               alignItems="center"
               gap="3"
               minW="0"
-              flex={source.canEdit ? "1 1 0" : "1 1 260px"}
+              flex={device === "phone" ? "1 0 100%" : source.canEdit ? "1 1 0" : "1 1 260px"}
             >
               {source.canEdit && inputsOpen ? (
                 <>

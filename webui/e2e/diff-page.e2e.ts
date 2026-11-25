@@ -350,6 +350,10 @@ test("Diff page", async ({ page, start }) => {
     client: document.documentElement.clientWidth,
   }))
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
+  // The range chip sits at the header's left edge, as in the mock, not centred on its own row.
+  const headBox = await page.getByTestId("diff-header").boundingBox()
+  const chipBox = await chipOf(page).boundingBox()
+  expect(chipBox!.x - headBox!.x).toBeLessThanOrEqual(1)
 
   // At a short phone window each tab scrolls on its own and the document never does.
   await page.setViewportSize({ width: 390, height: 300 })
