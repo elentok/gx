@@ -88,32 +88,32 @@ A question that gx asked (zero commits, stranded commits, a background-task gate
 
 A verify ticket runs these against a temporary gx server after the epic is built.
 
-Card and answer page (stories 1 to 8, 13, 17, 33, 35, 36):
+Card and answer page (stories 1 to 5, 7 to 8, 13 to 13, 17 to 17, 33 to 33, 35 to 37)
 - Flows: the pause recovery flow on the `paused` scenario, extended to open the long-question scenario's tickets: card with asker label, title, "Answer question" main, "Resume without answering" secondary, no sticky bar. Pause flow's existing Send answer step moves to the answer page. Design page question sheet flow runs unchanged.
 - Checks: `gx server tickets show` for the ticket lists the answer action. After Resume, the ticket is back on the frontier (exit 0).
 - New flows or scenarios to write: the long-question scenario below, and a One-off with an open question for Cancel.
 - Look checks are the Mock states lines `ticket-short-desktop`, `ticket-long-desktop` and `ticket-long-phone`.
 
-Gx-asked questions (stories 34, 38, 41, 43):
+Gx-asked questions (stories 34 to 34, 38 to 38, 41 to 41, 43 to 43)
 - Flows: on `paused-epic/04` (Choose base) and `paused-epic/06` (Retry), the ticket page shows today's layout: the question text in the reading view, no "Answer question" button, the first recovery verb main, and the sticky recovery bar unchanged. Opening `/answer/<address>` for either shows "This question is answered on the ticket page." and "Back to ticket". After Retry on `paused-epic/06`, the page shows no "Answer sent" card. The same holds for a model-mismatch pause.
 
-Reading and order (stories 6, 9 to 12):
+Reading and order (stories 6 to 6, 9 to 12)
 - Flows: the same pause flow asserts the question text appears once on each page and Agent's notes are on the ticket page only and no chat bubble shows while the card is open.
 - Look checks: `ticket-long-desktop`, `answer-long-desktop`.
 
-Answering and history (stories 14 to 23, 40):
+Answering and history (stories 14 to 23, 40 to 40)
 - Flows: on the long-question scenario, Answer question pushes `/answer/<address>`, "← Ticket" and back return one entry, a note survives the round trip, a reload clears it, Send answer lands on the ticket page with the "Answer sent" card (title, answer, note), Agent's notes show above it, no chat bubble shows, "Show question" opens the full question, and back does not return to the form. The reload step uses a queued answer (the agent is gone, the ticket is open again): the card stays. After a delivered answer the ticket is claimed again and a reload shows no card. Opening `/answer/<address>` directly and sending lands on the ticket page. The adopted-send card is not asserted after a reload.
 - Checks: `gx server tickets show <address>` lists the round as answered with the same answer.
 - Look checks: `answer-short-desktop`, `answer-long-desktop`, `answer-long-phone`, `ticket-sent-desktop`, `ticket-sent-phone`.
 
-Phone keyboard (story 16):
+Phone keyboard (stories 16 to 16)
 - Flows: at 390px on the long-question scenario, shrink `visualViewport` the way the existing `useKeyboardOpen` tests and the phone flows do, and assert that "Send answer" stays in view.
 
-Stale and refusal (stories 24 to 30, 41, 42):
+Stale and refusal (stories 24 to 30, 42 to 42)
 - Flows: answer the question from the CLI (`gx server tickets answer`, expected exit 0) while the page is open, then Send answer: stale banner, text kept, footer "Back to ticket". Replace the question while the person is on the ticket page and open the answer page again: a fresh form with the note kept, no banner. Open `/answer/<address>` for an answered ticket and for a missing one. Permission refusal on the new permission scenario (a self-reported open question whose live agent is blocked at a permission prompt) shows the refusal text and keeps the answer. Then open the ticket page: the permission card with Approve shows next to the question card (story 42). Approve it, return to the answer page and send.
 - Look checks: `answer-stale-phone`.
 
-Notification (stories 31, 32, 39):
+Notification (stories 31 to 32, 39 to 39)
 - Go tests, not Playwright: `fixture.pushRequests()` records only the push service's endpoint path, TTL, urgency, topic and body length, never the route inside the encrypted payload. `servertest.Pushes` records `Path`. In `server/ticketwrite/writer_push_test.go`, cover a self-reported pause (answer path), a gx-asked answer-class pause (ticket path), a repair pause (ticket path) and a conflict child pause (answer path when self-reported, ticket path otherwise). The recovery escalation push has a test for its `/t/` path.
 
 Story 34, 37: the `paused` scenario's other pause rows keep their buttons and labels; Resume still posts to the same route and the ticket resumes (CLI `gx server tickets show` agrees). The server's `action_info` label for Resume is covered by `server/epics/detail_test.go`.
@@ -128,15 +128,15 @@ New flows or scenarios to write (these become implementation tickets):
 
 The stored mock stacks every state in one file with no switcher, as `mocklint` requires of a stored mock. The header pill reads "Waiting for your answer", the real label.
 
-- `/Users/david/.local/share/gx/tickets/gx/queue-question-layout/mocks/04-mock-card-and-answer-page.html`, state `ticket-short-desktop`, 1100px, fixture scenario: the long-question scenario to write, its short-question ticket (a short title, options A/B/C), parts: ticket-header, agent-notes, question-card, question-title, card-actions, answer-question, resume-without-answering, earlier-rounds.
-- Same path, state `ticket-long-desktop`, 1100px, long-question scenario to write, its long-question ticket, parts as `ticket-short-desktop`, with the title clamped to three lines.
-- Same path, state `ticket-long-phone`, 390px, long-question scenario to write, same parts.
-- Same path, state `answer-short-desktop`, 1100px, long-question scenario to write, its short-question ticket, parts: answer-header, back-link, asker-label, question-title, question-body, options, note-row, earlier-rounds, answer-footer, send-answer (disabled).
-- Same path, state `answer-long-desktop`, 1100px, long-question scenario to write, same parts.
-- Same path, state `answer-long-phone`, 390px, long-question scenario to write, same parts.
-- Same path, state `answer-stale-phone`, 390px, long-question scenario to write, parts: stale-banner ("This question was answered elsewhere"), answer-header, back-link, asker-label, question-title, question-body, options (option A picked), note-row (a typed note shown), earlier-rounds, answer-footer, back-to-ticket (the footer's only button).
-- Same path, state `ticket-sent-desktop`, 1100px, long-question scenario to write, parts: ticket-header, agent-notes, question-card ("Answer sent"), question-title, sent-answer, sent-note, show-question (collapsed toggle), earlier-rounds.
-- Same path, state `ticket-sent-phone`, 390px, long-question scenario to write, same parts.
+- `/Users/david/.local/share/gx/tickets/gx/queue-question-layout/mocks/04-mock-card-and-answer-page.html`, `ticket-short-desktop`, 1100px, fixture scenario: the long-question scenario to write, its short-question ticket (a short title, options A/B/C), parts: ticket-header, agent-notes, question-card, question-title, card-actions, answer-question, resume-without-answering, earlier-rounds.
+- Same path, `ticket-long-desktop`, 1100px, long-question scenario to write, its long-question ticket, parts as `ticket-short-desktop`, with the title clamped to three lines.
+- Same path, `ticket-long-phone`, 390px, long-question scenario to write, same parts.
+- Same path, `answer-short-desktop`, 1100px, long-question scenario to write, its short-question ticket, parts: answer-header, back-link, asker-label, question-title, question-body, options, note-row, earlier-rounds, answer-footer, send-answer (disabled).
+- Same path, `answer-long-desktop`, 1100px, long-question scenario to write, same parts.
+- Same path, `answer-long-phone`, 390px, long-question scenario to write, same parts.
+- Same path, `answer-stale-phone`, 390px, long-question scenario to write, parts: stale-banner ("This question was answered elsewhere"), answer-header, back-link, asker-label, question-title, question-body, options (option A picked), note-row (a typed note shown), earlier-rounds, answer-footer, back-to-ticket (the footer's only button).
+- Same path, `ticket-sent-desktop`, 1100px, long-question scenario to write, parts: ticket-header, agent-notes, question-card ("Answer sent"), question-title, sent-answer, sent-note, show-question (collapsed toggle), earlier-rounds.
+- Same path, `ticket-sent-phone`, 390px, long-question scenario to write, same parts.
 
 A gx-asked question has no mock state: its ticket page is today's page. The permission card is today's card and has no mock state either.
 
