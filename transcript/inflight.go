@@ -73,6 +73,16 @@ func capInFlightLabel(s string) string {
 // real user line; sidechain lines are a sub-agent's and are skipped. A missing
 // file has nothing in flight.
 func ReadInFlightTools(path string) ([]InFlightTool, error) {
+	return readInFlightTools(path, false)
+}
+
+// ReadSubagentInFlightTools is ReadInFlightTools for a Claude subagent file,
+// whose lines are all sidechain lines and so all count.
+func ReadSubagentInFlightTools(path string) ([]InFlightTool, error) {
+	return readInFlightTools(path, true)
+}
+
+func readInFlightTools(path string, keepSidechain bool) ([]InFlightTool, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -89,7 +99,7 @@ func ReadInFlightTools(path string) ([]InFlightTool, error) {
 			return
 		}
 		var line unexecutedToolCallLine
-		if json.Unmarshal([]byte(raw), &line) != nil || line.IsSidechain {
+		if json.Unmarshal([]byte(raw), &line) != nil || (line.IsSidechain && !keepSidechain) {
 			return
 		}
 		t.feed(line.Type, line.Message.Content)

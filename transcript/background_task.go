@@ -117,7 +117,7 @@ var backgroundKinds = map[string]string{
 // Monitor expires on its own timeout, so its cap is that timeout plus a minute
 // for its notice, when that is shorter than cap.
 func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (BackgroundTaskReading, error) {
-	scan, err := scanTaskRecords(path)
+	scan, err := scanTaskRecords(path, false)
 	if err != nil {
 		return BackgroundTaskReading{}, err
 	}

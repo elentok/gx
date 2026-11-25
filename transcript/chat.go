@@ -159,6 +159,23 @@ func ReadChat(path, imagesDir string) (msgs []ChatMessage, ok bool, err error) {
 // ReadChatFrom is ReadChat over an open transcript, for callers that hold the
 // bytes in memory.
 func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error) {
+	msgs, _, err = readChat(r, imagesDir, false)
+	return msgs, err
+}
+
+// SubagentHandbackTool is the tool a Claude subagent's last call uses to hand
+// its report back; input.message is the report.
+const SubagentHandbackTool = "SubagentHandback"
+
+// ReadSubagentChatFrom reads a Claude subagent file as a chat. Every line of
+// such a file is a sidechain line, which ReadChatFrom drops; here they count.
+// The opening prompt comes out as the first person prompt. The handback call
+// is not a tool call: its message is returned as result, "" when there is none.
+func ReadSubagentChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, result string, err error) {
+	return readChat(r, imagesDir, true)
+}
+
+func readChat(r io.Reader, imagesDir string, subagentFile bool) (msgs []ChatMessage, result string, err error) {
 	var run *ChatMessage
 	// pending is the image message whose source-path line (isMeta, same
 	// promptId) may still follow; its images start as placeholders.
@@ -171,6 +188,9 @@ func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error)
 		}
 	}
 	handle := func(line chatLine) {
+		if subagentFile {
+			line.IsSidechain = false
+		}
 		if line.IsMeta && pendingIdx >= 0 && line.PromptID == pendingPrompt {
 			resolveImages(&msgs[pendingIdx], line, imagesDir)
 			pendingIdx = -1
@@ -188,6 +208,14 @@ func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error)
 			}
 		}
 		for _, call := range line.toolCalls() {
+			if subagentFile && call.Name == SubagentHandbackTool {
+				var in struct {
+					Message string `json:"message"`
+				}
+				_ = json.Unmarshal(call.Input, &in)
+				result = in.Message
+				continue
+			}
 			if run == nil {
 				run = &ChatMessage{ID: line.UUID, Role: ChatRoleAgent, Kind: ChatKindTools, At: line.at()}
 			}
@@ -203,10 +231,10 @@ func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error)
 		}
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	flush()
-	return msgs, nil
+	return msgs, result, nil
 }
 
 // ForEachLine calls fn with each line of r, newline included; a last line with

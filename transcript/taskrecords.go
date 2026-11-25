@@ -57,7 +57,17 @@ type taskRecordResult struct {
 // assembly. The same scan also returns the current turn's open calls, exactly
 // as ReadInFlightTools lists them.
 func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
-	scan, err := scanTaskRecords(path)
+	scan, err := scanTaskRecords(path, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	return scan.records, scan.inFlight, nil
+}
+
+// ReadSubagentTaskRecords is ReadTaskRecords for a Claude subagent file, whose
+// lines are all sidechain lines and so all count.
+func ReadSubagentTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
+	scan, err := scanTaskRecords(path, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,7 +85,7 @@ type taskScan struct {
 	parsed   int
 }
 
-func scanTaskRecords(path string) (taskScan, error) {
+func scanTaskRecords(path string, keepSidechain bool) (taskScan, error) {
 	var scan taskScan
 	f, err := os.Open(path)
 	if err != nil {
@@ -102,7 +112,7 @@ func scanTaskRecords(path string) (taskScan, error) {
 			return
 		}
 		scan.parsed++
-		if l.IsSidechain {
+		if l.IsSidechain && !keepSidechain {
 			return
 		}
 		if l.Type == "assistant" || l.Type == "user" {
