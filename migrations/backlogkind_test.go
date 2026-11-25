@@ -10,10 +10,10 @@ import (
 	"github.com/elentok/gx/config"
 )
 
-func TestDefault_PaneBusyStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
+func TestDefault_EpicBlockerListsStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
 	names := Default.Names()
-	if got := names[len(names)-1]; got != "initiative-epic-kind" {
-		t.Fatalf("last step = %q, want initiative-epic-kind", got)
+	if got := names[len(names)-1]; got != "epic-blocker-lists" {
+		t.Fatalf("last step = %q, want epic-blocker-lists", got)
 	}
 	root := t.TempDir()
 	epic := filepath.Join(root, "e", "ticket.md")
