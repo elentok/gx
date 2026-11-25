@@ -75,7 +75,7 @@ const placements: SessionPlacement[] = [
   { session: "s6", kind: "epic", epic: "p:blog" },
 ]
 const sessions = () => [
-  session("s1", "p", { name: "builder" }),
+  session("s1", "p", { name: "builder", fix_of: "p:blog/1" }),
   session("s2", "p", { name: "scratch", status: { state: "exited" } }),
   session("s3", "p", { name: "talk" }),
   session("s6", "p", { name: "queuer", queue: true, tier: "worker" }),
@@ -404,6 +404,18 @@ test("a non-empty draft brings the confirm back", async () => {
   const dialog = await screen.findByRole("alertdialog")
   expect(within(dialog).getByText("Landing page")).toBeTruthy()
   expect(ctl.calls).toHaveLength(0)
+})
+
+test("a chat and an agent together say their chats and agents are deleted", async () => {
+  setup()
+  await enterSelect()
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }))
+  fireEvent.click(box("Select talk"))
+  fireEvent.click(box("Select builder"))
+  fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
+  const dialog = await screen.findByRole("alertdialog")
+  expect(dialog.textContent).toContain("Their chats and agents are deleted.")
+  expect(dialog.textContent).not.toContain("Their chats are deleted.")
 })
 
 test("a chat and a draft share one confirmation, and Remove calls both removes once", async () => {
