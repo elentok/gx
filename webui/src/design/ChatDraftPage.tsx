@@ -1,14 +1,6 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { LuPencil } from "react-icons/lu"
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type FormEvent,
-} from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type ClipboardEvent } from "react"
 import { useNavigate, useParams } from "react-router"
 import type { FetchWorktrees } from "../agents/newSession"
 import { usePromptFocus } from "../agents/promptFocus"
@@ -227,10 +219,6 @@ function ChatDraftForm({
     if (startBlocked) return
     void start((session) => navigate(agentPath(session), { state: CREATING_STATE }))
   }
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    startNow()
-  }
   const pasted = (e: ClipboardEvent) => {
     const files = imageFiles(e.clipboardData?.files)
     if (files.length === 0) return
@@ -240,16 +228,8 @@ function ChatDraftForm({
 
   return (
     <DetailPage fill title={{ kind: "Chat draft", name: facts.label }}>
-      <Box
-        as="form"
-        ref={formRef}
-        onSubmit={submit}
-        flex="1"
-        minH="0"
-        display="flex"
-        flexDirection="column"
-        overflow="hidden"
-      >
+      {/* Not a <form>: with a "Name" field in a form, iOS shows AutoFill Contact over the brief's keyboard. */}
+      <Box ref={formRef} flex="1" minH="0" display="flex" flexDirection="column" overflow="hidden">
         <Box display="flex" alignItems="center" gap="2" pt="3" flexShrink="0">
           <MascotToggle />
           <ChatDraftIcon />
@@ -346,6 +326,7 @@ function ChatDraftForm({
               aria-label="Brief"
               name="chat-brief"
               autoComplete="off"
+              data-focus-ring="none"
               {...field}
               borderWidth="0"
               bg="transparent"
@@ -406,6 +387,7 @@ function ChatDraftForm({
           pending={starting}
           onAttach={() => fileInput.current?.click()}
           onRemove={draftMenu.remove}
+          onStart={startNow}
         />
       </Box>
     </DetailPage>

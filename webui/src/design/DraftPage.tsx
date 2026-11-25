@@ -396,6 +396,7 @@ function DraftForm({
             aria-label="Prompt"
             name="design-idea"
             autoComplete="off"
+            data-focus-ring="none"
             {...field}
             flex="1"
             minH="0"

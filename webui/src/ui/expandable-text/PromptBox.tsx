@@ -1,6 +1,7 @@
-import { Box, chakra, Text, Textarea } from "@chakra-ui/react"
+import { Box, chakra, Text, Textarea, VisuallyHidden } from "@chakra-ui/react"
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -164,6 +165,7 @@ function Field({
   const [selection, setSelection] = useState<Selection | null>(null)
 
   const { wantEditor, Editor, showEditor } = useInlineEditor()
+  const textareaId = useId()
   // Kept across blur and focus. The editor resets it itself when the parent empties the text.
   const [mode, setMode] = useState<ViMode>("INSERT")
   const onMode = menu?.onMode
@@ -260,37 +262,47 @@ function Field({
           />
         </Box>
       ) : (
-        <Textarea
-          ref={area}
-          {...fieldLook}
-          data-focus-ring="none"
-          {...{ [PROMPT_BOX_ATTR]: "" }}
-          size={size}
-          bg="transparent"
-          borderWidth="0"
-          borderRadius="0"
-          autoFocus={autoFocus && !swapped.current}
-          rows={effectiveRows}
-          lineHeight="1.5"
-          display="block"
-          pt="2.5"
-          pb="2.5"
-          ps="3"
-          pe="46px"
-          resize="none"
-          aria-label={label}
-          name={name}
-          autoComplete="off"
-          placeholder={placeholder}
-          disabled={disabled}
-          value={value}
-          onChange={(e) => {
-            menu?.onCursor(e.target.selectionStart)
-            onChange(e.target.value)
-          }}
-          onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
-          onKeyDown={onKeyDown}
-        />
+        <>
+          {/* Safari AutoFill reads a <label>; without one it guesses from the text around the box and can
+              offer a contact. aria-hidden: aria-label stays the accessible name. */}
+          <VisuallyHidden asChild>
+            <label htmlFor={textareaId} aria-hidden="true">
+              {label}
+            </label>
+          </VisuallyHidden>
+          <Textarea
+            id={textareaId}
+            ref={area}
+            {...fieldLook}
+            data-focus-ring="none"
+            {...{ [PROMPT_BOX_ATTR]: "" }}
+            size={size}
+            bg="transparent"
+            borderWidth="0"
+            borderRadius="0"
+            autoFocus={autoFocus && !swapped.current}
+            rows={effectiveRows}
+            lineHeight="1.5"
+            display="block"
+            pt="2.5"
+            pb="2.5"
+            ps="3"
+            pe="46px"
+            resize="none"
+            aria-label={label}
+            name={name}
+            autoComplete="off"
+            placeholder={placeholder}
+            disabled={disabled}
+            value={value}
+            onChange={(e) => {
+              menu?.onCursor(e.target.selectionStart)
+              onChange(e.target.value)
+            }}
+            onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
+            onKeyDown={onKeyDown}
+          />
+        </>
       )}
       <PromptFooter vi={wantEditor} mode={mode} disabled={disabled} note={note}>
         {footer}

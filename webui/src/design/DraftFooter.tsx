@@ -16,6 +16,8 @@ interface Props {
   onRemove: (button: HTMLElement) => void
   /** The Start button's text; "Start design" by default. */
   startLabel?: string
+  /** Start for a page with no `<form>`: the button is then a plain button that calls this. */
+  onStart?: () => void
 }
 
 // Chakra's `_disabled` also matches `aria-disabled`, and the Button sets `pointer-events: none`
@@ -31,12 +33,13 @@ export function DraftFooter({
   pending,
   onAttach,
   onRemove,
+  onStart,
 }: Props) {
   const reasonId = useId()
   const reason = startDisabled ? startReason : undefined
   const start = (tip?: TipTriggerProps) => (
     <Button
-      type="submit"
+      type={onStart ? "button" : "submit"}
       tone="running"
       aria-disabled={startDisabled || undefined}
       aria-describedby={reason ? reasonId : undefined}
@@ -45,7 +48,10 @@ export function DraftFooter({
       _disabled={blockedLook}
       {...tip}
       onClick={(e) => {
-        if (!startDisabled) return
+        if (!startDisabled) {
+          onStart?.()
+          return
+        }
         e.preventDefault()
         tip?.onClick()
       }}

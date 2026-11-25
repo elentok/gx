@@ -777,7 +777,9 @@ test("on a wide screen the settings are one pill too, and the paperclip is in th
   await openSettings()
   for (const name of ["Harness", "Model", "Effort"]) expect(control(name)).toBeTruthy()
   const attach = screen.getByRole("button", { name: "Add image" })
-  expect(attach.closest("form")?.lastElementChild?.contains(attach)).toBe(true)
+  expect(control("Name").parentElement?.parentElement?.lastElementChild?.contains(attach)).toBe(
+    true,
+  )
 })
 
 test("on a phone one pill sums up the settings, and its sheet changes them", async () => {
