@@ -103,3 +103,23 @@ func TestForkHooks_UnsetDirRefusesNothing(t *testing.T) {
 		t.Fatalf("start with no hook dir = %+v, want a chat", res)
 	}
 }
+
+func TestForkHooks_SaveFailFailsTheChatDraftSaveButNotTheStart(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	f := hookRig(t, dir)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderTrunk})
+	arm(t, dir, chatdrafts.HookSaveFail)
+
+	b, _ := json.Marshal(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "later", Revision: d.Revision})
+	if code, body := servertest.WebPostJSON(t, f.Base+"/v1/agents/drafts/save", string(b), f.Ck, "", servertest.JSONPost(f.Base)); code != http.StatusInternalServerError {
+		t.Fatalf("armed save = %d %s, want 500", code, body)
+	}
+	if got := post(t, f, "read", ops.ChatDraftReadRequest{ID: d.ID}).Draft; got == nil || got.Brief != d.Brief {
+		t.Errorf("draft after failed save = %+v, want it unchanged", got)
+	}
+	res := post(t, f, "start", ops.ChatDraftStartRequest{ID: d.ID, Edit: &ops.ChatDraftEdit{Brief: "later"}})
+	if res.Refused || res.Started == "" {
+		t.Fatalf("start with save-fail armed = %+v, want a chat", res)
+	}
+}

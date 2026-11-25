@@ -12,7 +12,8 @@ const (
 	HookStartFail = "start-fail"
 )
 
-// ErrHookSaveFail is the error a draft create answers while save-fail is armed.
+// ErrHookSaveFail is the error a draft create or save answers while save-fail
+// is armed. Start ignores the hook: a failing save no longer blocks a start.
 var ErrHookSaveFail = errors.New("test hook: draft save forced to fail")
 
 // ErrHookStartFail is the error a Start answers while start-fail is armed. It

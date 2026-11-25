@@ -176,11 +176,24 @@ func (s *Store) SaveChecked(req ops.ChatDraftSaveRequest, check func(d *ops.Chat
 	if d.Revision != req.Revision {
 		return ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
+	refusal, err := s.applyEdit(d, req.Edit(), check)
+	if err != nil {
+		return ops.ChatDraftResult{}, err
+	}
+	if refusal != nil {
+		return *refusal, nil
+	}
+	return ops.ChatDraftResult{Draft: d}, nil
+}
+
+// applyEdit merges e into d, runs check, bumps the revision and writes d. The
+// caller holds the draft's lock. A refusal from check writes nothing.
+func (s *Store) applyEdit(d *ops.ChatDraft, e ops.ChatDraftEdit, check func(d *ops.ChatDraft, before ops.ChatDraft) *ops.ChatDraftResult) (*ops.ChatDraftResult, error) {
 	before := *d
-	d.Brief = req.Brief
+	d.Brief = e.Brief
 	for dst, src := range map[*string]*string{
-		&d.Project: req.Project, &d.Name: req.Name, &d.Harness: req.Harness, &d.Model: req.Model,
-		&d.Effort: req.Effort, &d.Folder: req.Folder, &d.Worktree: req.Worktree, &d.Dir: req.Dir,
+		&d.Project: e.Project, &d.Name: e.Name, &d.Harness: e.Harness, &d.Model: e.Model,
+		&d.Effort: e.Effort, &d.Folder: e.Folder, &d.Worktree: e.Worktree, &d.Dir: e.Dir,
 	} {
 		if src != nil {
 			*dst = *src
@@ -189,16 +202,16 @@ func (s *Store) SaveChecked(req ops.ChatDraftSaveRequest, check func(d *ops.Chat
 	d.Name = strings.TrimSpace(d.Name)
 	if check != nil {
 		if refusal := check(d, before); refusal != nil {
-			return *refusal, nil
+			return refusal, nil
 		}
 	}
 	d.Revision++
 	d.EditedAt = s.now().UTC()
 	if err := s.write(d); err != nil {
-		return ops.ChatDraftResult{}, err
+		return nil, err
 	}
 	d.Label = Label(d.Name, d.Brief)
-	return ops.ChatDraftResult{Draft: d}, nil
+	return nil, nil
 }
 
 // Pick restores a history entry onto draft id under the draft's lock. A stale

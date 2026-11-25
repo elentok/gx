@@ -19,6 +19,15 @@ func (c *ChatDrafts) gone(id string) ops.ChatDraftResult {
 // saves the message on it as start_error. The per-id lock makes a double click
 // start one chat: the second Start finds the draft gone.
 func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
+	return c.StartWithEdit(id, nil)
+}
+
+// StartWithEdit is Start with an optional edit applied first, under the same
+// lock, with the save route's validation and no revision check. A draft that
+// is gone or already started ignores the edit. A written edit stays on the
+// draft when the start fails. A written settings edit publishes once: on
+// success finishStart does it, on a failure this does.
+func (c *ChatDrafts) StartWithEdit(id string, edit *ops.ChatDraftEdit) (out ops.ChatDraftResult, err error) {
 	unlock := c.store.lock(id)
 	defer unlock()
 	d, err := c.store.Get(id)
@@ -30,6 +39,22 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 	}
 	if session := c.store.Started(id); session != "" {
 		return c.finishStart(id, session), nil
+	}
+	if edit != nil {
+		refusal, err := c.store.applyEdit(d, *edit, c.checkSave)
+		if err != nil {
+			return ops.ChatDraftResult{}, err
+		}
+		if refusal != nil {
+			return *refusal, nil
+		}
+		if edit.Settings() {
+			defer func() {
+				if out.Started == "" {
+					c.publish()
+				}
+			}()
+		}
 	}
 	if d.Brief == "" {
 		return refuse(wire.ReasonEmptyPrompt, "a brief is required"), nil
@@ -109,11 +134,11 @@ func (c *ChatDrafts) startFailed(d *ops.ChatDraft, reason, msg string) (ops.Chat
 }
 
 func (c *ChatDrafts) start(w http.ResponseWriter, r *http.Request) {
-	req, ok := decode[ops.ChatDraftReadRequest](w, r)
+	req, ok := decode[ops.ChatDraftStartRequest](w, r)
 	if !ok {
 		return
 	}
-	res, err := c.Start(req.ID)
+	res, err := c.StartWithEdit(req.ID, req.Edit)
 	if err != nil {
 		serverError(w, err)
 		return

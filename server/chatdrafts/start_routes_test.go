@@ -118,3 +118,69 @@ func TestChatDraftStart_FailureKeepsTheDraftAndShowsTheError(t *testing.T) {
 		t.Errorf("read = %+v", got)
 	}
 }
+
+func TestChatDraftStart_EditAppliesTheBriefAndSettingsAndPublishesOnce(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{})
+	var res ops.ChatDraftResult
+	events := draftEvents(t, f, func() {
+		res = post(t, f, "start", ops.ChatDraftStartRequest{ID: d.ID,
+			Edit: &ops.ChatDraftEdit{Brief: "edited brief", Name: str(" renamed "), Model: str("opus"), Effort: str("high")}})
+	})
+	if res.Refused || res.Started == "" {
+		t.Fatalf("start = %+v", res)
+	}
+	meta := servertest.ReadMeta(t, f.H, res.Started)
+	if meta["first_prompt"] != "edited brief" || meta["name"] != "renamed" || meta["model"] != "opus" || meta["effort"] != "high" {
+		t.Errorf("meta = %+v", meta)
+	}
+	if events != 1 {
+		t.Errorf("events = %d, want 1", events)
+	}
+}
+
+func TestChatDraftStart_RefusedEditAnswersLikeASaveAndKeepsTheDraft(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{})
+	var res ops.ChatDraftResult
+	events := draftEvents(t, f, func() {
+		res = post(t, f, "start", ops.ChatDraftStartRequest{ID: d.ID,
+			Edit: &ops.ChatDraftEdit{Brief: "edited", Effort: str("high")}})
+	})
+	save := post(t, f, "save", ops.ChatDraftSaveRequest{ID: d.ID, Brief: "edited", Revision: d.Revision, Effort: str("high")})
+	if !res.Refused || res.Reason != save.Reason || res.Message != save.Message || res.Reason == "" {
+		t.Fatalf("start = %+v, save = %+v", res, save)
+	}
+	got := post(t, f, "read", ops.ChatDraftReadRequest{ID: d.ID}).Draft
+	if got == nil || got.Brief != d.Brief || got.Revision != d.Revision || events != 0 {
+		t.Errorf("draft = %+v, events = %d", got, events)
+	}
+}
+
+func TestChatDraftStart_FailedStartKeepsTheEditAndPublishesOnlyForASettingsEdit(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	src, _ := plainChat(t, f, "") // its dir is neither the root nor a worktree
+	for name, c := range map[string]struct {
+		edit   ops.ChatDraftEdit
+		events int
+	}{
+		"settings": {ops.ChatDraftEdit{Brief: "settings edit", Name: str("kept")}, 1},
+		"brief":    {ops.ChatDraftEdit{Brief: "brief edit"}, 0},
+	} {
+		d := mustCreate(t, f, ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderSource, FromSession: src})
+		var res ops.ChatDraftResult
+		events := draftEvents(t, f, func() {
+			res = post(t, f, "start", ops.ChatDraftStartRequest{ID: d.ID, Edit: &c.edit})
+		})
+		got := post(t, f, "read", ops.ChatDraftReadRequest{ID: d.ID}).Draft
+		if !res.Refused || got == nil || got.Brief != c.edit.Brief || got.StartError == "" || got.StartError != res.Message {
+			t.Errorf("%s: start = %+v, draft = %+v", name, res, got)
+		}
+		if events != c.events {
+			t.Errorf("%s: events = %d, want %d", name, events, c.events)
+		}
+	}
+}

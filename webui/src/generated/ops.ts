@@ -98,6 +98,33 @@ export interface ChatDraftSaveRequest {
   dir?: string;
 }
 /**
+ * ChatDraftEdit is the brief and settings of a save without the id and the
+ * revision: what Start applies to the draft before it runs. A settings field
+ * left out (nil) stays as it is.
+ */
+export interface ChatDraftEdit {
+  brief: string;
+  project?: string;
+  name?: string;
+  harness?: string;
+  model?: string;
+  effort?: string;
+  folder?: string;
+  worktree?: string;
+  /**
+   * Dir names the folder of the "dir" choice; the other choices resolve it.
+   */
+  dir?: string;
+}
+/**
+ * ChatDraftStartRequest starts a draft. A non-nil Edit is applied under the
+ * draft's lock first, with no revision check.
+ */
+export interface ChatDraftStartRequest {
+  id: string;
+  edit?: ChatDraftEdit;
+}
+/**
  * ChatDraftResult answers every chat draft route. A refusal is a result:
  * Reason is a wire.Reason* or a ReasonDraft* constant. Started is the session
  * id a gone draft became, when a Start record exists. Deleted: a delete

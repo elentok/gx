@@ -82,9 +82,41 @@ type ChatDraftSaveRequest struct {
 }
 
 // Settings reports whether the save changes anything besides the brief.
-func (r ChatDraftSaveRequest) Settings() bool {
-	return r.Project != nil || r.Name != nil || r.Harness != nil || r.Model != nil ||
-		r.Effort != nil || r.Folder != nil || r.Worktree != nil || r.Dir != nil
+func (r ChatDraftSaveRequest) Settings() bool { return r.Edit().Settings() }
+
+// ChatDraftEdit is the brief and settings of a save without the id and the
+// revision: what Start applies to the draft before it runs. A settings field
+// left out (nil) stays as it is.
+type ChatDraftEdit struct {
+	Brief    string  `json:"brief"`
+	Project  *string `json:"project,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Harness  *string `json:"harness,omitempty"`
+	Model    *string `json:"model,omitempty"`
+	Effort   *string `json:"effort,omitempty"`
+	Folder   *string `json:"folder,omitempty"`
+	Worktree *string `json:"worktree,omitempty"`
+	// Dir names the folder of the "dir" choice; the other choices resolve it.
+	Dir *string `json:"dir,omitempty"`
+}
+
+// Settings reports whether the edit changes anything besides the brief.
+func (e ChatDraftEdit) Settings() bool {
+	return e.Project != nil || e.Name != nil || e.Harness != nil || e.Model != nil ||
+		e.Effort != nil || e.Folder != nil || e.Worktree != nil || e.Dir != nil
+}
+
+// Edit is the save without its id and revision.
+func (r ChatDraftSaveRequest) Edit() ChatDraftEdit {
+	return ChatDraftEdit{Brief: r.Brief, Project: r.Project, Name: r.Name, Harness: r.Harness,
+		Model: r.Model, Effort: r.Effort, Folder: r.Folder, Worktree: r.Worktree, Dir: r.Dir}
+}
+
+// ChatDraftStartRequest starts a draft. A non-nil Edit is applied under the
+// draft's lock first, with no revision check.
+type ChatDraftStartRequest struct {
+	ID   string         `json:"id"`
+	Edit *ChatDraftEdit `json:"edit,omitempty"`
 }
 
 // ChatDraftResult answers every chat draft route. A refusal is a result:

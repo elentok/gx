@@ -299,3 +299,60 @@ func TestStart_TwoConcurrentStartsCreateOneChat(t *testing.T) {
 		}
 	}
 }
+
+func TestStart_NilEditWritesNothingAndABriefEditBumpsTheRevisionOnce(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t)
+	r.createRes = func() (wire.SessionResult, error) {
+		return wire.SessionResult{Refused: true, Reason: wire.ReasonSessionBadRequest, Message: "no good"}, nil
+	}
+	d := r.draft(t, ops.ChatDraft{})
+	if _, err := r.c.StartWithEdit(d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := r.c.store.Get(d.ID); got.Revision != d.Revision || got.Brief != "do it" {
+		t.Fatalf("after nil edit = %+v, want revision %d", got, d.Revision)
+	}
+	if _, err := r.c.StartWithEdit(d.ID, &ops.ChatDraftEdit{Brief: "edited"}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := r.c.store.Get(d.ID)
+	if got.Revision != d.Revision+1 || got.Brief != "edited" || got.StartError != "no good" {
+		t.Fatalf("after edit = %+v", got)
+	}
+	if n := len(r.reqs); n != 2 || r.reqs[1].Prompt != "edited" {
+		t.Errorf("requests = %+v", r.reqs)
+	}
+}
+
+func TestStart_EditToAnEmptyBriefIsRefusedAndTheDraftStays(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t)
+	d := r.draft(t, ops.ChatDraft{})
+	res, _ := r.c.StartWithEdit(d.ID, &ops.ChatDraftEdit{Brief: ""})
+	if !res.Refused || res.Reason != wire.ReasonEmptyPrompt || r.chats.Load() != 0 {
+		t.Fatalf("start = %+v", res)
+	}
+	if got, err := r.c.store.Get(d.ID); err != nil || got.Brief != "" {
+		t.Errorf("draft = %+v, %v", got, err)
+	}
+}
+
+func TestStart_EditIsIgnoredForAGoneOrAlreadyStartedDraft(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t)
+	edit := &ops.ChatDraftEdit{Brief: "edited"}
+	if res, _ := r.c.StartWithEdit("nosuchdraft", edit); res.Reason != ops.ReasonDraftGone || res.Started != "" {
+		t.Fatalf("gone = %+v", res)
+	}
+	d := r.draft(t, ops.ChatDraft{})
+	if _, err := r.c.Start(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if res, _ := r.c.StartWithEdit(d.ID, edit); res.Reason != ops.ReasonDraftGone || res.Started != "sess-1" {
+		t.Fatalf("started = %+v", res)
+	}
+	if r.chats.Load() != 1 {
+		t.Errorf("chats = %d, want 1", r.chats.Load())
+	}
+}

@@ -319,6 +319,10 @@ func (c *ChatDrafts) save(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if HookArmed(c.ForkHookDir, HookSaveFail) {
+		serverError(w, ErrHookSaveFail)
+		return
+	}
 	res, err := c.store.SaveChecked(req, c.checkSave)
 	if err != nil {
 		serverError(w, err)
