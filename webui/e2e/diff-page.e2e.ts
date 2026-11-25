@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process"
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import { expect, test } from "./fixture"
 
@@ -33,7 +36,24 @@ test("Diff page", async ({ page, start }) => {
   const opts = { reloads: 1 }
   await page.setViewportSize({ width: 1200, height: 900 })
 
-  await start("epic-diff", { ...opts, shape: "merged" })
+  const fixture = await start("epic-diff", { ...opts, shape: "merged" })
+
+  // A forced failed first load shows Try again inside its notice, and the button loads the page data.
+  let failing = true
+  await page.route("**/v1/diff/files*", (route) =>
+    failing ? route.fulfill({ status: 500, body: "boom" }) : route.continue(),
+  )
+  await go(page, `#/e/${EPIC}`)
+  await page.getByRole("link", { name: "View diff" }).click()
+  const failedNotice = page.getByTestId("notice")
+  await expect(failedNotice).toHaveAttribute("data-kind", "failed")
+  await expect(treeFiles(page)).toHaveCount(0)
+  failing = false
+  await failedNotice.getByRole("button", { name: "Try again" }).click()
+  await expect(treeFiles(page).first()).toBeVisible()
+  await expect(failedNotice).toHaveCount(0)
+  await page.unroute("**/v1/diff/files*")
+
   await go(page, `#/e/${EPIC}`)
   await page.getByRole("link", { name: "View diff" }).click()
   await expect(chipOf(page)).toHaveText(/^[0-9a-f]{40}→[0-9a-f]{40}$/)
@@ -55,6 +75,43 @@ test("Diff page", async ({ page, start }) => {
   await baseRef(page).fill(base)
   await baseRef(page).press("Enter")
   await expect(treeFiles(page)).toHaveCount(allFiles)
+
+  // Edit keys: Enter in the tip input applies and closes, Esc and a second click on the edit link
+  // close with the chip and URL unchanged, and an unknown ref marks its input invalid.
+  const chipText = (await chipOf(page).textContent())!
+  const urlBefore = page.url()
+  await editRefs(page)
+  await tipRef(page).fill(`${tip}~1`)
+  await tipRef(page).press("Enter")
+  await expect(page).toHaveURL(new RegExp(`${tip}~1`.replace("~", "(?:~|%7E)")))
+  await expect(tipRef(page)).toHaveCount(0)
+  await editRefs(page)
+  await tipRef(page).fill(tip)
+  await tipRef(page).press("Enter")
+  await expect(tipRef(page)).toHaveCount(0)
+  await expect(page).toHaveURL(urlBefore)
+  await editRefs(page)
+  await baseRef(page).fill("changed-but-escaped")
+  await baseRef(page).press("Escape")
+  await expect(baseRef(page)).toHaveCount(0)
+  await expect(chipOf(page)).toHaveText(chipText)
+  await expect(page).toHaveURL(urlBefore)
+  await editRefs(page)
+  await tipRef(page).fill("changed-but-cancelled")
+  await page.getByRole("button", { name: "Edit refs" }).click()
+  await expect(tipRef(page)).toHaveCount(0)
+  await expect(chipOf(page)).toHaveText(chipText)
+  await expect(page).toHaveURL(urlBefore)
+  await editRefs(page)
+  await baseRef(page).fill("no-such-ref")
+  await baseRef(page).press("Enter")
+  await expect(page.getByTestId("notice")).toContainText('Unknown ref "no-such-ref"')
+  await expect(baseRef(page)).toHaveAttribute("aria-invalid", "true")
+  await expect(tipRef(page)).not.toHaveAttribute("aria-invalid", "true")
+  await baseRef(page).fill(base)
+  await baseRef(page).press("Enter")
+  await expect(treeFiles(page)).toHaveCount(allFiles)
+  await expect(page.getByTestId("notice")).toHaveCount(0)
 
   // Entry 12: the commit list is collapsed at load; a ticket narrows the tree and the highlighted row is the only sign, and All commits clears it.
   const disclosure = page.getByTestId("commits-disclosure")
@@ -311,6 +368,56 @@ test("Diff page", async ({ page, start }) => {
   await expect.poll(() => scrolls("diff-pane")).toEqual({ own: 30, doc: expect.any(Number) })
   expect((await scrolls("diff-pane")).doc).toBeLessThanOrEqual(0)
   await page.setViewportSize({ width: 1200, height: 900 })
+
+  // Focus refetch: the repo moves while the page is open and a window focus event updates the tree
+  // with no reload. The tip is `main`, so commits on main move the range.
+  const projects: { name: string; repo: string }[] = JSON.parse(
+    await fixture.cli("project", "list", "--json"),
+  )
+  const repo = projects.find((p) => p.name === "demo")!.repo
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", ...args])
+  const focus = () => page.evaluate(() => window.dispatchEvent(new Event("focus")))
+  await openDiff(page, `#/e/${EPIC}`)
+  await editRefs(page)
+  await tipRef(page).fill("main")
+  await tipRef(page).press("Enter")
+  await expect(chipOf(page)).toContainText("main")
+  await expect(treeFiles(page)).toHaveCount(allFiles)
+  await treeFiles(page).filter({ hasText: "state.ts" }).click()
+  await expect(area).toHaveAttribute("data-file", "src/web/state.ts")
+  writeFileSync(join(repo, "added-on-focus.txt"), "one\n")
+  git("add", "added-on-focus.txt")
+  git("commit", "-m", "add a file while open")
+  await focus()
+  await expect(treeFiles(page)).toHaveCount(allFiles + 1)
+  await expect(area).toHaveAttribute("data-file", "src/web/state.ts")
+  git("checkout", base, "--", "src/web/state.ts")
+  git("commit", "-m", "restore state.ts")
+  await focus()
+  await expect(page.locator('[data-testid="tree-file"][data-path="src/web/state.ts"]')).toHaveCount(
+    0,
+  )
+  await expect(area).toHaveAttribute(
+    "data-file",
+    (await treeFiles(page).first().getAttribute("data-path"))!,
+  )
+  // With a ticket narrowing active a focus keeps the narrowed tree and the highlighted row.
+  await disclosure.getByRole("button", { name: /^\d+ commits?$/ }).click()
+  await disclosure.getByRole("button", { name: /^every-commit-stamped/ }).click()
+  await expect(page).toHaveURL(/commits=/)
+  // Ticket 01's commits still touch state.ts, so the narrowed tree keeps its five files.
+  await expect(treeFiles(page)).toHaveCount(narrowed)
+  writeFileSync(join(repo, "added-on-focus-2.txt"), "two\n")
+  git("add", "added-on-focus-2.txt")
+  git("commit", "-m", "add another file while narrowed")
+  await focus()
+  await expect(disclosure.getByRole("button", { name: /^every-commit-stamped/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  )
+  await expect(treeFiles(page)).toHaveCount(narrowed)
+  await expect(page).toHaveURL(/commits=/)
 
   // Entry 3: each running epic's link opens its derived refs; the quiet epic has none.
   await start("epic-diff", { ...opts, shape: "running" })
