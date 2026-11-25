@@ -75,8 +75,13 @@ test("Diff page", async ({ page, start }) => {
   await disclosure.getByRole("button", { name: /^every-commit-stamped/ }).click()
   await expect(treeFiles(page)).toHaveCount(narrowed)
 
-  // Entry 15: the file filter rebuilds the tree.
+  // Entry 15: no filter at load (the range lists 15 files or fewer); `/` shows it focused with no
+  // slash typed, and the filter rebuilds the tree.
   const filter = page.getByTestId("file-filter")
+  await expect(filter).toHaveCount(0)
+  await page.keyboard.press("/")
+  await expect(filter).toBeFocused()
+  await expect(filter).toHaveValue("")
   await filter.fill("state")
   await expect(treeFiles(page)).toHaveCount(1)
   await filter.fill("")
@@ -176,7 +181,10 @@ test("Diff page", async ({ page, start }) => {
     })
   expect(accents).toEqual({ add: tokens.done, del: tokens.deadlocked })
 
-  // Entry 21: expand context works un-narrowed (a real blob round trip).
+  // Entry 21: expand context works un-narrowed (a real blob round trip). The reload hid the filter again.
+  await expect(filter).toHaveCount(0)
+  await page.keyboard.press("/")
+  await expect(filter).toBeFocused()
   await page.getByTestId("file-filter").fill("long")
   await treeFiles(page).filter({ hasText: "long.go" }).click()
   await expect(area).toHaveAttribute("data-file", LONG_FILE)

@@ -1,5 +1,5 @@
 import { Box, chakra } from "@chakra-ui/react"
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react"
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
 import { fetchArchivedEpicDetail, fetchEpicDetail, type FetchEpicDetail } from "../epic/detail"
 import type { DiffFile } from "../generated/server"
@@ -223,6 +223,9 @@ function Tabs({
   )
 }
 
+/** The file filter shows on its own once the view lists more files than this. */
+const FILTER_MIN_FILES = 15
+
 function FilesBrowser({
   files,
   range,
@@ -268,11 +271,24 @@ function FilesBrowser({
     onSelect(order[(from + d + order.length) % order.length].path)
   }
   const stepRef = useLatest(step)
+  // Sticky: a filter that has text must not vanish when a narrowing shrinks the list.
+  const [filterShown, setFilterShown] = useState(false)
+  const [focusTick, setFocusTick] = useState(0)
+  const filterRef = useRef<HTMLInputElement>(null)
+  if (!filterShown && files.length > FILTER_MIN_FILES) setFilterShown(true)
+  useEffect(() => {
+    if (focusTick > 0) filterRef.current?.focus()
+  }, [focusTick])
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTextTarget(e.target)) return
       if (e.key === "n") stepRef.current(1)
       else if (e.key === "p") stepRef.current(-1)
+      else if (e.key === "/") {
+        e.preventDefault()
+        setFilterShown(true)
+        setFocusTick((t) => t + 1)
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
@@ -285,14 +301,8 @@ function FilesBrowser({
   const left = (
     <>
       {commitList}
-      <FileFilter value={filter} onChange={setFilter} count={filterFiles(files, filter).length} />
-      <FileTree
-        files={files}
-        filter={filter}
-        selected={selected}
-        onSelect={pick}
-        dirCounts={!phone}
-      />
+      {filterShown && <FileFilter ref={filterRef} value={filter} onChange={setFilter} />}
+      <FileTree files={files} filter={filter} selected={selected} onSelect={pick} />
       {emptyNotice && (
         <Box data-testid="narrow-notice" mt="3" fontSize="sm" color="text.muted">
           {emptyNotice}

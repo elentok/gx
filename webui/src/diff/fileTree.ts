@@ -1,7 +1,7 @@
 import type { DiffFile } from "../generated/server"
 
 export type TreeRow =
-  | { kind: "dir"; id: string; depth: number; name: string; count: number; expanded: boolean }
+  | { kind: "dir"; id: string; depth: number; name: string }
   | { kind: "file"; id: string; depth: number; name: string; file: DiffFile }
 
 interface Node {
@@ -20,21 +20,12 @@ function sorted(n: Node): Node[] {
   return [...dirs, ...files]
 }
 
-function countFiles(n: Node): number {
-  let c = n.file ? 1 : 0
-  for (const k of n.children.values()) c += countFiles(k)
-  return c
-}
-
 /**
  * Port of the TUI's ui/tree BuildEntriesFromPaths: directories before files, each sorted by name,
  * and a chain of directories that each hold one directory folds into one row ("a/b/c").
- * A directory id is the path of the last directory in its chain; `collapsed` holds those ids.
+ * A directory id is the path of the last directory in its chain.
  */
-export function buildTree(
-  files: DiffFile[],
-  collapsed: ReadonlySet<string> = new Set(),
-): TreeRow[] {
+export function buildTree(files: DiffFile[]): TreeRow[] {
   const root: Node = { name: "", path: "", children: new Map() }
   for (const file of files) {
     const parts = file.path.split("/")
@@ -66,16 +57,8 @@ export function buildTree(
         names.push(only.name)
         dir = only
       }
-      const expanded = !collapsed.has(dir.path)
-      rows.push({
-        kind: "dir",
-        id: dir.path,
-        depth,
-        name: names.join("/"),
-        count: countFiles(dir),
-        expanded,
-      })
-      if (expanded) walk(dir, depth + 1)
+      rows.push({ kind: "dir", id: dir.path, depth, name: names.join("/") })
+      walk(dir, depth + 1)
     }
   }
   walk(root, 0)
@@ -88,7 +71,7 @@ export function filterFiles(files: DiffFile[], text: string): DiffFile[] {
   return q ? files.filter((f) => f.path.toLowerCase().includes(q)) : files
 }
 
-/** The files in tree order, ignoring collapsed directories: the order Prev and Next walk. */
+/** The files in tree order: the order Prev and Next walk. */
 export function treeOrder(files: DiffFile[]): DiffFile[] {
   return buildTree(files).flatMap((r) => (r.kind === "file" ? [r.file] : []))
 }

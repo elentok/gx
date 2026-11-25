@@ -247,10 +247,58 @@ test("n and p walk the visible rows with wrap-around and the file goes to the UR
   await waitFor(() => expect(selectedPath()).toBe("README.md"))
 })
 
+const many = (n: number) => named(...Array.from({ length: n }, (_, i) => `f${i}.go`))
+const filterBox = () => screen.queryByTestId("file-filter")
+
+test("no filter and no heading at 15 files, a filter at 16", async () => {
+  render(OPEN, async () => many(15))
+  await screen.findByTestId("diff-area")
+  expect(filterBox()).toBeNull()
+  expect(screen.queryByTestId("files-heading")).toBeNull()
+  cleanup()
+  render(OPEN, async () => many(16))
+  await screen.findByTestId("diff-area")
+  expect(filterBox()).not.toBeNull()
+})
+
+test("/ shows the filter focused without typing a slash, and it stays", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("diff-area")
+  expect(filterBox()).toBeNull()
+  press("/")
+  const input = (await screen.findByTestId("file-filter")) as HTMLInputElement
+  await waitFor(() => expect(document.activeElement).toBe(input))
+  expect(input.value).toBe("")
+  fireEvent.change(input, { target: { value: "src" } })
+  expect(screen.getAllByTestId("tree-file")).toHaveLength(2)
+  fireEvent.change(input, { target: { value: "a.go" } })
+  expect(filterBox()).not.toBeNull()
+})
+
+test("/ in a focused text field shows nothing new, and a modifier does nothing", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("diff-area")
+  const edit = await openEdit()
+  press("/", edit)
+  expect(filterBox()).toBeNull()
+  fireEvent.keyDown(document.body, { key: "/", ctrlKey: true })
+  fireEvent.keyDown(document.body, { key: "/", metaKey: true })
+  fireEvent.keyDown(document.body, { key: "/", altKey: true })
+  expect(filterBox()).toBeNull()
+})
+
+test("the selected row is the only aria-selected one", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("diff-area")
+  const rows = screen.getAllByTestId("tree-file")
+  expect(rows.map((r) => r.getAttribute("aria-selected"))).toEqual(["true", "false", "false"])
+})
+
 test("a filter narrows the walk and p/n do nothing while it has focus", async () => {
   render(OPEN, async () => TREE())
   await screen.findByTestId("diff-area")
-  const input = screen.getByTestId("file-filter")
+  press("/")
+  const input = await screen.findByTestId("file-filter")
   fireEvent.change(input, { target: { value: "src" } })
   expect(screen.getAllByTestId("tree-file")).toHaveLength(2)
   press("n", input)
@@ -262,7 +310,8 @@ test("a filter narrows the walk and p/n do nothing while it has focus", async ()
 test("a filter that matches nothing selects no file and says so", async () => {
   render(OPEN, async () => TREE())
   await screen.findByTestId("diff-area")
-  fireEvent.change(screen.getByTestId("file-filter"), { target: { value: "zzzz" } })
+  press("/")
+  fireEvent.change(await screen.findByTestId("file-filter"), { target: { value: "zzzz" } })
   expect(selectedPath()).toBeNull()
   expect(screen.getByTestId("no-files").textContent).toBe("No files in this selection.")
   expect(screen.getByTestId("file-tree").textContent).toBe('No files match "zzzz".')
@@ -283,7 +332,6 @@ test("on a phone the Files and Diff tabs show one pane each and picking a file o
   render(OPEN, async () => TREE(), "phone")
   const files = await screen.findByRole("tab", { name: "Files 3" })
   expect(screen.getByRole("tab", { name: "Diff" })).toBeTruthy()
-  expect(screen.queryByTestId("dir-count")).toBeNull()
   expect(screen.queryByTestId("diff-area")).toBeNull()
   fireEvent.click(files)
   fireEvent.click(screen.getAllByTestId("tree-file")[1])
