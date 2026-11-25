@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
@@ -33,25 +34,16 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rc := resolveCall(c, kind, path, meta, parent.Records, callID)
 	if kind == harness.Codex {
-		c.codexSubagentRead(w, id, dir, meta, parent.Records, callID)
+		c.codexSubagentRead(w, id, dir, meta, rc, callID)
 		return
 	}
 	if kind != harness.Claude {
 		http.Error(w, noSuchSubagent, http.StatusNotFound)
 		return
 	}
-	rec, inParent := recordOfCall(parent.Records, callID)
-	if !inParent {
-		rec = transcript.TaskRecord{Kind: transcript.TaskKindSubagent, CallID: callID}
-	}
-	ref, ok := c.claudeSubagent(rec, path)
-	var above []subagent.SessionSubagentLink
-	if ok && !inParent {
-		// A call the parent does not hold is a nested one: its record is in
-		// the file of the subagent that made it.
-		rec, above, inParent = c.nestedCall(parent.Records, path, rec, ref)
-	}
+	rec, ref, ok, above, inParent := rc.rec, rc.ref, rc.hasRef, rc.above, rc.inParent
 	var snap Snapshot
 	if ok {
 		snap, err = c.subagentPages.Read(ref.Path, kind, false, c.subagentLoader(dir))
@@ -68,7 +60,6 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	rec = c.withSubagentDetails([]transcript.TaskRecord{rec}, path)[0]
 
 	// resolveTask is the one rule set of the task row. A call no file holds
 	// has no record to resolve.
@@ -114,6 +105,58 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		out.Current, out.Others = currentCalls(snap.InFlight)
 	}
 	wire.WriteJSON(w, out)
+}
+
+// resolvedCall is what the parent transcript and the files beside it say about
+// one subagent call. The page read and the watch both start from it, so they
+// judge the call the same way.
+type resolvedCall struct {
+	rec      transcript.TaskRecord
+	ref      subagentRef // the file lookup; its path may not exist yet
+	hasRef   bool        // the lookup found a file path
+	above    []subagent.SessionSubagentLink
+	inParent bool // rec is a real record, from the parent or a nested file
+}
+
+// resolveCall finds the record, the file and the calls above for callID. A Codex
+// miss is forgotten first: the lookup runs on an event or a tick, and a
+// remembered miss from before the rollout existed would hide it.
+func resolveCall(c *Chat, kind agentrunner.Kind, path string, meta Meta, parentRecords []transcript.TaskRecord, callID string) resolvedCall {
+	rec, inParent := recordOfCall(parentRecords, callID)
+	switch kind {
+	case harness.Codex:
+		// The call links to the child through the record's thread id, so a call
+		// the parent does not hold is unknown: the server never looks inside a
+		// child for more calls.
+		if !inParent {
+			return resolvedCall{}
+		}
+		c.transcripts.ForgetMiss(rec.ID)
+		rec = c.withCodexChildren([]transcript.TaskRecord{rec}, meta)[0]
+		ref, ok := c.codexSubagent(rec, meta)
+		return resolvedCall{rec: rec, ref: ref, hasRef: ok, inParent: true}
+	case harness.Claude:
+		if !inParent {
+			rec = transcript.TaskRecord{Kind: transcript.TaskKindSubagent, CallID: callID}
+		}
+		ref, ok := c.claudeSubagent(rec, path)
+		var above []subagent.SessionSubagentLink
+		if ok && !inParent {
+			// A call the parent does not hold is a nested one: its record is in
+			// the file of the subagent that made it.
+			rec, above, inParent = c.nestedCall(parentRecords, path, rec, ref)
+		}
+		if ok {
+			rec = c.withSubagentDetails([]transcript.TaskRecord{rec}, path)[0]
+		}
+		return resolvedCall{rec: rec, ref: ref, hasRef: ok, above: above, inParent: inParent}
+	}
+	return resolvedCall{}
+}
+
+// live reports whether the call still runs. A call no record holds is not live.
+func (rc resolvedCall) live(c *Chat, meta Meta) bool {
+	return rc.inParent && !resolveTask(rc.rec, meta, c.clock()).finished && !rc.ref.Finished
 }
 
 // writeParentGone answers a known session whose parent transcript cannot be

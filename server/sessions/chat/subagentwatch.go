@@ -4,9 +4,6 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/transcript"
 )
 
 // SubagentWatch ticks while one subagent page is open. It stats the file on the
@@ -88,9 +85,11 @@ func watchSubagent(c *Chat, w *SubagentWatch, id, dir, callID string, t subagent
 			return
 		case <-ticker.C:
 		}
-		if t.path == "" {
-			// A Starting call's file is found by lookups that remember misses.
-			t = resolveSubagent(c, id, dir, callID)
+		// Each tick re-judges the call: a finished one is no longer watched, and
+		// a Starting one keeps looking until its file appears.
+		t = resolveSubagent(c, id, dir, callID)
+		if !t.known || !t.live {
+			return
 		}
 	}
 }
@@ -110,38 +109,15 @@ func resolveSubagent(c *Chat, id, dir, callID string) subagentTarget {
 	if err != nil {
 		return subagentTarget{known: true}
 	}
-	rec, inParent := recordOfCall(parent.Records, callID)
-	switch kind {
-	case harness.Codex:
-		if !inParent {
-			return subagentTarget{}
-		}
-		c.transcripts.ForgetMiss(rec.ID)
-		rec = c.withCodexChildren([]transcript.TaskRecord{rec}, meta)[0]
-		t := subagentTarget{known: true, live: !resolveTask(rec, meta, c.clock()).finished}
-		if ref, ok := c.codexSubagent(rec, meta); ok {
-			t.path = existingFile(ref.Path)
-		}
-		return t
-	case harness.Claude:
-		if !inParent {
-			rec = transcript.TaskRecord{Kind: transcript.TaskKindSubagent, CallID: callID}
-		}
-		ref, ok := c.claudeSubagent(rec, path)
-		if ok && !inParent {
-			rec, _, inParent = c.nestedCall(parent.Records, path, rec, ref)
-		}
-		if !inParent {
-			return subagentTarget{}
-		}
-		rec = c.withSubagentDetails([]transcript.TaskRecord{rec}, path)[0]
-		t := subagentTarget{known: true, live: !resolveTask(rec, meta, c.clock()).finished && !ref.Finished}
-		if ok {
-			t.path = existingFile(ref.Path)
-		}
-		return t
+	rc := resolveCall(c, kind, path, meta, parent.Records, callID)
+	if !rc.inParent {
+		return subagentTarget{}
 	}
-	return subagentTarget{}
+	t := subagentTarget{known: true, live: rc.live(c, meta)}
+	if rc.hasRef {
+		t.path = existingFile(rc.ref.Path)
+	}
+	return t
 }
 
 func existingFile(path string) string {

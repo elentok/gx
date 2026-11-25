@@ -18,20 +18,14 @@ import (
 const codexPromptUnreadable = "Prompt not readable"
 
 // codexSubagentRead answers a chat read with subagent=<call id> for a Codex
-// session: the page of one child rollout. The call links to the child through
-// the record's thread id, so a call the parent does not hold is unknown: the
-// server never looks inside a child for more calls.
-func (c *Chat) codexSubagentRead(w http.ResponseWriter, id, dir string, meta Meta, records []transcript.TaskRecord, callID string) {
-	rec, ok := recordOfCall(records, callID)
-	if !ok {
+// session: the page of one child rollout. A call the parent does not hold is
+// unknown.
+func (c *Chat) codexSubagentRead(w http.ResponseWriter, id, dir string, meta Meta, rc resolvedCall, callID string) {
+	if !rc.inParent {
 		http.Error(w, noSuchSubagent, http.StatusNotFound)
 		return
 	}
-	// Like the parent's read, this runs on an event: a remembered miss from
-	// before the rollout existed would hide it.
-	c.transcripts.ForgetMiss(rec.ID)
-	rec = c.withCodexChildren([]transcript.TaskRecord{rec}, meta)[0]
-	ref, found := c.codexSubagent(rec, meta)
+	rec, ref, found := rc.rec, rc.ref, rc.hasRef
 	var snap Snapshot
 	var err error
 	if found {

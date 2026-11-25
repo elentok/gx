@@ -153,8 +153,8 @@ func (f *subWatch) eventWithin(d time.Duration) bool {
 	}
 }
 
-// drain drops the events already queued, so a later wait sees only new ones.
-func (f *subWatch) drain() {
+// discardQueued drops the events already queued, so a later wait sees only new ones.
+func (f *subWatch) discardQueued() {
 	for {
 		select {
 		case <-f.evs:
@@ -236,7 +236,7 @@ func TestSessionChatChanged_SubagentWatchEndsWithTheStream(t *testing.T) {
 	servertest.WaitFor(t, 5*time.Second, "the stream's client to be gone", func() bool {
 		return f.open(t, "a1").Reason == wire.ReasonSubagentWatchUnknownClient
 	})
-	f.drain()
+	f.discardQueued()
 	servertest.AppendLines(t, path, subFileLine)
 	// Negative wait: no event marks the end of a watch.
 	if f.eventWithin(10 * chatPollTestInterval) {
@@ -253,7 +253,7 @@ func TestSessionChatChanged_SubagentWatchEndsWhenThePageReportsClosed(t *testing
 	if res := f.watch(t, subagent.WatchRequest{Client: "page-1", Session: f.id, CallID: "a1", Closed: true}); res.Refused {
 		t.Fatalf("close refused: %+v", res)
 	}
-	f.drain()
+	f.discardQueued()
 	servertest.AppendLines(t, path, subFileLine)
 	// Negative wait: no event marks the end of a watch.
 	if f.eventWithin(10 * chatPollTestInterval) {
@@ -273,5 +273,59 @@ func TestSessionChatChanged_FinishedSubagentIsNotWatched(t *testing.T) {
 	// Negative wait: nothing was started, so no event can mark it.
 	if f.eventWithin(10 * chatPollTestInterval) {
 		t.Fatal("subagent event for a finished call")
+	}
+}
+
+// callResult is the parent's line that ends call a1.
+func callResult() string {
+	return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":"a1","content":"ok"}]},"toolUseResult":{"status":"completed"}}`, time.Now().UTC().Format(time.RFC3339Nano))
+}
+
+func TestSessionChatChanged_RunningSubagentWatchEndsWhenItsCallEnds(t *testing.T) {
+	t.Parallel()
+	f := startSubWatch(t, false, claudeCall)
+	path := f.writeSubagent(t)
+	f.openTab(t, "page-1")
+	f.open(t, "a1")
+	servertest.AppendLines(t, f.parent, callResult())
+	// Negative wait: the watch needs a tick to see the call end.
+	f.eventWithin(5 * chatPollTestInterval)
+	f.discardQueued()
+	servertest.AppendLines(t, path, subFileLine)
+	// Negative wait: no event marks the end of a watch.
+	if f.eventWithin(10 * chatPollTestInterval) {
+		t.Fatal("subagent event after the call ended")
+	}
+}
+
+func TestSessionChatChanged_StartingSubagentWatchEndsWhenItsCallEndsWithNoFile(t *testing.T) {
+	t.Parallel()
+	f := startSubWatch(t, false, claudeCall)
+	f.openTab(t, "page-1")
+	f.open(t, "a1")
+	servertest.AppendLines(t, f.parent, callResult())
+	// Negative wait: the watch needs a tick to see the call end.
+	f.eventWithin(5 * chatPollTestInterval)
+	f.discardQueued()
+	f.writeSubagent(t)
+	// Negative wait: no event marks the end of a watch.
+	if f.eventWithin(10 * chatPollTestInterval) {
+		t.Fatal("subagent event for a file that appeared after the call ended")
+	}
+}
+
+func TestSessionChatChanged_StartingSubagentWatchKeepsWatchingTheFileThatAppeared(t *testing.T) {
+	t.Parallel()
+	f := startSubWatch(t, false, claudeCall)
+	f.openTab(t, "page-1")
+	f.open(t, "a1")
+	path := f.writeSubagent(t)
+	if !f.eventWithin(5 * time.Second) {
+		t.Fatal("no subagent event when the file appeared")
+	}
+	f.discardQueued()
+	servertest.AppendLines(t, path, subFileLine)
+	if !f.eventWithin(5 * time.Second) {
+		t.Fatal("no subagent event when the appeared file grew")
 	}
 }
