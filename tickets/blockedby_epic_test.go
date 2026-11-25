@@ -272,3 +272,61 @@ func TestFlagDanglingBlockers_CrossEpicRefDoesNotHideDoneTickets(t *testing.T) {
 		t.Errorf("open ticket: got %v, want error (fails closed)", got)
 	}
 }
+
+func epicBlockerRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	write := func(path, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const issue = "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# x\n"
+	write("a/ticket.md", "---\ntype: epic\n---\n# a\n")
+	write("a/issues/01-x.md", issue)
+	write("b/ticket.md", "---\ntype: epic\nblocked_by: [a]\n---\n# b\n")
+	write("b/issues/01-x.md", issue)
+	write("c/ticket.md", "---\ntype: epic\n---\n# c\n")
+	write("c/issues/01-x.md", issue)
+	return root
+}
+
+func TestCheckEpicBlockerAdd_IgnoresStaleEntries(t *testing.T) {
+	md := filepath.Join(epicBlockerRoot(t), "c", "ticket.md")
+	refs := []string{"gone", "a/01", "b"}
+	if err := CheckEpicBlockerAdd(md, refs, "b"); err != nil {
+		t.Errorf("good blocker refused by stale entries: %v", err)
+	}
+	if err := CheckEpicBlockedByWrite(md, refs); err == nil {
+		t.Error("CheckEpicBlockedByWrite accepted stale entries")
+	}
+}
+
+func TestCheckEpicBlockerAdd_TypedCycle(t *testing.T) {
+	// b waits on a, so a waiting on b closes a cycle.
+	md := filepath.Join(epicBlockerRoot(t), "a", "ticket.md")
+	err := CheckEpicBlockerAdd(md, []string{"b"}, "b")
+	var cyc *BlockedByCycleError
+	if !errors.As(err, &cyc) {
+		t.Fatalf("err = %v, want *BlockedByCycleError", err)
+	}
+	if cyc.Epic != "a" || cyc.Blocker != "b" || len(cyc.Chain) == 0 {
+		t.Errorf("cycle = %+v", cyc)
+	}
+	if !strings.Contains(err.Error(), "closes a cycle") {
+		t.Errorf("message changed: %v", err)
+	}
+}
+
+func TestCheckEpicBlockerAdd_UnknownEpic(t *testing.T) {
+	md := filepath.Join(epicBlockerRoot(t), "c", "ticket.md")
+	err := CheckEpicBlockerAdd(md, []string{"nope"}, "nope")
+	var ae *AddressError
+	if !errors.As(err, &ae) || ae.Code != CodeUnknownEpic {
+		t.Errorf("err = %v, want unknown-epic", err)
+	}
+}

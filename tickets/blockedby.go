@@ -213,25 +213,45 @@ func CheckBlockedByWrite(path string, st schema.Ticket) error {
 // blocked_by: refs is what `tickets epic set --blocked-by` would write to the
 // epic ticket.md at ticketMD (<project>/<epic>/ticket.md).
 func CheckEpicBlockedByWrite(ticketMD string, refs []string) error {
+	g, e, err := epicWriteGraph(ticketMD, refs)
+	if err != nil {
+		return err
+	}
+	return errors.Join(g.epicBlockedByErrors(e)...)
+}
+
+// CheckEpicBlockerAdd is CheckEpicBlockedByWrite for adding one blocker: refs
+// is the post-write list, but only added is checked, so a stale entry among the
+// others does not refuse a good blocker.
+func CheckEpicBlockerAdd(ticketMD string, refs []string, added string) error {
+	g, e, err := epicWriteGraph(ticketMD, refs)
+	if err != nil {
+		return err
+	}
+	return errors.Join(g.epicBlockedByRefErrors(e, added)...)
+}
+
+// epicWriteGraph is the project graph as it would be after writing refs to the
+// epic at ticketMD, with that epic.
+func epicWriteGraph(ticketMD string, refs []string) (*projectGraph, Epic, error) {
 	epicDir := filepath.Dir(ticketMD)
 	root := filepath.Dir(epicDir)
 	epics, err := Load(root)
 	if err != nil {
-		return err
+		return nil, Epic{}, err
 	}
 	name := filepath.Base(epicDir)
 	post := slices.Clone(epics)
 	i := slices.IndexFunc(post, func(e Epic) bool { return e.Name == name })
 	if i < 0 {
-		return &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
+		return nil, Epic{}, &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
 	}
 	post[i].BlockedBy = refs
 	archived, err := ArchivedEpicNames(root)
 	if err != nil {
-		return err
+		return nil, Epic{}, err
 	}
-	g := newProjectGraph(ProjectName(root), post, archived)
-	return errors.Join(g.epicBlockedByErrors(post[i])...)
+	return newProjectGraph(ProjectName(root), post, archived), post[i], nil
 }
 
 // LoadResolved is Load plus resolveEpicHold: the project's epics (dir holds

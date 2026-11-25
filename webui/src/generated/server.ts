@@ -1340,6 +1340,29 @@ export interface EpicSeenRequest {
   address: string;
 }
 /**
+ * EpicBlockerRequest is the body of POST /v1/epics/blocker: add (or, with
+ * Remove, drop) one blocker epic on an epic's own blocked_by.
+ */
+export interface EpicBlockerRequest {
+  address: string;
+  blocker: string;
+  remove?: boolean;
+}
+/**
+ * EpicBlockerResult is the answer to POST /v1/epics/blocker. BlockedBy is the
+ * epic's stored blocked_by after the write, or unchanged on a refusal. A
+ * refusal writes nothing and carries a stable Reason; a cycle also names the
+ * Blocker (bare epic name) and the wait Chain.
+ */
+export interface EpicBlockerResult {
+  blocked_by: string[];
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  blocker?: string;
+  chain?: string[];
+}
+/**
  * FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is
  * exactly "the Follow-ups card is in Needs you".
  */
@@ -2408,6 +2431,7 @@ export const ReasonUnknownTicket = "unknown-ticket";
 export const ReasonInvestigateStop = "investigate-stop";
 export const ReasonInvalidAddress = "invalid-address";
 export const ReasonInvalidAgent = "invalid-agent";
+export const ReasonBlockedByCycle = "blocked-by-cycle";
 export const ReasonAlreadyQueued = "already-queued";
 export const ReasonNotQueued = "not-queued";
 export const ReasonBadPosition = "bad-position";
@@ -2432,7 +2456,7 @@ export const ReasonPROpenFailed = "pr-open-failed";
 /**
  * Refusal reasons of the queue writes. Stable: clients switch on them.
  */
-export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonBacklogEpic | typeof ReasonInitiativeEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
+export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonBlockedByCycle | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonBacklogEpic | typeof ReasonInitiativeEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
 /**
  * EventQueueChanged is emitted once per queue write; Address is the ticket it
  * touched. Clients re-read the queue on it.

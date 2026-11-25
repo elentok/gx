@@ -191,6 +191,27 @@ type EpicSeenRequest struct {
 	Address string `json:"address"`
 }
 
+// EpicBlockerRequest is the body of POST /v1/epics/blocker: add (or, with
+// Remove, drop) one blocker epic on an epic's own blocked_by.
+type EpicBlockerRequest struct {
+	Address string `json:"address"`
+	Blocker string `json:"blocker"`
+	Remove  bool   `json:"remove,omitempty"`
+}
+
+// EpicBlockerResult is the answer to POST /v1/epics/blocker. BlockedBy is the
+// epic's stored blocked_by after the write, or unchanged on a refusal. A
+// refusal writes nothing and carries a stable Reason; a cycle also names the
+// Blocker (bare epic name) and the wait Chain.
+type EpicBlockerResult struct {
+	BlockedBy []string `json:"blocked_by"`
+	Refused   bool     `json:"refused,omitempty"`
+	Reason    string   `json:"reason,omitempty"`
+	Message   string   `json:"message,omitempty"`
+	Blocker   string   `json:"blocker,omitempty"`
+	Chain     []string `json:"chain,omitempty"`
+}
+
 // FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is
 // exactly "the Follow-ups card is in Needs you".
 type FollowUpTriage string

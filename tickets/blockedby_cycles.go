@@ -332,23 +332,39 @@ func (g *projectGraph) cycleErrors(epic string, t Ticket) []error {
 func (g *projectGraph) epicBlockedByErrors(e Epic) []error {
 	var errs []error
 	for _, ref := range e.BlockedBy {
-		var blocker string
-		var err error
-		if _, _, isEpic := BlockedByEpicRef(g.project, ref); isEpic {
-			blocker, err = g.resolveBlocker(e.Name, ref)
-		} else if err = g.crossEpicRefusal(e.Name, ref, "an epic may only be blocked by whole epics"); err == nil {
-			err = fmt.Errorf("%q names a ticket of this epic", ref)
-		}
-		if err != nil {
-			errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
-			continue
-		}
-		if chain := g.cycleThrough(e.Name, blocker); chain != nil {
-			errs = append(errs, fmt.Errorf("epic %s: blocked_by %q closes a cycle: %s",
-				e.Name, ref, g.renderChain(chain, e.Name)))
-		}
+		errs = append(errs, g.epicBlockedByRefErrors(e, ref)...)
 	}
 	return errs
+}
+
+// BlockedByCycleError is an epic blocker that closes a wait cycle. Blocker is
+// the bare epic name and Chain the wait chain as rendered in the message.
+type BlockedByCycleError struct {
+	Epic, Blocker string
+	Chain         []string
+	ref           string
+}
+
+func (e *BlockedByCycleError) Error() string {
+	return fmt.Sprintf("epic %s: blocked_by %q closes a cycle: %s", e.Epic, e.ref, strings.Join(e.Chain, " → "))
+}
+
+// epicBlockedByRefErrors is epicBlockedByErrors for the one ref of e.
+func (g *projectGraph) epicBlockedByRefErrors(e Epic, ref string) []error {
+	var blocker string
+	var err error
+	if _, _, isEpic := BlockedByEpicRef(g.project, ref); isEpic {
+		blocker, err = g.resolveBlocker(e.Name, ref)
+	} else if err = g.crossEpicRefusal(e.Name, ref, "an epic may only be blocked by whole epics"); err == nil {
+		err = fmt.Errorf("%q names a ticket of this epic", ref)
+	}
+	if err != nil {
+		return []error{fmt.Errorf("epic %s: blocked_by %w", e.Name, err)}
+	}
+	if chain := g.cycleThrough(e.Name, blocker); chain != nil {
+		return []error{&BlockedByCycleError{Epic: e.Name, Blocker: blocker, Chain: g.chainNames(chain, e.Name), ref: ref}}
+	}
+	return nil
 }
 
 // cycleThrough returns the wait chain from self through blocker back to self,
@@ -403,6 +419,10 @@ func (g *projectGraph) blocking(key string) bool {
 // renderChain names tickets of `epic` by number, others as "epic/number" and
 // whole epics by name.
 func (g *projectGraph) renderChain(chain []string, epic string) string {
+	return strings.Join(g.chainNames(chain, epic), " → ")
+}
+
+func (g *projectGraph) chainNames(chain []string, epic string) []string {
 	names := make([]string, len(chain))
 	for i, key := range chain {
 		if isEpicKey(key) {
@@ -414,7 +434,7 @@ func (g *projectGraph) renderChain(chain []string, epic string) string {
 			names[i] = key[:strings.Index(key, "/")] + "/" + names[i]
 		}
 	}
-	return strings.Join(names, " → ")
+	return names
 }
 
 // shortestPath returns the keys from `from` to `to` inclusive of `to` but, when

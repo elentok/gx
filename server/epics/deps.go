@@ -2,6 +2,7 @@ package epics
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -130,11 +131,15 @@ type Deps struct {
 	TaskCard          func(address string) (*wire.BackgroundTaskCard, error)
 	AmbiguousBlockers func(addr tickets.Address) []string
 	DesignUncharted   func(epicAddr string, e tickets.Epic) (bool, error)
+	// Rescan re-reads the ticket store so open pages follow a write. May be nil.
+	Rescan func()
 }
 
 // Epics serves the epic and ticket read models.
 type Epics struct {
 	Deps
+
+	blockerMu sync.Mutex
 
 	// cards holds the last card list under the event sequence it was built for.
 	cards cardCache

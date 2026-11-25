@@ -88,6 +88,7 @@ const (
 	ReasonInvestigateStop  = "investigate-stop"
 	ReasonInvalidAddress   = "invalid-address"
 	ReasonInvalidAgent     = "invalid-agent"
+	ReasonBlockedByCycle   = "blocked-by-cycle"
 	ReasonAlreadyQueued    = "already-queued"
 	ReasonNotQueued        = "not-queued"
 	ReasonBadPosition      = "bad-position"

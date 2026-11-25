@@ -17,6 +17,7 @@ func TestChangedEpicMeta(t *testing.T) {
 	}
 	none := tickets.Epic{}
 	blocked := tickets.Epic{MergeBlockKind: "dirty-trunk", MergeBlockReason: "trunk is dirty", MergeBlockFiles: []string{"a.go"}}
+	withBlockers := func(refs ...string) tickets.Epic { return tickets.Epic{BlockedBy: refs} }
 	moreFiles := blocked
 	moreFiles.MergeBlockFiles = []string{"a.go", "b.go"}
 	tests := []struct {
@@ -32,6 +33,9 @@ func TestChangedEpicMeta(t *testing.T) {
 		{"merge block cleared", scan("", blocked), scan("", none), []string{"p:loop"}},
 		{"block files changed", scan("", blocked), scan("", moreFiles), []string{"p:loop"}},
 		{"block unchanged", scan("", blocked), scan("", blocked), nil},
+		{"blocker added", scan("", none), scan("", withBlockers("a")), []string{"p:loop"}},
+		{"blocker removed", scan("", withBlockers("a")), scan("", none), []string{"p:loop"}},
+		{"blockers unchanged", scan("", withBlockers("a", "b")), scan("", withBlockers("a", "b")), nil},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

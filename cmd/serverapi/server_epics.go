@@ -122,6 +122,38 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	markSeen.Flags().BoolVar(&seenJSON, "json", false, "emit the result as JSON")
 	cmd.AddCommand(markSeen)
 
+	var blockerJSON bool
+	var addBlocker, removeBlocker string
+	blocker := &cobra.Command{
+		Use:   "blocker <project:epic> (--add|--remove) <project:other>",
+		Short: "add or remove one blocker epic on an epic's blocked_by",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
+				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
+			}
+			if (addBlocker == "") == (removeBlocker == "") {
+				return fmt.Errorf("pass exactly one of --add or --remove")
+			}
+			other, remove := cmp.Or(addBlocker, removeBlocker), removeBlocker != ""
+			return cmdbase.ServerRead(d.Dial(), c.Context(), blockerJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (wire.EpicBlockerResult, error) {
+					return cl.Tickets.EpicBlocker(ctx, args[0], other, remove)
+				},
+				func(w io.Writer, r wire.EpicBlockerResult) error {
+					if r.Refused {
+						return fmt.Errorf("refused (%s): %s", r.Reason, r.Message)
+					}
+					_, err := fmt.Fprintf(w, "%s blocked_by: %v\n", args[0], r.BlockedBy)
+					return err
+				})
+		},
+	}
+	blocker.Flags().StringVar(&addBlocker, "add", "", "the epic to add as a blocker (project:epic)")
+	blocker.Flags().StringVar(&removeBlocker, "remove", "", "the epic to drop from the blockers (project:epic)")
+	blocker.Flags().BoolVar(&blockerJSON, "json", false, "emit the result (or refusal) as JSON")
+	cmd.AddCommand(blocker)
+
 	stashMerge := &cobra.Command{
 		Use:   "stash-merge <project:epic>",
 		Short: "merge an epic paused on a dirty trunk: set the clashing files aside, merge, restore them with conflict markers",

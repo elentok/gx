@@ -38,5 +38,8 @@ func Routes(get func() *Epics) []wire.Route {
 			}
 			wire.WriteJSON(w, struct{}{})
 		}},
+		{Pattern: "POST /v1/epics/blocker", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
+			get().blockerRoute(w, r)
+		}},
 	}
 }

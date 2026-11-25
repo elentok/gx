@@ -84,6 +84,14 @@ func (s *Tickets) EpicMarkSeen(ctx context.Context, address string) (struct{}, e
 	return res, err
 }
 
+// EpicBlocker adds (or, with remove, drops) one blocker epic on an epic's own
+// blocked_by. A refusal comes back as a result, not an error.
+func (s *Tickets) EpicBlocker(ctx context.Context, address, blocker string, remove bool) (wire.EpicBlockerResult, error) {
+	var res wire.EpicBlockerResult
+	err := s.t.post(ctx, "/v1/epics/blocker", wire.EpicBlockerRequest{Address: address, Blocker: blocker, Remove: remove}, &res)
+	return res, err
+}
+
 // EpicMarkMerged records a merge done outside gx on an epic.
 func (s *Tickets) EpicMarkMerged(ctx context.Context, address string) (wire.QueueResult, error) {
 	return s.t.queueWriteTo(ctx, "/v1/epics/mark-merged", wire.QueueRequest{Address: address})
