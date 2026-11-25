@@ -89,9 +89,13 @@ type EpicListRow struct {
 	Queued bool `json:"queued"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
-	// BlockedByEpics are the addresses of the epics named in blocked_by that
-	// have not merged yet.
+	// BlockedByEpics is the addresses of Blockers. Deprecated: transitional so
+	// the web fixtures type-check; removed with them.
 	BlockedByEpics []string `json:"blocked_by_epics"`
+	// Blockers is optional so fixtures without it type-check. WaitingOnEpic
+	// marks a Waiting epic, whose list State is only queued or ready.
+	Blockers      []EpicBlocker `json:"blockers,omitempty"`
+	WaitingOnEpic bool          `json:"waiting_on_epic,omitempty"`
 	// LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
 	LastActivityAt time.Time `json:"last_activity_at,omitzero"`
 	// MergeBlockKind and MergeBlockReason are set only on a Merge blocked row;
@@ -159,6 +163,29 @@ type EpicListRow struct {
 	// Unread is set on an Implementation card that is in Needs you or Merged and
 	// whose state a person has not seen yet. Opening the epic clears it.
 	Unread bool `json:"unread,omitempty"`
+}
+
+// EpicBlocker is an unreleased entry of an epic's blocked_by, ordered invalid
+// refs first, then not-moving, then by name; entry 0 is "A". Address, Name and
+// State are empty for an Invalid entry, whose Ref is the stored token.
+// Deadlocked is separate because a deadlocked epic's State is plain paused.
+// Hint is the deepest not-moving epic behind a Waiting blocker, else nil.
+type EpicBlocker struct {
+	Address    string        `json:"address,omitempty"`
+	Name       string        `json:"name,omitempty"`
+	State      EpicListState `json:"state,omitempty"`
+	Deadlocked bool          `json:"deadlocked,omitempty"`
+	Hint       *BlockerHint  `json:"hint,omitempty"`
+	Invalid    bool          `json:"invalid,omitempty"`
+	Ref        string        `json:"ref,omitempty"`
+}
+
+// BlockerHint is the epic an EpicBlocker is stuck behind.
+type BlockerHint struct {
+	Address    string        `json:"address"`
+	Name       string        `json:"name"`
+	State      EpicListState `json:"state"`
+	Deadlocked bool          `json:"deadlocked,omitempty"`
 }
 
 // EpicSeenRequest is the body of POST /v1/epics/mark-seen: the card whose
@@ -388,6 +415,8 @@ type EpicSummary struct {
 	// Active is the running tickets, listed only while the epic is Running.
 	Active []SummaryTicket `json:"active"`
 	Paused []SummaryTicket `json:"parked"`
+	// Blockers are the epics this one waits on, as in EpicListRow.Blockers.
+	Blockers []EpicBlocker `json:"blockers,omitempty"`
 	// HasRepair is set when a paused ticket is broken (stuck or error), so
 	// both clients show a fault in the alarm color instead of a question.
 	HasRepair bool `json:"has_repair"`

@@ -42,6 +42,7 @@ func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 			sum.Active[j].LaunchStep = s.launchStep(sum.Active[j].Address)
 		}
+		sum.Blockers = s.blockersOf(root.Project, projEpics[i], epicsByName(projEpics))
 		sum.Verdict, sum.VerdictReason = s.capLine(root, projEpics[i], sum.State == wire.EpicStateWaiting || sum.State == wire.EpicStateRunning)
 		out = append(out, sum)
 	}

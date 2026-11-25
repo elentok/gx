@@ -51,6 +51,7 @@ func (s *Epics) EpicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.buildEpicDetail(root, epics, epics[i], time.Now())
 	d.BackLink = backLinkOf(root.Project, epics[i], s.withArchived(root.Project, epics))
+	d.Blockers = s.blockersOf(root.Project, epics[i], epicsByName(epics))
 	s.decorateLive(&d, root, epics[i])
 	wire.WriteJSON(w, d)
 }

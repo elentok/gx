@@ -1032,6 +1032,10 @@ export interface EpicDetail extends ViewDiff, BackLink {
   steps?: MapStep[];
   impl_address?: string;
   /**
+   * Blockers are the epics this one waits on, as in EpicListRow.Blockers.
+   */
+  blockers?: EpicBlocker[];
+  /**
    * RingProgress is a map epic's Design progress in percent, as on the Design card.
    */
   ring_progress?: number /* int */;
@@ -1196,10 +1200,21 @@ export interface EpicListRow extends BackLink {
    */
   queueable: boolean;
   /**
-   * BlockedByEpics are the addresses of the epics named in blocked_by that
-   * have not merged yet.
+   * BlockedByEpics are the addresses of Blockers.
+   * Deprecated: transitional so the web fixtures keep type-checking; read
+   * Blockers. Removed with the fixtures' migration.
    */
   blocked_by_epics: string[];
+  /**
+   * Blockers are the epics the epic waits on; see EpicBlocker. Optional so
+   * fixtures that do not carry it still type-check.
+   */
+  blockers?: EpicBlocker[];
+  /**
+   * WaitingOnEpic is set when the epic is Waiting on an unreleased epic. Its
+   * list State is queued or ready, so the row has no other way to say so.
+   */
+  waiting_on_epic?: boolean;
   /**
    * LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
    */
@@ -1301,6 +1316,45 @@ export interface EpicListRow extends BackLink {
    * whose state a person has not seen yet. Opening the epic clears it.
    */
   unread?: boolean;
+}
+/**
+ * EpicBlocker is one entry of an epic's blocked_by that has not released it.
+ * The list is ordered invalid refs first, then not-moving blockers, then by
+ * name; clients take entry 0 as "A".
+ */
+export interface EpicBlocker {
+  /**
+   * Address, Name and State are the blocker's own, State being its Epics page
+   * state. All of Address, Name and State are empty for an Invalid entry.
+   */
+  address?: string;
+  name?: string;
+  state?: EpicListState;
+  /**
+   * Deadlocked is set when the blocker is Deadlocked: its State is plain
+   * paused then, which cannot say so.
+   */
+  deadlocked?: boolean;
+  /**
+   * Hint is the deepest not-moving epic behind a Waiting blocker; nil for a
+   * moving blocker and for one that is not moving itself.
+   */
+  hint?: BlockerHint;
+  /**
+   * Invalid marks a stored blocked_by entry that names no whole epic of the
+   * project; Ref is that stored token.
+   */
+  invalid?: boolean;
+  ref?: string;
+}
+/**
+ * BlockerHint is the epic an EpicBlocker is stuck behind.
+ */
+export interface BlockerHint {
+  address: string;
+  name: string;
+  state: EpicListState;
+  deadlocked?: boolean;
 }
 /**
  * EpicSeenRequest is the body of POST /v1/epics/mark-seen: the card whose
@@ -1615,6 +1669,10 @@ export interface EpicSummary {
    */
   active: SummaryTicket[];
   parked: SummaryTicket[];
+  /**
+   * Blockers are the epics this one waits on, as in EpicListRow.Blockers.
+   */
+  blockers?: EpicBlocker[];
   /**
    * HasRepair is set when a paused ticket is broken (stuck or error), so
    * both clients show a fault in the alarm color instead of a question.

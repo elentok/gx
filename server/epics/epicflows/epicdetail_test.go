@@ -305,6 +305,30 @@ func TestEpicDetail_MapRingProgress(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_BlockersOfAWaitingEpic(t *testing.T) {
+	t.Parallel()
+	open := map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")}
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "dep", "---\nstatus: open\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "waiter", "---\nstatus: open\nblocked_by: [dep]\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "free", "---\nstatus: open\n---\n", open)
+	})
+
+	code, d, body := getEpicDetail(t, h, base, "proj:waiter")
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	if d.State != wire.EpicStateWaitingOnEpic {
+		t.Errorf("state = %q, want %q", d.State, wire.EpicStateWaitingOnEpic)
+	}
+	if len(d.Blockers) != 1 || d.Blockers[0].Address != "proj:dep" || d.Blockers[0].State != wire.EpicListReady {
+		t.Errorf("blockers = %+v, want proj:dep in state ready", d.Blockers)
+	}
+	if _, free, _ := getEpicDetail(t, h, base, "proj:free"); len(free.Blockers) != 0 {
+		t.Errorf("free blockers = %+v, want none", free.Blockers)
+	}
+}
+
 func TestEpicDetail_LoopEpicWithoutCostKeepsZeroTotals(t *testing.T) {
 	t.Parallel()
 	h, base := rigs.StartEpicDetail(t, func(store string) {

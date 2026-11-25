@@ -187,8 +187,8 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 		t.Fatal(err)
 	}
 	for _, row := range list.Epics {
-		if row.Name == "waiter" && !slices.Equal(row.BlockedByEpics, []string{"proj:" + schedEpic}) {
-			t.Errorf("waiter blocked_by_epics = %v, want [proj:%s]", row.BlockedByEpics, schedEpic)
+		if row.Name == "waiter" && (len(row.Blockers) != 1 || row.Blockers[0].Address != "proj:"+schedEpic) {
+			t.Errorf("waiter blockers = %+v, want [proj:%s]", row.Blockers, schedEpic)
 		}
 	}
 }

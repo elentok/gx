@@ -113,6 +113,13 @@ type Epic struct {
 	BlockedBy   []string
 	Base        string
 
+	// UnreleasedBlockers are the bare names of the epics in BlockedBy that
+	// still block, in blocked_by order; InvalidBlockers are the stored refs
+	// that do not resolve (a ticket ref, a deleted, map or other-project
+	// epic). Both are set in memory by resolveEpicHold.
+	UnreleasedBlockers []string
+	InvalidBlockers    []string
+
 	// StartedAt and CompletedAt come from ticket.md's frontmatter; zero when
 	// it doesn't set the field.
 	StartedAt   time.Time

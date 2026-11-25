@@ -125,6 +125,12 @@ func init() {
 	Default.Register(Step{Name: "initiative-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// epic-blocker-lists: Epic.UnreleasedBlockers and InvalidBlockers are
+	// derived in memory and never stored, so nothing needs rewriting. Never
+	// rename this step.
+	Default.Register(Step{Name: "epic-blocker-lists", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

@@ -193,6 +193,33 @@ func TestEpicsDeps_EpicSummariesAskTheProjectsFake(t *testing.T) {
 	}
 }
 
+func TestEpicsDeps_EpicSummariesCarryTheBlockersOfAWaitingEpic(t *testing.T) {
+	d := fakeEpics()
+	d.Projects = &fakeProjects{epics: map[string][]tickets.Epic{"p": {
+		{Name: "dep", Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}},
+		{
+			Name: "e", BlockedBy: []string{"dep"}, UnreleasedBlockers: []string{"dep"},
+			Tickets: []tickets.Ticket{{Number: 1, Status: "open", ExternalBlockers: []string{"dep"}}},
+		},
+		{Name: "free", Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}},
+	}}}
+	d.Queue = fakeQueue{items: []wire.QueueItem{{Address: "p:e/01"}, {Address: "p:free/01"}}}
+	byName := map[string]wire.EpicSummary{}
+	for _, sum := range New(d).EpicSummaries(nil) {
+		byName[sum.Name] = sum
+	}
+	waiting := byName["e"]
+	if waiting.State != wire.EpicStateWaitingOnEpic {
+		t.Errorf("state = %q, want %q", waiting.State, wire.EpicStateWaitingOnEpic)
+	}
+	if len(waiting.Blockers) != 1 || waiting.Blockers[0].Address != "p:dep" || waiting.Blockers[0].Name != "dep" {
+		t.Errorf("blockers = %+v, want p:dep", waiting.Blockers)
+	}
+	if got := byName["free"].Blockers; len(got) != 0 {
+		t.Errorf("free blockers = %+v, want none", got)
+	}
+}
+
 func TestEpicsDeps_EpicListReadsTheSettingsFake(t *testing.T) {
 	d := fakeEpics()
 	d.TicketStore = t.TempDir()

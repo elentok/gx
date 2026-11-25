@@ -78,6 +78,7 @@ func resolveEpicHold(project string, release EpicRelease, epics []Epic, archived
 		e := &out[i]
 		e.Tickets = slices.Clone(e.Tickets)
 		epicErrs := g.epicBlockedByErrors(*e)
+		e.UnreleasedBlockers, e.InvalidBlockers = g.epicBlockers(*e)
 		for j := range e.Tickets {
 			t := &e.Tickets[j]
 			t.BlockedByErr, t.CycleErr, t.ExternalBlockers = "", "", nil
@@ -92,14 +93,29 @@ func resolveEpicHold(project string, release EpicRelease, epics []Epic, archived
 				t.BlockedByErr = errors.Join(errs...).Error()
 				continue
 			}
-			for _, ref := range qualifiedRefs(e.BlockedBy) {
-				if key, _ := g.resolveBlocker(e.Name, ref); g.blocking(key) {
-					t.ExternalBlockers = append(t.ExternalBlockers, ref)
-				}
-			}
+			t.ExternalBlockers = e.UnreleasedBlockers
 		}
 	}
 	return out
+}
+
+// epicBlockers splits e's blocked_by into the whole epics that still block
+// (bare names, in order) and the stored refs that do not resolve.
+func (g *projectGraph) epicBlockers(e Epic) (unreleased, invalid []string) {
+	for _, ref := range e.BlockedBy {
+		if _, _, isEpic := BlockedByEpicRef(g.project, ref); !isEpic {
+			invalid = append(invalid, ref)
+			continue
+		}
+		key, err := g.resolveBlocker(e.Name, ref)
+		switch {
+		case err != nil:
+			invalid = append(invalid, ref)
+		case g.blocking(key):
+			unreleased = append(unreleased, key)
+		}
+	}
+	return unreleased, invalid
 }
 
 // ValidateRefs is ValidateProject's cross-ticket half, run on epics already in

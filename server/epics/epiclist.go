@@ -216,12 +216,7 @@ func (s *Epics) buildCardList() (wire.EpicList, error) {
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
 func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, rec, done *triage.Record, triageLive map[string]bool, qidx queueIndex) []wire.EpicListRow {
-	merged := map[string]bool{}
-	byName := map[string]tickets.Epic{}
-	for _, e := range epics {
-		merged[e.Name] = !e.MergedAt.IsZero()
-		byName[e.Name] = e
-	}
+	byName := epicsByName(epics)
 	// joined maps a listed map's name to its -impl epic.
 	joined := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -250,7 +245,7 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 			continue
 		}
 		row := s.epicListRow(project, e, qidx)
-		row.BlockedByEpics = unmergedBlockers(project, e, merged)
+		applyBlockers(&row, e, s.blockersOf(project, e, byName))
 		if e.IsMap {
 			row.ProgressStep = queue.MapProgress(e)
 			var impl *wire.EpicListRow
@@ -284,22 +279,6 @@ func (s *Epics) applyFollowUpWorkspaces(rows []wire.EpicListRow, counts []wire.F
 	}
 }
 
-// unmergedBlockers returns the addresses of the epics in e's blocked_by that
-// exist in the project and have not merged. Ticket refs are not epic blockers.
-func unmergedBlockers(project string, e tickets.Epic, merged map[string]bool) []string {
-	out := []string{}
-	for _, ref := range e.BlockedBy {
-		p, name, isEpic := tickets.BlockedByEpicRef(project, ref)
-		if !isEpic || p != project {
-			continue
-		}
-		if isMerged, exists := merged[name]; exists && !isMerged {
-			out = append(out, queue.RootRef{Project: project, Epic: name}.String())
-		}
-	}
-	return out
-}
-
 // lastActivity is the newest claimed_at or done_at across e's tickets.
 func lastActivity(e tickets.Epic) time.Time {
 	var newest time.Time
@@ -317,6 +296,7 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	root := queue.RootRef{Project: project, Epic: e.Name}
 	queued := s.Queue.RootQueued(root)
 	queueable := queue.EpicQueueable(e, queued)
+	state := s.listStateOf(project, e)
 	row := wire.EpicListRow{
 		Address: root.String(), Project: project, Name: e.Name, Kind: wire.EpicKindLoop,
 		Done: e.DoneCount(), Total: e.TotalCount(),
@@ -328,7 +308,7 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	if e.IsMap {
 		row.Kind = wire.EpicKindMap
 	}
-	row.State = epicListState(e, queued, queueable, EpicStateFor(root, e, s.Delivery(project), s.Runs.StartedAtOf))
+	row.State = state
 	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}

@@ -132,30 +132,6 @@ func TestEpicList_RowFields(t *testing.T) {
 	}
 }
 
-func TestEpicList_BlockedByEpicsIgnoresMerged(t *testing.T) {
-	t.Parallel()
-	done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
-	open := map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")}
-	h, base := rigs.StartEpicDetail(t, func(store string) {
-		rigs.WriteEpicFiles(t, store, "live", "---\nstatus: open\n---\n", open)
-		rigs.WriteEpicFiles(t, store, "landed", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
-		rigs.WriteEpicFiles(t, store, "waiter", "---\nstatus: open\nblocked_by: [live, \"proj:landed\", ghost]\n---\n", open)
-		rigs.WriteEpicFiles(t, store, "free", "---\nstatus: open\nblocked_by: [landed]\n---\n", open)
-	})
-
-	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
-	byName := map[string]wire.EpicListRow{}
-	for _, r := range rigs.GetEpicList(t, code, body).Epics {
-		byName[r.Name] = r
-	}
-	if got := byName["waiter"].BlockedByEpics; !slices.Equal(got, []string{"proj:live"}) {
-		t.Errorf("waiter blocked_by_epics = %v, want [proj:live]", got)
-	}
-	if got := byName["free"].BlockedByEpics; len(got) != 0 {
-		t.Errorf("free blocked_by_epics = %v, want none", got)
-	}
-}
-
 func TestEpicList_LastActivityIsTheNewestStamp(t *testing.T) {
 	t.Parallel()
 	h, base := rigs.StartEpicDetail(t, func(store string) {

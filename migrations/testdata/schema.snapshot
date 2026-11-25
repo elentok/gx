@@ -55,6 +55,8 @@ struct tickets.Epic
   Status string 
   BlockedBy []string 
   Base string 
+  UnreleasedBlockers []string 
+  InvalidBlockers []string 
   StartedAt time.Time 
   CompletedAt time.Time 
   CreatedAt time.Time 
