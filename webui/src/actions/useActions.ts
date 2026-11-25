@@ -36,7 +36,7 @@ import {
   postQueueAdd,
   type PostEpicWrite,
 } from "../epics/queue"
-import { epicHref } from "../hrefs"
+import { diffHref, epicHref } from "../hrefs"
 import { chatDraftPageActions, draftPageActions } from "../shell/draftPageActions"
 import { openModelPicker } from "../shell/modelPickerOpen"
 import { openRename, type DraftIdentity } from "../shell/renameOpen"
@@ -65,7 +65,7 @@ import {
   type ConfirmRequest,
   type SurfaceContext,
 } from "./confirmRequest"
-import { isDraftEntity, isPlainChat, type Entity } from "./entity"
+import { isDraftEntity, isPlainChat, showDiffUrl, type Entity } from "./entity"
 import { actionById, menuActions, type ActionDecl, type Group } from "./registry"
 
 export interface ActionWriters extends ItemWriters {
@@ -433,6 +433,10 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     switch (decl.id) {
       case "open-design-epic":
         return w.navigate(epicHref(e.key))
+      case "show-diff": {
+        const url = showDiffUrl(e)
+        return url ? w.navigate(diffHref(url)) : undefined
+      }
       case "open-pr":
         return e.prUrl ? w.openUrl(e.prUrl) : undefined
       case "rename":

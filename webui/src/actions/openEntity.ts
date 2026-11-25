@@ -2,8 +2,9 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import { isCurrent, useEpicListWhen } from "../epics/list"
 import { isChat } from "../agents/sessionWrites"
 import { useOpenChat, agentIdOf, chatDraftIdOf, draftIdOf } from "../shell/chords"
-import type { SessionInfo } from "../generated/server"
-import { agentKindOf, chatEntity, type Entity } from "./entity"
+import type { EpicDetail, SessionInfo, TicketDetail } from "../generated/server"
+import { readPageCache } from "../pageCache"
+import { agentKindOf, chatEntity, viewDiffOf, type Entity } from "./entity"
 
 type DraftRow = { member_key: string; label: string; workspace: string }
 
@@ -40,21 +41,53 @@ export function useOpenEntity(): {
   const card = list?.epics?.find((r) => isCurrent(r, key))
   const base = { key, name: key, surface: "page" } as const
 
-  if (kind === "e")
+  // The page keeps its last detail in the page cache; the rules read it, never a fetch.
+  if (kind === "e") {
+    const detail = readPageCache<EpicDetail>("epic", key)
     return {
       path,
       session,
-      entity: { ...base, kind: "epic", workspace: card?.workspace || undefined },
+      entity: {
+        ...base,
+        kind: "epic",
+        workspace: card?.workspace || undefined,
+        viewDiff: detail ? viewDiffOf(key, detail) : undefined,
+      },
     }
+  }
   if (kind === "d")
     return {
       path,
       session,
       entity: { ...base, kind: "design", workspace: card?.workspace || undefined, session },
     }
-  if (kind === "t") return { path, session, entity: { ...base, kind: "ticket" } }
-  if (kind === "archive")
-    return { path, session, entity: { ...base, kind: "epic", archived: true } }
+  if (kind === "t") {
+    const detail = readPageCache<TicketDetail>("ticket", key)
+    return {
+      path,
+      session,
+      entity: {
+        ...base,
+        kind: "ticket",
+        status: detail?.status,
+        hasWorktree: detail?.has_worktree,
+        viewDiff: detail ? viewDiffOf(detail.epic, detail) : undefined,
+      },
+    }
+  }
+  if (kind === "archive") {
+    const detail = readPageCache<EpicDetail>("archived-epic", key)
+    return {
+      path,
+      session,
+      entity: {
+        ...base,
+        kind: "epic",
+        archived: true,
+        viewDiff: detail ? viewDiffOf(key, detail) : undefined,
+      },
+    }
+  }
 
   const chat = agentIdOf(path)
   if (chat) {

@@ -87,6 +87,7 @@ function setup(
 test("a Design offers Move and Hold, never Remove, in registry order with Hold or Take off hold one at a time", () => {
   expect(setup(design).labels()).toEqual([
     "Open design epic",
+    "Show diff",
     "Move to workspace",
     "New session",
     "Hold",
@@ -97,6 +98,32 @@ test("a Design offers Move and Hold, never Remove, in registry order with Hold o
   const held = setup({ ...design, held: true }).labels()
   expect(held).toContain("Take off hold")
   expect(held).not.toContain("Hold")
+})
+
+test("Show diff navigates to the worktree of a chat, a Design and a ticket", async () => {
+  const run = async (entity: Entity) => {
+    const navigate = vi.fn()
+    const { act1 } = setup(entity, { navigate })
+    await act1("show-diff").run()
+    return navigate.mock.calls[0]?.[0]
+  }
+  const chat: Entity = {
+    kind: "chat",
+    key: "s1",
+    name: "c",
+    agent: "chat",
+    session: session("s1", "demo", { show_diff_dir: true }),
+  }
+  expect(await run(chat)).toBe("#/diff?project=demo&worktree=chat%3As1")
+  expect(await run(design)).toBe("#/diff?project=demo&worktree=design%3Adesign-epic")
+  const ticket: Entity = {
+    kind: "ticket",
+    key: "demo:e/01",
+    name: "t",
+    status: "paused",
+    hasWorktree: true,
+  }
+  expect(await run(ticket)).toBe("#/diff?project=demo&worktree=ticket%3Ademo%3Ae%2F01")
 })
 
 test("an epic, a chat, a draft and a ticket each offer their own actions", () => {

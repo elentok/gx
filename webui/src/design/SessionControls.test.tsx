@@ -307,6 +307,7 @@ test("the menu reads Live sessions first, then the registry groups, with Copy ID
   const registry = labels.slice(open)
   expect(registry.map((l) => l.replace(/›$/, ""))).toEqual([
     "Open design epic",
+    "Show diff",
     "Move to workspace",
     "New session",
     "Hold",
@@ -330,6 +331,7 @@ test("a deletable Design with no session ends its menu with Delete design in the
   const labels = screen.getAllByRole("menuitem").map((i) => i.textContent?.replace(/›$/, ""))
   expect(labels).toEqual([
     "Open design epic",
+    "Show diff",
     "Move to workspace",
     "Hold",
     "Archive",

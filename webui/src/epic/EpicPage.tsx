@@ -20,7 +20,7 @@ import {
   type EpicDetailRow,
   type EpicListRow,
 } from "../generated/server"
-import type { Entity } from "../actions/entity"
+import { viewDiffOf, type Entity } from "../actions/entity"
 import { unarchiveOne } from "../actions/useActions"
 import { useEntityActions } from "../workspaces/itemActions"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
@@ -401,6 +401,7 @@ function useEpicActions(
         queued: card?.queued ?? detail.queued,
         prUrl: prLink,
         archived: !!detail.archived_at,
+        viewDiff: viewDiffOf(address, detail),
       }
   const hide = markMerged ? [] : ["mark-merged"]
   const { groups, get } = useEntityActions(

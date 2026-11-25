@@ -11,7 +11,7 @@ import {
   type Action,
   type TicketDetail,
 } from "../generated/server"
-import type { Entity } from "../actions/entity"
+import { viewDiffOf, type Entity } from "../actions/entity"
 import { apiFetch } from "../apiFetch"
 import { createExternalStore } from "../shell/externalStore"
 import { WriteError, type Refusable } from "../useWrite"
@@ -53,6 +53,8 @@ export const ticketEntity = (detail: TicketDetail): Entity => ({
   surface: "page",
   serverActions: detail.actions as Action[],
   status: detail.status,
+  hasWorktree: detail.has_worktree,
+  viewDiff: viewDiffOf(detail.epic, detail),
 })
 
 /** A One-off that has not ended. The server refuses any other ticket. */

@@ -1,4 +1,5 @@
-import type { Action, SessionInfo } from "../generated/server"
+import { projectOf, viewDiffUrl, worktreeUrl, type DiffUrl } from "../diff/diffUrl"
+import type { Action, SessionInfo, ViewDiff } from "../generated/server"
 
 export type EntityKind = "epic" | "design" | "ticket" | "chat" | "design-draft" | "chat-draft"
 
@@ -30,6 +31,37 @@ export interface Entity {
   serverActions?: Action[]
   /** A ticket's status word as the page reads it; the address is `key`. */
   status?: string
+  /** A claimed or paused ticket's iteration worktree is on disk (`detail.has_worktree`). */
+  hasWorktree?: boolean
+  /** Set when the response says its "View diff" link shows (`shows_view_diff`): the epic range it opens. */
+  viewDiff?: { epic: string; base?: string; tip?: string }
+}
+
+/** The entity's `viewDiff` from a response: set only when the response shows the "View diff" link. */
+export const viewDiffOf = (epic: string, d: ViewDiff): Entity["viewDiff"] =>
+  d.shows_view_diff ? { epic, base: d.diff_base, tip: d.diff_tip } : undefined
+
+/** The Diff page URL the Show diff action opens, or undefined when the entity has none. Reads the snapshot only. */
+export function showDiffUrl(e: Entity): DiffUrl | undefined {
+  switch (e.kind) {
+    case "chat":
+      return e.agent !== "managed" && e.session?.show_diff_dir
+        ? worktreeUrl(e.session.project, { kind: "chat", id: e.key })
+        : undefined
+    case "design":
+      return worktreeUrl(projectOf(e.key), {
+        kind: "design",
+        id: e.key.slice(e.key.indexOf(":") + 1),
+      })
+    case "ticket":
+      if ((e.status === "claimed" || e.status === "paused") && e.hasWorktree)
+        return worktreeUrl(projectOf(e.key), { kind: "ticket", id: e.key })
+      return e.viewDiff ? viewDiffUrl({ ...e.viewDiff, ticket: e.key }) : undefined
+    case "epic":
+      return e.viewDiff ? viewDiffUrl(e.viewDiff) : undefined
+    default:
+      return undefined
+  }
 }
 
 /** The agent a session is: the Queue agent, a Fix agent, or a plain chat. */

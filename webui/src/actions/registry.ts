@@ -7,6 +7,7 @@ import {
   isDraftEntity,
   isLoopEntity,
   isPlainChat,
+  showDiffUrl,
   type Entity,
 } from "./entity"
 
@@ -102,6 +103,14 @@ export const ACTIONS = [
     group: "open",
     order: 2,
     available: (e) => e.kind === "epic" && !e.archived && !!e.prUrl,
+    confirm: confirmNever,
+  },
+  {
+    id: "show-diff",
+    label: "Show diff",
+    group: "open",
+    order: 3,
+    available: (e) => !!showDiffUrl(e),
     confirm: confirmNever,
   },
   {

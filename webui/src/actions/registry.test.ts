@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 import { session } from "../agents/agentsTestKit"
 import { ActionStartOver, HoldQueuedText } from "../generated/server"
 import { chordTable } from "../shell/chords"
-import type { Entity, EntityKind } from "./entity"
+import { diffHref } from "../hrefs"
+import { viewDiffUrl } from "../diff/diffUrl"
+import { showDiffUrl, type Entity, type EntityKind } from "./entity"
 import {
   ACTIONS,
   GROUP_ORDER,
@@ -213,6 +215,62 @@ describe("availability", () => {
   it("offers Open PR only with a PR URL", () => {
     expect(idsOf(F.epic)).toContain("open-pr")
     expect(idsOf(e("epic"))).not.toContain("open-pr")
+  })
+
+  describe("Show diff", () => {
+    const range = { epic: "p:epic", base: "main", tip: "feat" }
+    const shown = (x: Entity) => idsOf(x).includes("show-diff")
+    const diffChat = (agent: Entity["agent"], dir = true) =>
+      e("chat", { key: "s1", agent, session: session("s1", "p", { show_diff_dir: dir }) })
+
+    it("is in the open group with no chord", () => {
+      const a = actionById("show-diff")
+      expect(a?.group).toBe("open")
+      expect(a?.chord).toBeUndefined()
+    })
+    it("shows on eligible entities", () => {
+      for (const x of [
+        diffChat("chat"),
+        diffChat("queue"),
+        diffChat("fix"),
+        e("design", { key: "p:map" }),
+        e("ticket", { key: "p:e/01", status: "claimed", hasWorktree: true }),
+        e("ticket", { key: "p:e/01", status: "paused", hasWorktree: true }),
+        e("ticket", { key: "p:e/01", status: "done", viewDiff: range }),
+        e("epic", { viewDiff: range }),
+        e("epic", { viewDiff: range, archived: true }),
+      ])
+        expect(shown(x)).toBe(true)
+    })
+    it("is absent where nothing can be shown", () => {
+      for (const x of [
+        diffChat("managed"),
+        diffChat("chat", false),
+        e("ticket", { key: "p:e/01", status: "claimed" }),
+        e("ticket", { key: "p:e/01", status: "open" }),
+        e("epic"),
+        e("design-draft"),
+        e("chat-draft"),
+      ])
+        expect(shown(x)).toBe(false)
+    })
+    it("opens the worktree of a chat, a Design and a ticket", () => {
+      const href = (x: Entity) => {
+        const u = showDiffUrl(x)
+        return u && diffHref(u)
+      }
+      expect(href(diffChat("chat"))).toBe("#/diff?project=p&worktree=chat%3As1")
+      expect(href(e("design", { key: "p:map" }))).toBe("#/diff?project=p&worktree=design%3Amap")
+      expect(href(e("ticket", { key: "p:e/01", status: "claimed", hasWorktree: true }))).toBe(
+        "#/diff?project=p&worktree=ticket%3Ap%3Ae%2F01",
+      )
+    })
+    it("opens exactly what View diff opens for an epic and a done ticket", () => {
+      const epic = e("epic", { key: "p:epic", viewDiff: range })
+      expect(showDiffUrl(epic)).toEqual(viewDiffUrl(range))
+      const done = e("ticket", { key: "p:epic/01", status: "done", viewDiff: range })
+      expect(showDiffUrl(done)).toEqual(viewDiffUrl({ ...range, ticket: "p:epic/01" }))
+    })
   })
 
   describe("Stop on a Design", () => {

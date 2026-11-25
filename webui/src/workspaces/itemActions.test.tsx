@@ -75,7 +75,7 @@ const labels = () => screen.getAllByRole("menuitem").map((i) => i.textContent)
 test("a Design offers Move, Hold, Archive and Copy ID in group order, never Remove; Move lists every workspace with the current one marked and posts the pick", async () => {
   const w = writers()
   await open(design, w)
-  expect(labels()).toEqual(["Move to workspace›", "Hold", "Archive", "Copy ID"])
+  expect(labels()).toEqual(["Show diff", "Move to workspace›", "Hold", "Archive", "Copy ID"])
   expect(screen.getAllByRole("separator").length).toBeGreaterThan(0)
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   const work = await screen.findByRole("menuitem", { name: /Work/ })

@@ -86,3 +86,28 @@ export function diffQuery(url: DiffUrl): string {
   set(KEYS.file, url.file)
   return p.toString()
 }
+
+/** The project part of a `project:name` address. */
+export const projectOf = (address: string) => address.slice(0, address.indexOf(":"))
+
+/** What "View diff" opens: an epic's range, narrowed to a ticket's commits when `ticket` is set. The link and the Show diff action both build it here. */
+export const viewDiffUrl = (p: {
+  epic: string
+  base?: string
+  tip?: string
+  ticket?: string
+}): DiffUrl => ({
+  project: projectOf(p.epic),
+  first: p.base ?? "",
+  second: p.tip ?? "",
+  epic: p.epic,
+  ticket: p.ticket,
+})
+
+/** A worktree diff of one target. */
+export const worktreeUrl = (project: string, worktree: WorktreeTarget): DiffUrl => ({
+  project,
+  first: "",
+  second: "",
+  worktree,
+})
