@@ -145,7 +145,10 @@ test("75. Read a session", async ({ page, start }) => {
   const seen: string[] = []
   for (const s of noticed) {
     await go(page, `#/agents/${s.id}`)
-    const status = page.getByRole("status").filter({ hasText: /\S/ })
+    // A session-done toast is also a status; only the notice strip has a button named exactly "Dismiss".
+    const status = page
+      .getByRole("status")
+      .filter({ has: page.getByRole("button", { name: "Dismiss", exact: true }) })
     await expect(status).toHaveCount(1)
     const text = ((await status.textContent()) ?? "").replace(/\s*Dismiss\s*$/, "")
     expect(noticeTexts.filter((re) => re.test(text))).toHaveLength(1)
