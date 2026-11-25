@@ -268,6 +268,7 @@ const FILTER_MIN_FILES = 15
 
 function FilesBrowser({
   files,
+  totalFiles,
   range,
   fetchPatch,
   fetchBlob,
@@ -281,6 +282,8 @@ function FilesBrowser({
   phone,
 }: {
   files: DiffFile[]
+  /** The unfiltered, un-narrowed file count: the filter's show rule reads this. */
+  totalFiles: number
   range: PatchRange
   fetchPatch: FetchDiffPatch
   fetchBlob: FetchDiffBlob
@@ -311,11 +314,12 @@ function FilesBrowser({
     onSelect(order[(from + d + order.length) % order.length].path)
   }
   const stepRef = useLatest(step)
-  // Sticky: a filter that has text must not vanish when a narrowing shrinks the list.
-  const [filterShown, setFilterShown] = useState(false)
+  // `/` opens the filter on a short list; a filter that has text never vanishes.
+  const [filterOpened, setFilterOpened] = useState(false)
+  const filterShown = filterOpened || filter !== "" || totalFiles > FILTER_MIN_FILES
+  const setFilterShown = setFilterOpened
   const [focusTick, setFocusTick] = useState(0)
   const filterRef = useRef<HTMLInputElement>(null)
-  if (!filterShown && files.length > FILTER_MIN_FILES) setFilterShown(true)
   useEffect(() => {
     if (focusTick > 0) filterRef.current?.focus()
   }, [focusTick])
@@ -688,6 +692,7 @@ export function DiffPage({
       {loadedFiles && shown ? (
         <FilesBrowser
           files={shown}
+          totalFiles={loadedFiles.files.length}
           commits={wanted && !uncommittedPicked ? narrowing : undefined}
           commitList={
             returned && (

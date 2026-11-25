@@ -735,3 +735,42 @@ test("worktree mode: focus calls the worktree route again and the files follow t
   expect(fetchWorktree).toHaveBeenCalledTimes(2)
   expect(fetchFiles).toHaveBeenLastCalledWith("p", "base1", "snap2")
 })
+
+test("worktree mode: a refetch with new SHAs keeps the page, the open commits row and the file on screen", async () => {
+  let n = 1
+  let release: (r: DiffFilesResult) => void = () => {}
+  const fetchFiles = vi.fn<FetchDiffFiles>(async (_p, _a, second) =>
+    second === "snap1"
+      ? named("a.go", "b.go")
+      : new Promise<DiffFilesResult>((resolve) => {
+          release = resolve
+        }),
+  )
+  render(`${WORKTREE}&file=b.go`, fetchFiles, undefined, undefined, {
+    diffWorktree: async () => snap(n),
+    diffCommits: commitsOf,
+  })
+  await waitFor(() => expect(treePaths()).toHaveLength(2))
+  fireEvent.click(await screen.findByRole("button", { expanded: false, name: /commits$/ }))
+  n = 2
+  focus()
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledWith("p", "base1", "snap2"))
+  expect(screen.queryByRole("status", { name: "Loading diff" })).toBeNull()
+  expect(treePaths()).toHaveLength(2)
+  expect(screen.getByRole("button", { expanded: true, name: /commits$/ })).toBeTruthy()
+  expect(selectedPath()).toBe("b.go")
+  await act(async () => release(named("a.go", "b.go", "c.go")))
+  await waitFor(() => expect(treePaths()).toHaveLength(3))
+  expect(screen.getByRole("button", { expanded: true, name: /commits$/ })).toBeTruthy()
+})
+
+test("the filter counts the unfiltered list: shown when a link narrows 20 files to 3, not for 10", async () => {
+  const fetchFiles = vi.fn<FetchDiffFiles>(async (_p, _a, _b, shas) => (shas ? many(3) : many(20)))
+  narrowedRender(`${NARROW}&commits=c3`, { diffFiles: fetchFiles })
+  await waitFor(() => expect(treePaths()).toHaveLength(3))
+  expect(filterBox()).not.toBeNull()
+  cleanup()
+  render(OPEN, async () => many(10))
+  await screen.findByTestId("diff-area")
+  expect(filterBox()).toBeNull()
+})

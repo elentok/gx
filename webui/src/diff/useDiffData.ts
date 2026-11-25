@@ -30,6 +30,19 @@ function useTicketTitles(
   return titles
 }
 
+/**
+ * Worktree mode only: while `fetched` is pending for a new key, return the last settled answer of the
+ * same `scope`, so a refetch that changes the SHAs swaps the diff instead of blanking it.
+ */
+function useHeld<T>(fetched: T | undefined, scope: string | null): T | undefined {
+  const [held, setHeld] = useState<{ scope: string; value: T }>()
+  useEffect(() => {
+    if (fetched !== undefined && scope !== null) setHeld({ scope, value: fetched })
+  }, [fetched, scope])
+  if (fetched !== undefined || scope === null) return fetched
+  return held?.scope === scope ? held.value : undefined
+}
+
 /** The data side of the Diff page: the range's files and commits, and the files narrowed to chosen commits. */
 export function useDiffData(
   url: DiffUrl,
@@ -76,10 +89,14 @@ export function useDiffData(
     return () => window.removeEventListener("focus", onFocus)
   }, [canRefetch])
 
-  const commitsFetch = useKeyedFetch(
-    canFetch ? `${key}\n${commitsTip}` : null,
-    () => fetchCommits(project, first, commitsTip),
-    refresh,
+  const heldScope = worktree && project ? `${project}\n${target}` : null
+  const commitsFetch = useHeld(
+    useKeyedFetch(
+      canFetch ? `${key}\n${commitsTip}` : null,
+      () => fetchCommits(project, first, commitsTip),
+      refresh,
+    ),
+    heldScope,
   )
   // Only commits the commit call returned can be narrowed to. Until it answers, the URL's SHAs
   // are held back so the file call is not made with a set that may be dropped.
@@ -116,13 +133,16 @@ export function useDiffData(
 
   const narrowedKey =
     canFetch && narrowing?.length && !commitsPending ? `${key}\n${narrowing.join(",")}` : null
-  const narrowedFetch = useKeyedFetch(
-    narrowedKey,
-    () =>
-      uncommittedPicked
-        ? fetchFiles(project, answer?.head_sha ?? "", second)
-        : fetchFiles(project, first, second, narrowing),
-    refresh,
+  const narrowedFetch = useHeld(
+    useKeyedFetch(
+      narrowedKey,
+      () =>
+        uncommittedPicked
+          ? fetchFiles(project, answer?.head_sha ?? "", second)
+          : fetchFiles(project, first, second, narrowing),
+      refresh,
+    ),
+    heldScope && `${heldScope}\n${narrowing?.join(",") ?? ""}`,
   )
   const narrowedResult =
     narrowedFetch && "value" in narrowedFetch && narrowedFetch.value.kind === "files"
@@ -130,10 +150,9 @@ export function useDiffData(
       : undefined
   const narrowedFiles = narrowedResult?.files ?? []
 
-  const files = useKeyedFetch(
-    canFetch ? key : null,
-    () => fetchFiles(project, first, second),
-    refresh,
+  const files = useHeld(
+    useKeyedFetch(canFetch ? key : null, () => fetchFiles(project, first, second), refresh),
+    heldScope,
   )
 
   return {
