@@ -30,11 +30,13 @@ type File struct {
 // Seed is what a session gets after the fake wrote its own transcript: Lines
 // are appended to it and Files are written beside it.
 type Seed struct {
-	Lines   []string
-	Files   []File
-	Version string        // written as the Codex rollout's cli_version when set
-	Age     time.Duration // how long before the seed the session was created; tasks older than the run need a longer one
-	Working bool          // also wait for the chat read's Working row
+	Lines []string
+	Files []File
+	// Reserved are named in Output.TaskFiles but not written; their folder exists.
+	Reserved []File
+	Version  string        // written as the Codex rollout's cli_version when set
+	Age      time.Duration // how long before the seed the session was created; tasks older than the run need a longer one
+	Working  bool          // also wait for the chat read's Working row
 	// Ready, when set, replaces the task-count wait: the call descriptions the
 	// parent's tools entries must name. Calls are the call ids by name, printed in
 	// Output.Subagents.
@@ -54,7 +56,11 @@ type Lines struct {
 	p       Paths
 	entries []entry
 	files   []File
+	// reserved are paths named in Output.TaskFiles that nothing writes at start.
+	reserved []File
 }
+
+func (b *Lines) reserve(f ...File) { b.reserved = append(b.reserved, f...) }
 
 func NewLines(now time.Time, p Paths) *Lines {
 	return &Lines{now: now.Truncate(time.Second), p: p}
@@ -63,7 +69,7 @@ func NewLines(now time.Time, p Paths) *Lines {
 // Seed is the lines in time order and the files.
 func (b *Lines) Seed() Seed {
 	slices.SortStableFunc(b.entries, func(x, y entry) int { return x.at.Compare(y.at) })
-	out := Seed{Files: b.files}
+	out := Seed{Files: b.files, Reserved: b.reserved}
 	for _, e := range b.entries {
 		out.Lines = append(out.Lines, e.line)
 	}

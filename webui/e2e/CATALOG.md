@@ -160,12 +160,23 @@ hold subagents (`start("subagents", { shape })`; default `claude`). Output keys:
 `subagents.calls` has the parent's Agent call ids by name (`running`, `finished`, `missing`; only the names a shape holds),
 `taskFiles` has `subagent-running-file` and `subagent-running-meta` (grow the file, rewrite the meta) and
 `subagent-finished-file` and `subagent-finished-meta`. Every `meta.json` has `toolUseId` equal to its call id; the running one has
-no `finished`, the finished one has `finished: true`. Shapes (this section lists the first four; the rest are added by later
-tickets): `claude` (the mock states `a-parent`, `a-subagent-running`, `a-subagent-finished`, `a-subagent-missing`) holds all
+no `finished`, the finished one has `finished: true`. The other shapes add call names `stopped`, `background`, `nested`,
+`grandchild`, `starting` and `marked` and task-file keys `subagent-<name>-file` and `subagent-<name>-meta` for each of them
+(`grandchild` under the nested one). Shapes: `claude` (the mock states `a-parent`, `a-subagent-running`, `a-subagent-finished`, `a-subagent-missing`) holds all
 three below; `foreground-running` is an `Agent` call with no result, "Survey the sessions code", whose file starts with its prompt
 and has model, usage and tool calls; `finished-handback` is "Check the wire types", whose file ends with a `SubagentHandback`
 call and its result, with the report as the parent call's result; `file-gone` is "Read the old notes", a finished call whose
-file does not exist. Data: `testutil/gxfixture/spec/subagents.go` and `bgtx/subagents.go`.
+file does not exist. `stopped-no-handback` ("Trace the stop path"): the call returned, the file has no `SubagentHandback`, the meta
+has no `finished`. `background-returned` ("Watch the build in the background"): meta `requestShape: "background"`, the call returned
+`async_launched` 30 minutes ago, no end notification, so the task row stays running with model, tokens and tool calls.
+`nested` ("Map the server packages", call `nested`): its file holds an open `Agent` call (`grandchild`, "Read the wire package");
+the grandchild's file sits flat in the same `subagents/` folder with meta `parentAgentId` (the nested agent) and `toolUseId` (that
+call), `spawnDepth` 2. `starting` ("Warm up the new worker"): the call runs and `subagent-starting-file` and `subagent-starting-meta`
+name paths that do not exist yet (their folder does); a flow writes them. `finished-no-handback` ("Summarise the config files",
+call `marked`): meta `finished: true`, the file has no `SubagentHandback` and ends with an assistant text. `parent-gone`: the
+`running` subagent of `foreground-running`, with the parent transcript deleted after seeding (no `tools` entry; the chat read still
+answers). `exited`: the same, with the session crashed (exit 1) so it is Exited. Data: `testutil/gxfixture/spec/subagents.go` and
+`bgtx/subagents.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

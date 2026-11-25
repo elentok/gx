@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -45,6 +46,15 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 			f.taskFiles[file.Key] = file.Path
 		}
 	}
+	for _, file := range seed.Reserved {
+		if err := os.MkdirAll(filepath.Dir(file.Path), 0o755); err != nil {
+			return err
+		}
+		if f.taskFiles == nil {
+			f.taskFiles = map[string]string{}
+		}
+		f.taskFiles[file.Key] = file.Path
+	}
 	if err := appendLines(path, seed.Lines); err != nil {
 		return err
 	}
@@ -55,7 +65,16 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 	}
 	if seed.Ready != nil {
 		f.subagents = &output.SubagentsOutput{SessionID: id, Calls: seed.Calls}
-		return f.waitFor(id, "the subagent calls", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool { return seed.CallsShown(c) })
+		if err := f.waitFor(id, "the subagent calls", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool { return seed.CallsShown(c) }); err != nil {
+			return err
+		}
+		// recordTranscript leaves the file of a seeded session: the lines above need it.
+		if s.NoTranscript {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	return f.waitFor(id, fmt.Sprintf("%d tasks", s.BgTasks), func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
 		return len(c.Tasks) == s.BgTasks && (!seed.Working || c.Current != nil)

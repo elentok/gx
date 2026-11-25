@@ -25,11 +25,48 @@ const (
 
 	SubHandback = "The wire types match: SessionTask has the model and token fields."
 
+	SubStoppedCall    = "toolu_sub_stopped"
+	SubBackgroundCall = "toolu_sub_background"
+	SubNestedCall     = "toolu_sub_nested"
+	SubGrandchildCall = "toolu_sub_grandchild"
+	SubStartingCall   = "toolu_sub_starting"
+	SubMarkedCall     = "toolu_sub_marked"
+
+	SubStoppedAgent    = "a5ub0004"
+	SubBackgroundAgent = "a5ub0005"
+	SubNestedAgent     = "a5ub0006"
+	SubGrandchildAgent = "a5ub0007"
+	SubStartingAgent   = "a5ub0008"
+	SubMarkedAgent     = "a5ub0009"
+
+	SubStoppedDesc    = "Trace the stop path"
+	SubBackgroundDesc = "Watch the build in the background"
+	SubNestedDesc     = "Map the server packages"
+	SubGrandchildDesc = "Read the wire package"
+	SubStartingDesc   = "Warm up the new worker"
+	SubMarkedDesc     = "Summarise the config files"
+
+	// SubMarkedLast is the last assistant message of the marked-finished subagent,
+	// which has no handback.
+	SubMarkedLast = "The config files only set paths."
+
 	// Keys of Seed.Files in Output.TaskFiles.
-	SubRunningFileKey  = "subagent-running-file"
-	SubRunningMetaKey  = "subagent-running-meta"
-	SubFinishedFileKey = "subagent-finished-file"
-	SubFinishedMetaKey = "subagent-finished-meta"
+	SubRunningFileKey    = "subagent-running-file"
+	SubRunningMetaKey    = "subagent-running-meta"
+	SubFinishedFileKey   = "subagent-finished-file"
+	SubFinishedMetaKey   = "subagent-finished-meta"
+	SubStoppedFileKey    = "subagent-stopped-file"
+	SubStoppedMetaKey    = "subagent-stopped-meta"
+	SubBackgroundFileKey = "subagent-background-file"
+	SubBackgroundMetaKey = "subagent-background-meta"
+	SubNestedFileKey     = "subagent-nested-file"
+	SubNestedMetaKey     = "subagent-nested-meta"
+	SubGrandchildFileKey = "subagent-grandchild-file"
+	SubGrandchildMetaKey = "subagent-grandchild-meta"
+	SubStartingFileKey   = "subagent-starting-file" // not on disk at start: a flow writes it
+	SubStartingMetaKey   = "subagent-starting-meta" // not on disk at start: a flow writes it
+	SubMarkedFileKey     = "subagent-marked-file"
+	SubMarkedMetaKey     = "subagent-marked-meta"
 )
 
 // Subagent is one subagents-scenario shape: its lines, the call ids it
@@ -61,6 +98,14 @@ var SubagentShapes = map[string]Subagent{
 	"foreground-running": {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 	"finished-handback":  {Build: func(b *Lines) { b.subFinished(3 * minute) }, Calls: finishedCalls, Ready: []string{SubFinishedDesc}},
 	"file-gone":          {Build: func(b *Lines) { b.subMissing(3 * minute) }, Calls: missingCalls, Ready: []string{SubMissingDesc}},
+
+	"stopped-no-handback":  {Build: func(b *Lines) { b.subStopped(10 * minute) }, Calls: map[string]string{"stopped": SubStoppedCall}, Ready: []string{SubStoppedDesc}},
+	"background-returned":  {Build: func(b *Lines) { b.subBackground(30 * minute) }, Calls: map[string]string{"background": SubBackgroundCall}, Ready: []string{SubBackgroundDesc}},
+	"nested":               {Build: func(b *Lines) { b.subNested(3 * minute) }, Calls: map[string]string{"nested": SubNestedCall, "grandchild": SubGrandchildCall}, Ready: []string{SubNestedDesc}},
+	"starting":             {Build: func(b *Lines) { b.subStarting(20 * sec) }, Calls: map[string]string{"starting": SubStartingCall}, Ready: []string{SubStartingDesc}},
+	"finished-no-handback": {Build: func(b *Lines) { b.subMarked(5 * minute) }, Calls: map[string]string{"marked": SubMarkedCall}, Ready: []string{SubMarkedDesc}},
+	"parent-gone":          {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
+	"exited":               {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 }
 
 // CallsShown reports whether the chat read has a tools entry naming every Ready call.
@@ -87,15 +132,83 @@ type meta struct {
 // subagentCall is the parent's Agent call plus the subagent's file and
 // meta.json. The call has no result; the caller adds one.
 func (b *Lines) subagentCall(ago time.Duration, useID, id, desc string, finished bool, fileLines []string, fileKey, metaKey string) {
+	b.subCall(ago, useID, desc)
+	b.subFiles(ago, id, meta{Description: desc, ToolUseID: useID, SpawnDepth: 1, RequestShape: "foreground", Finished: finished}, fileLines, fileKey, metaKey)
+}
+
+func (b *Lines) subCall(ago time.Duration, useID, desc string) {
 	b.use(ago, useID, "Agent", map[string]any{"description": desc, "subagent_type": "Explore", "prompt": desc + " and report back."})
-	raw, err := json.Marshal(meta{AgentType: "Explore", Description: desc, ToolUseID: useID, RequestShape: "foreground", Model: model, Finished: finished})
+}
+
+// metaFor fills the fields every meta.json has.
+func metaFor(m meta) []byte {
+	m.AgentType, m.Model = "Explore", model
+	raw, err := json.Marshal(m)
 	if err != nil {
 		panic(err)
 	}
-	prompt := subLine(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": desc + " and report back."}})
+	return append(raw, '\n')
+}
+
+// subFiles is a subagent's file, which starts with its prompt, and its meta.json.
+func (b *Lines) subFiles(ago time.Duration, id string, m meta, fileLines []string, fileKey, metaKey string) {
+	prompt := subLine(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": m.Description + " and report back."}})
 	base := b.p.Subagents + "/agent-" + id
 	b.file(File{Path: base + ".jsonl", Content: strings.Join(append([]string{prompt}, fileLines...), "\n") + "\n", Mtime: b.when(ago - 2*time.Second), Key: fileKey})
-	b.file(File{Path: base + ".meta.json", Content: string(raw) + "\n", Mtime: b.when(ago - time.Second), Key: metaKey})
+	b.file(File{Path: base + ".meta.json", Content: string(metaFor(m)), Mtime: b.when(ago - time.Second), Key: metaKey})
+}
+
+// subStopped is a foreground call that returned with the subagent's last
+// message, without a handback in its file or a finished marker.
+func (b *Lines) subStopped(ago time.Duration) {
+	file := []string{
+		subAssistant("msg_x1", 900, 50, toolUse("toolu_x1", "Grep", map[string]any{"pattern": "Stop"})),
+		subResult("toolu_x1", "server/sessions/stop.go", nil),
+		subAssistant("msg_x2", 1300, 80, map[string]any{"type": "text", "text": "Stopped before reporting."}),
+	}
+	b.subagentCall(ago, SubStoppedCall, SubStoppedAgent, SubStoppedDesc, false, file, SubStoppedFileKey, SubStoppedMetaKey)
+	b.result(ago-time.Minute, SubStoppedCall, "The subagent was stopped.", map[string]any{"status": "completed", "agentId": SubStoppedAgent, "resolvedModel": model})
+}
+
+// subBackground is a background launch whose call returned async_launched long
+// ago, with the symlink in the tasks folder; nothing ended it.
+func (b *Lines) subBackground(ago time.Duration) {
+	b.subCall(ago, SubBackgroundCall, SubBackgroundDesc)
+	file, link := b.p.Subagents+"/agent-"+SubBackgroundAgent+".jsonl", b.outputPath(SubBackgroundAgent)
+	b.result(ago-time.Second, SubBackgroundCall, "Async agent launched successfully.\nagentId: "+SubBackgroundAgent,
+		map[string]any{"status": "async_launched", "agentId": SubBackgroundAgent, "resolvedModel": model, "outputFile": link})
+	b.subFiles(ago, SubBackgroundAgent, meta{Description: SubBackgroundDesc, ToolUseID: SubBackgroundCall, SpawnDepth: 1, RequestShape: "background"}, surveyFile(), SubBackgroundFileKey, SubBackgroundMetaKey)
+	b.file(File{Path: link, Link: file})
+}
+
+// subNested is a subagent whose file has an open Agent call; the grandchild's
+// file sits flat beside it, its meta.json pointing into the parent subagent's file.
+func (b *Lines) subNested(ago time.Duration) {
+	child := []string{subAssistant("msg_n1", 1000, 70, toolUse(SubGrandchildCall, "Agent",
+		map[string]any{"description": SubGrandchildDesc, "subagent_type": "Explore", "prompt": SubGrandchildDesc + " and report back."}))}
+	b.subagentCall(ago, SubNestedCall, SubNestedAgent, SubNestedDesc, false, child, SubNestedFileKey, SubNestedMetaKey)
+	b.subFiles(ago-sec, SubGrandchildAgent, meta{Description: SubGrandchildDesc, ToolUseID: SubGrandchildCall, SpawnDepth: 2, RequestShape: "foreground", ParentAgent: SubNestedAgent},
+		surveyFile(), SubGrandchildFileKey, SubGrandchildMetaKey)
+}
+
+// subStarting is a call that runs while its subagent has no file yet: the
+// paths a flow writes are reserved, not created.
+func (b *Lines) subStarting(ago time.Duration) {
+	b.subCall(ago, SubStartingCall, SubStartingDesc)
+	base := b.p.Subagents + "/agent-" + SubStartingAgent
+	b.reserve(File{Path: base + ".jsonl", Key: SubStartingFileKey}, File{Path: base + ".meta.json", Key: SubStartingMetaKey})
+}
+
+// subMarked is a subagent whose meta.json says finished while its file has no
+// handback; the call returned.
+func (b *Lines) subMarked(ago time.Duration) {
+	file := []string{
+		subAssistant("msg_m1", 700, 40, toolUse("toolu_m1", "Glob", map[string]any{"pattern": "**/*.toml"})),
+		subResult("toolu_m1", "config.toml", nil),
+		subAssistant("msg_m2", 1100, 60, map[string]any{"type": "text", "text": SubMarkedLast}),
+	}
+	b.subagentCall(ago, SubMarkedCall, SubMarkedAgent, SubMarkedDesc, true, file, SubMarkedFileKey, SubMarkedMetaKey)
+	b.result(ago-time.Minute, SubMarkedCall, SubMarkedLast, map[string]any{"status": "completed", "agentId": SubMarkedAgent, "resolvedModel": model})
 }
 
 // subRunning is a foreground subagent: no result on the parent call, no

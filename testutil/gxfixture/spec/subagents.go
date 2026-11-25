@@ -8,7 +8,10 @@ import (
 
 // SubagentsShapes are the --shape names of the subagents scenario; the first is
 // the default and holds the mock states of the spec.
-var SubagentsShapes = []string{"claude", "foreground-running", "finished-handback", "file-gone"}
+var SubagentsShapes = []string{
+	"claude", "foreground-running", "finished-handback", "file-gone",
+	"stopped-no-handback", "background-returned", "nested", "starting", "finished-no-handback", "parent-gone", "exited",
+}
 
 // SubagentsScenario is the subagents scenario in the given shape: one Working
 // Claude Design session of design-epic whose transcript and subagent files hold
@@ -22,6 +25,8 @@ func SubagentsScenario(shape string) (Scenario, bool) {
 	session := bgClaudeSession(mapAddr, shape, agentfake.ChatSlowMarker+" subagents", 0, bgSeed(sub.Build, func(s *bgtx.Seed) {
 		s.Ready, s.Calls = sub.Ready, sub.Calls
 	}))
+	session.NoTranscript = shape == "parent-gone"
+	session.Crash = shape == "exited"
 	return Scenario{
 		Epics:       []Epic{{Project: project, Name: "design-epic"}},
 		DesignSteps: map[string]string{mapAddr: string(tickets.StepResolveTickets)},

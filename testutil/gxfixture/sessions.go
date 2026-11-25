@@ -331,7 +331,7 @@ func (f sessionSeeder) recordTranscript(id string, s sessionSpec) error {
 		}
 		f.keyedTranscripts[s.Key] = path
 	}
-	if s.NoTranscript {
+	if s.NoTranscript && s.BgSeed == nil {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}
