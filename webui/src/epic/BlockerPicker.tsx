@@ -1,8 +1,9 @@
 import { Box, chakra, Input, Text } from "@chakra-ui/react"
 import { useState } from "react"
+import { ReasonBlockedByCycle, type EpicBlockerResult } from "../generated/server"
 import { slugOf } from "../slug"
 import { refusalText, useWrite } from "../useWrite"
-import { candidates } from "./blockers"
+import { candidates, cycleSentence } from "./blockers"
 import { postBlockerAdd, postBlockerRemove } from "./blockerWrite"
 import type { EpicList } from "../epics/list"
 
@@ -24,11 +25,12 @@ export function BlockerPicker({
   refetch: () => void
 }) {
   const [query, setQuery] = useState("")
-  const { run, refusal, error } = useWrite({ toastRefusal: false })
+  const { run, refusal, error } = useWrite<EpicBlockerResult>({ toastRefusal: false })
   const q = query.trim().toLowerCase()
   const rows = candidates(list, address).filter((c) => c.name.toLowerCase().includes(q))
   const project = address.slice(0, address.indexOf(":"))
-  const failure = refusal ? refusalText(refusal) : error
+  const cycle = refusal?.reason === ReasonBlockedByCycle && refusal.blocker && refusal.chain?.length
+  const failure = cycle ? cycleSentence(refusal) : refusal ? refusalText(refusal) : error
   return (
     <Box
       data-testid="blocker-picker"
@@ -84,6 +86,7 @@ export function BlockerPicker({
         <Box
           role="alert"
           mt="2"
+          fontSize="14px"
           bg="tone.paused.bg"
           color="tone.paused.text"
           borderRadius="md"

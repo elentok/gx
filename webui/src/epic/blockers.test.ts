@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
 import type { EpicListRow } from "../generated/server"
-import { candidates } from "./blockers"
+import { candidates, cycleSentence } from "./blockers"
 
 const row = (over: Partial<EpicListRow>): EpicListRow =>
   ({
@@ -31,4 +31,10 @@ test("a joined card stands for its -impl address and a Needs you card shows its 
 
 test("no list gives no candidates", () => {
   expect(candidates(null, "gx:me")).toEqual([])
+})
+
+test("the cycle sentence names the error's blocker and this epic, for any chain length", () => {
+  const want = "Can’t add b: it already waits on me. That would be a cycle."
+  expect(cycleSentence({ blocker: "b", chain: ["me", "b", "me"] })).toBe(want)
+  expect(cycleSentence({ blocker: "b", chain: ["me", "b", "c", "d", "me"] })).toBe(want)
 })

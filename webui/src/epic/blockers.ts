@@ -24,6 +24,13 @@ const implOf = (row: EpicListRow): string | undefined => {
   return undefined
 }
 
+/**
+ * The picker's sentence for a refused cycle. Both names come from the error: the blocker is the one
+ * the server named and the chain starts at the epic being edited.
+ */
+export const cycleSentence = ({ blocker, chain }: { blocker?: string; chain?: string[] }) =>
+  `Can’t add ${blocker}: it already waits on ${chain?.[0]}. That would be a cycle.`
+
 /** The loop epics of this epic's project that it could wait on: not itself, not Merged. */
 export function candidates(list: EpicList | null, address: string): BlockerCandidate[] {
   const project = address.slice(0, address.indexOf(":"))

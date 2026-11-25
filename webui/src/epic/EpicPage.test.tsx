@@ -1695,3 +1695,52 @@ test("a refused picker write shows its text inside the open panel and leaves the
     vi.unstubAllGlobals()
   }
 })
+
+const cycleAnswer = {
+  blocked_by: ["a-impl"],
+  refused: true,
+  reason: "blocked-by-cycle",
+  message: "epic blog-impl: blocked_by closes a cycle",
+  blocker: "waits-on-impl",
+  chain: ["blog-impl", "waits-on-impl", "blog-impl"],
+}
+
+test("a cycle refusal reads as the mock's sentence from the error's names, in the open panel", async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => answer(cycleAnswer))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    const picker = await openPicker()
+    fireEvent.click(within(picker).getByRole("button", { name: /b-impl/ }))
+    expect((await within(picker).findByRole("alert")).textContent).toBe(
+      "Can’t add waits-on-impl: it already waits on blog-impl. That would be a cycle.",
+    )
+    expect(within(picker).getByRole("button", { name: /☐ b-impl/ })).toBeTruthy()
+    expect(screen.getAllByTestId("blocker-chip")).toHaveLength(1)
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/v1/epics/blocker")).toHaveLength(1)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a later successful toggle clears the cycle block; a non-cycle failure keeps its text", async () => {
+  const answers = [
+    cycleAnswer,
+    { blocked_by: ["a-impl", "b-impl"] },
+    { blocked_by: [], refused: true, message: "Not now." },
+  ]
+  const fetchMock = vi.fn(async (url: string) =>
+    url === "/v1/epics/blocker" ? answer(answers.shift()) : answer({}),
+  )
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    const picker = await openPicker()
+    fireEvent.click(within(picker).getByRole("button", { name: /b-impl/ }))
+    await within(picker).findByRole("alert")
+    fireEvent.click(within(picker).getByRole("button", { name: /b-impl/ }))
+    await waitFor(() => expect(within(picker).queryByRole("alert")).toBeNull())
+    fireEvent.click(within(picker).getByRole("button", { name: /a-impl/ }))
+    expect((await within(picker).findByRole("alert")).textContent).toBe("Not now.")
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
