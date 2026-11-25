@@ -661,7 +661,7 @@ test("worktree mode: the chip names target and base, and every call gets the rou
     diffCommits: fetchCommits,
   })
   const chip = await screen.findByTestId("range-chip")
-  expect(chip.textContent).toBe("Worktree · gx:e-impl/03 since main@base1")
+  await waitFor(() => expect(chip.textContent).toBe("Worktree · gx:e-impl/03 since main@base1"))
   expect(screen.queryByRole("textbox")).toBeNull()
   expect(screen.queryByRole("button", { name: "Edit refs" })).toBeNull()
   await screen.findByTestId("diff-area")
