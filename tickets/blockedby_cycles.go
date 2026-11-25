@@ -176,16 +176,11 @@ func BlockedByEpicRef(defaultProject, ref string) (project, epic string, ok bool
 
 // resolveBlocker is resolve widened to blocked_by's whole-epic tokens: a
 // token that is not in ticket-id form names an epic ("epic" or
-// "project:epic"), keyed by its bare name. A ticket in another epic that has
-// commits widens to that whole epic (see widen).
+// "project:epic"), keyed by its bare name.
 func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 	project, name, isEpic := BlockedByEpicRef(g.project, ref)
 	if !isEpic {
-		key, err := g.resolve(epic, ref)
-		if err != nil {
-			return "", err
-		}
-		return g.widen(epic, key), nil
+		return g.resolve(epic, ref)
 	}
 	switch target, ok := g.epics[name]; {
 	case project == g.project && g.isArchived(name):
@@ -200,23 +195,6 @@ func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 		return "", &AddressError{CodeBlockedByMapEpic, fmt.Sprintf("%q names a map epic, which never merges", ref)}
 	}
 	return name, nil
-}
-
-// widen turns a ticket key in another epic into that epic's key unless the
-// ticket is commitless: its code only reaches this epic once its epic merges.
-// The file keeps the ticket token, so it narrows back if the ticket turns
-// commitless. A map epic never merges, so its tickets stay tickets.
-func (g *projectGraph) widen(epic, key string) string {
-	target := key[:strings.Index(key, "/")]
-	if target == epic || g.tickets[key].Commitless || g.epics[target].IsMap {
-		return key
-	}
-	return target
-}
-
-// widened reports whether ref resolved to blocker only by widening.
-func widened(ref, blocker string) bool {
-	return strings.Contains(ref, "/") && isEpicKey(blocker)
 }
 
 // expand is the ticket nodes a blocker key stands for: a whole epic's every
@@ -254,7 +232,7 @@ func (g *projectGraph) waitTargets(blocker string) []string {
 func (g *projectGraph) buildWait(epics []Epic) {
 	for _, e := range epics {
 		for _, ref := range e.BlockedBy {
-			if blocker, err := g.resolveBlocker(e.Name, ref); err == nil && crossEpicRef(ref) {
+			if blocker, err := g.resolveBlocker(e.Name, ref); err == nil && IsWholeEpicRef(ref) {
 				g.wait[e.Name] = append(g.wait[e.Name], g.waitTargets(blocker)...)
 			}
 		}
@@ -269,6 +247,9 @@ func (g *projectGraph) buildWait(epics []Epic) {
 				}
 			}
 			for _, ref := range t.BlockedBy {
+				if crossEpicRef(ref) {
+					continue
+				}
 				if blocker, err := g.resolveBlocker(e.Name, ref); err == nil {
 					g.wait[key] = append(g.wait[key], g.waitTargets(blocker)...)
 				}
@@ -338,8 +319,8 @@ func (g *projectGraph) cycleErrors(epic string, t Ticket) []error {
 			continue
 		}
 		if chain := g.cycleThrough(self, blocker); chain != nil {
-			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %s closes a cycle: %s",
-				t.DisplayNumber(), cycleToken(ref, blocker), g.renderChain(chain, epic)))
+			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %q closes a cycle: %s",
+				t.DisplayNumber(), ref, g.renderChain(chain, epic)))
 		}
 	}
 	return errs
@@ -363,8 +344,8 @@ func (g *projectGraph) epicBlockedByErrors(e Epic) []error {
 			continue
 		}
 		if chain := g.cycleThrough(e.Name, blocker); chain != nil {
-			errs = append(errs, fmt.Errorf("epic %s: blocked_by %s closes a cycle: %s",
-				e.Name, cycleToken(ref, blocker), g.renderChain(chain, e.Name)))
+			errs = append(errs, fmt.Errorf("epic %s: blocked_by %q closes a cycle: %s",
+				e.Name, ref, g.renderChain(chain, e.Name)))
 		}
 	}
 	return errs
@@ -385,14 +366,6 @@ func (g *projectGraph) cycleThrough(self, blocker string) []string {
 		return append(chain, back...)
 	}
 	return nil
-}
-
-func cycleToken(ref, blocker string) string {
-	token := fmt.Sprintf("%q", ref)
-	if widened(ref, blocker) {
-		token += fmt.Sprintf(" (widened to epic %q)", blocker)
-	}
-	return token
 }
 
 // subtree is root followed by every fork descendant.

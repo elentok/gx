@@ -161,7 +161,7 @@ func newTicketsSetCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsSet(d.dirs(), c, path, c.OutOrStdout(), c.ErrOrStderr(), d.Getwd, d.Dial())
+			return runTicketsSet(d.dirs(), c, path, c.OutOrStdout(), d.Getwd, d.Dial())
 		},
 	}
 
@@ -262,15 +262,13 @@ func RunEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 		update.ConversationsDir = records
 		changed = append(changed, "completed_at="+at.Format(time.RFC3339))
 	}
-	var notices []string
 	if c.Flags().Changed("blocked-by") {
 		v, _ := c.Flags().GetString("blocked-by")
 		refs := []string{}
 		if v != "" {
 			refs = strings.Split(v, ",")
 		}
-		var err error
-		if notices, err = tickets.CheckEpicBlockedByWrite(path, refs); err != nil {
+		if err := tickets.CheckEpicBlockedByWrite(path, refs); err != nil {
 			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketref.TicketLabel(path), v, err)
 		}
 		update.BlockedBy = &refs
@@ -283,7 +281,6 @@ func RunEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 		return fmt.Errorf("%s: %w", ticketref.TicketLabel(path), err)
 	}
 	pingLabels(dial, ticketref.TicketLabel(path))
-	printNotices(c.ErrOrStderr(), notices)
 
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
 		return cmdbase.WriteStamped(w, struct {
@@ -417,7 +414,7 @@ func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversatio
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
-func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
+func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	if ticketref.IsEpicTicketMD(path) {
 		return RunEpicSet(dirs, c, path, w, getwd, dial)
 	}
@@ -469,7 +466,6 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		}
 	}
 
-	var notices []string
 	if c.Flags().Changed("blocked-by") {
 		current, err := schema.ParseTicket(path)
 		if err != nil {
@@ -477,7 +473,7 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		}
 		blockedBy, _ := c.Flags().GetString("blocked-by")
 		current.BlockedBy = parseCSVIDs(blockedBy)
-		if notices, err = tickets.CheckBlockedByWrite(path, current); err != nil {
+		if err := tickets.CheckBlockedByWrite(path, current); err != nil {
 			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketref.TicketLabel(path), blockedBy, err)
 		}
 	}
@@ -521,8 +517,6 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 	if err != nil {
 		return err
 	}
-	printNotices(stderr, notices)
-
 	pingLabels(dial, ticketref.TicketLabel(path))
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
 		return cmdbase.WriteStamped(w, struct {

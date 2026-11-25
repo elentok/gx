@@ -22,10 +22,14 @@ func setupEpicBlockedByProject(t *testing.T, xBlockedBy string) (d Deps, ticketM
 		extra = "blocked_by:\n  - \"" + xBlockedBy + "\"\n"
 	}
 	writeEpicTicket(t, project, "e", "01-a.md", ticketFrontmatter("01", ""))
-	writeEpicTicket(t, project, "x", "01-a.md", ticketFrontmatter("01", extra))
+	writeEpicTicket(t, project, "x", "01-a.md", ticketFrontmatter("01", ""))
 	writeEpicTicket(t, project, "m", "01-a.md", ticketFrontmatter("01", ""))
 	for epic, kind := range map[string]string{"x": "loop", "m": "map"} {
-		if err := os.WriteFile(filepath.Join(project, epic, "ticket.md"), []byte("---\nkind: "+kind+"\nstatus: open\n---\n\n# "+epic+"\n"), 0o644); err != nil {
+		fm := "kind: " + kind + "\nstatus: open\n"
+		if epic == "x" {
+			fm += extra
+		}
+		if err := os.WriteFile(filepath.Join(project, epic, "ticket.md"), []byte("---\n"+fm+"---\n\n# "+epic+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -53,8 +57,7 @@ func TestTicketsEpicSet_BlockedByRefusals(t *testing.T) {
 		{name: "dangling", ref: "nope", code: tickets.CodeUnknownEpic},
 		{name: "map epic", ref: "m", code: tickets.CodeBlockedByMapEpic},
 		{name: "own ticket", ref: "01", want: `epic e: blocked_by "01" names a ticket of this epic`},
-		{name: "cycle", xBlockedBy: "e", ref: "x", want: `epic e: blocked_by "x" closes a cycle: e → x → x/01 → e`},
-		{name: "widened cycle", xBlockedBy: "e/01", ref: "x/01", want: `epic e: blocked_by "x/01" (widened to epic "x") closes a cycle`},
+		{name: "cycle", xBlockedBy: "e", ref: "x", want: `epic e: blocked_by "x" closes a cycle: e → x → x/01 → x → e`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, ticketMD := setupEpicBlockedByProject(t, tc.xBlockedBy)

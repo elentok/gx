@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strings"
 )
 
 // claimEventType is the run-log event written when a ticket is claimed.
@@ -72,10 +71,6 @@ func (g *projectGraph) baseWarnings(epic string, t Ticket) []Warning {
 			continue
 		}
 		unlanded++
-		if !strings.HasPrefix(key, epic+"/") {
-			warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: blocker %q is in another epic, so no base is derived",
-				t.DisplayNumber(), ref)})
-		}
 	}
 	if unlanded >= 2 && t.Base == "" {
 		warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: %d unlanded commitful blockers and no base: set base: to pick one",

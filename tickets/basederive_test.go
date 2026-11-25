@@ -101,12 +101,7 @@ func TestDeriveRootBase(t *testing.T) {
 			e[1].BlockedBy = []string{"a"}
 			return e
 		}(), want: "a"},
-		"whole-epic blocker on the ticket gives its branch": {epics: func() []Epic {
-			e := baseEpics("open")
-			e[1].BlockedBy, e[1].Tickets[0].BlockedBy = nil, []string{"p:a"}
-			return e
-		}(), want: "a"},
-		"widened blocker gives its branch": {epics: func() []Epic {
+		"whole-epic blocker with a live ticket after a cancelled one gives its branch": {epics: func() []Epic {
 			e := baseEpics("cancelled")
 			e[0].Tickets = append(e[0].Tickets, Ticket{Number: 2, Identifier: "02", Status: "open"})
 			return e

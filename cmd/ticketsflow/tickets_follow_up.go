@@ -87,7 +87,7 @@ func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, opts followU
 
 	fm.Status = string(schema.StatusDraft)
 	fm.Type = string(schema.TypeResearch)
-	path, _, err := ticketscmd.CreateTicket(epicPath, "", followUpSlug(text), &text, fm)
+	path, err := ticketscmd.CreateTicket(epicPath, "", followUpSlug(text), &text, fm)
 	if err != nil {
 		return err
 	}

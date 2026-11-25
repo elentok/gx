@@ -20,9 +20,8 @@ func TestEpicsWaitedOn(t *testing.T) {
 		epics []Epic
 		want  []string
 	}{
-		{"whole epic", []Epic{{Name: "a", Tickets: doneTicket()}, {Name: "d", Tickets: []Ticket{open("a")}}}, []string{"a"}},
 		{"epic-level", []Epic{{Name: "a", Tickets: doneTicket()}, {Name: "d", BlockedBy: []string{"a"}, Tickets: []Ticket{open()}}}, []string{"a"}},
-		{"terminal dependent", []Epic{{Name: "a", Tickets: doneTicket()}, {Name: "d", Tickets: []Ticket{done("a")}}}, nil},
+		{"terminal dependent", []Epic{{Name: "a", Tickets: doneTicket()}, {Name: "d", BlockedBy: []string{"a"}, Tickets: []Ticket{done()}}}, nil},
 		{"no blockers", []Epic{{Name: "a", Tickets: doneTicket()}, {Name: "d", Tickets: []Ticket{open()}}}, nil},
 	} {
 		got := slices.Sorted(maps.Keys(EpicsWaitedOn("p", tc.epics)))

@@ -149,13 +149,11 @@ type Ticket struct {
 	// no ticket in the epic (see Epic.CheckBlockedBy). Renders as StatusError.
 	BlockedByErr string
 
-	// ExternalBlockers are the qualified refs (the ticket's own and its epic's)
-	// still unresolved, set by ResolveCrossEpic.
+	// ExternalBlockers are the epic's whole-epic refs still unresolved, set by
+	// resolveEpicHold.
 	ExternalBlockers []string
 
-	// WidenedBlockers maps each of the ticket's own blocked_by tokens that
-	// resolved as a whole epic ("epic2/b" → "epic2") to that epic, set by
-	// ResolveCrossEpic.
+	// WidenedBlockers is no longer set; kept until the wire fields go.
 	WidenedBlockers map[string]string
 }
 

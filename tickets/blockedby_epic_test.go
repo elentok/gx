@@ -24,11 +24,11 @@ func wholeEpic(aTickets []Ticket, completed, merged bool) []Epic {
 func doneTicket() []Ticket { return []Ticket{{Number: 1, Identifier: "01", Status: "done"}} }
 
 func dependentStatus(release EpicRelease, epics []Epic) RenderedStatus {
-	d := ResolveCrossEpic("p", release, epics)[1]
+	d := resolveEpicHold("p", release, epics, nil)[1]
 	return d.RenderedStatus(d.Tickets[0])
 }
 
-func TestResolveCrossEpic_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
+func TestResolveEpicHold_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
 	onMerged := EpicRelease{}
 	onDone := EpicRelease{OnDone: true}
 	onDoneFF := EpicRelease{OnDone: true, AutoFFMerge: true}
@@ -53,7 +53,7 @@ func TestResolveCrossEpic_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_PREpicReleasesOnlyOnMergedAt(t *testing.T) {
+func TestResolveEpicHold_PREpicReleasesOnlyOnMergedAt(t *testing.T) {
 	for _, release := range []EpicRelease{{}, {OnDone: true}, {OnDone: true, AutoFFMerge: true}} {
 		open := wholeEpic(doneTicket(), true, false)
 		open[0].PRNumber = 7
@@ -68,7 +68,7 @@ func TestResolveCrossEpic_PREpicReleasesOnlyOnMergedAt(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_WholeEpicBlocksWhileATicketIsOpen(t *testing.T) {
+func TestResolveEpicHold_WholeEpicBlocksWhileATicketIsOpen(t *testing.T) {
 	reopened := append(doneTicket(), Ticket{Number: 2, Identifier: "02", Status: "open"})
 	for _, release := range []EpicRelease{{}, {OnDone: true}, {OnDone: true, AutoFFMerge: true}} {
 		if got := dependentStatus(release, wholeEpic(reopened, true, true)); got != StatusBlocked {
@@ -77,7 +77,7 @@ func TestResolveCrossEpic_WholeEpicBlocksWhileATicketIsOpen(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_EmptyEpicBlocksUntilStamped(t *testing.T) {
+func TestResolveEpicHold_EmptyEpicBlocksUntilStamped(t *testing.T) {
 	if got := dependentStatus(EpicRelease{}, wholeEpic(nil, false, false)); got != StatusBlocked {
 		t.Errorf("unstamped empty epic: got %v, want blocked", got)
 	}
@@ -129,12 +129,12 @@ func TestResolveBlocker_RejectsWithCodes(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_ArchivedEpicIsSatisfied(t *testing.T) {
+func TestResolveEpicHold_ArchivedEpicIsSatisfied(t *testing.T) {
 	archived := map[string]bool{"gone": true}
 	for _, ref := range []string{"gone", "p:gone"} {
 		epics := wholeEpic(doneTicket(), true, true)
 		epics[1].BlockedBy = []string{ref}
-		d := resolveCrossEpic("p", EpicRelease{}, epics, archived)[1]
+		d := resolveEpicHold("p", EpicRelease{}, epics, archived)[1]
 		if got := d.RenderedStatus(d.Tickets[0]); got != StatusOpen {
 			t.Errorf("%q: got %v, want open", ref, got)
 		}
@@ -142,11 +142,11 @@ func TestResolveCrossEpic_ArchivedEpicIsSatisfied(t *testing.T) {
 	// A typo still errors, and a live epic wins a name clash.
 	epics := wholeEpic(nil, false, false)
 	epics[1].BlockedBy = []string{"zz"}
-	if d := resolveCrossEpic("p", EpicRelease{}, epics, archived)[1]; d.RenderedStatus(d.Tickets[0]) != StatusError {
+	if d := resolveEpicHold("p", EpicRelease{}, epics, archived)[1]; d.RenderedStatus(d.Tickets[0]) != StatusError {
 		t.Errorf("typo: got %v, want error", d.RenderedStatus(d.Tickets[0]))
 	}
 	epics = wholeEpic(nil, false, false)
-	if got := resolveCrossEpic("p", EpicRelease{}, epics, map[string]bool{"a": true})[1]; got.RenderedStatus(got.Tickets[0]) != StatusBlocked {
+	if got := resolveEpicHold("p", EpicRelease{}, epics, map[string]bool{"a": true})[1]; got.RenderedStatus(got.Tickets[0]) != StatusBlocked {
 		t.Errorf("live epic with archived twin: got %v, want blocked", got.RenderedStatus(got.Tickets[0]))
 	}
 }
@@ -174,7 +174,7 @@ func TestValidateProject_ArchivedBlockerEpic(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_UnknownEpicIsError(t *testing.T) {
+func TestResolveEpicHold_UnknownEpicIsError(t *testing.T) {
 	epics := wholeEpic(doneTicket(), true, true)
 	epics[1].BlockedBy = []string{"zz"}
 	if got := dependentStatus(EpicRelease{}, epics); got != StatusError {
@@ -182,12 +182,12 @@ func TestResolveCrossEpic_UnknownEpicIsError(t *testing.T) {
 	}
 }
 
-func TestResolveCrossEpic_EpicLevelErrorSkipsTerminalTickets(t *testing.T) {
+func TestResolveEpicHold_EpicLevelErrorSkipsTerminalTickets(t *testing.T) {
 	epics := []Epic{{Name: "d", BlockedBy: []string{"zz"}, Tickets: []Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open"},
 	}}}
-	d := ResolveCrossEpic("p", EpicRelease{}, epics)[0]
+	d := resolveEpicHold("p", EpicRelease{}, epics, nil)[0]
 	if got := d.Tickets[0].BlockedByErr; got != "" {
 		t.Errorf("done ticket: BlockedByErr = %q, want none", got)
 	}

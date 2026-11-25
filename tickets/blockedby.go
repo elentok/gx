@@ -32,7 +32,7 @@ func (e Epic) checkBlockedByIn(g *projectGraph, t Ticket) error {
 //
 // A ticket's cross-epic ref is refused outright. A single epic can't resolve
 // its epic's own whole-epic blocked_by, so it fails closed here: only
-// ResolveCrossEpic, which sees the whole project, lifts that. This is what an
+// resolveEpicHold, which sees the whole project, lifts that. This is what an
 // in-process loop (no server) falls back on.
 func (e *Epic) flagDanglingBlockers() {
 	epicQualified := qualifiedRefs(e.BlockedBy)
@@ -44,7 +44,7 @@ func (e *Epic) flagDanglingBlockers() {
 			continue
 		}
 		// A finished ticket is never claimed, so failing it closed only hides
-		// that it is done (and blocks archiving its epic), as ResolveCrossEpic knows.
+		// that it is done (and blocks archiving its epic), as resolveEpicHold knows.
 		if t.IsTerminal() {
 			continue
 		}
@@ -60,21 +60,16 @@ func qualifiedRefs(refs []string) []string {
 	})
 }
 
-// ResolveCrossEpic returns epics (all of one project, named project) with each
-// ticket's blockers resolved project-wide. A ticket is runnable only if its own
-// blocked_by refs and its epic's are all resolved; children never copy an
-// ancestor's blocked_by, the epic's refs are applied here instead. Unresolved
-// cross-epic refs go into Ticket.ExternalBlockers (rendering the ticket
-// blocked); bad refs and wait cycles set BlockedByErr (rendering it error),
-// the same check ValidateRefs runs. release decides
-// when a whole-epic ref is resolved.
-func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic {
-	return resolveCrossEpic(project, release, epics, nil)
-}
-
-// resolveCrossEpic is ResolveCrossEpic with the project's archived epic names,
-// so a blocker on an archived epic counts as satisfied.
-func resolveCrossEpic(project string, release EpicRelease, epics []Epic, archived map[string]bool) []Epic {
+// resolveEpicHold returns epics (all of one project, named project) with each
+// ticket held by its epic's own whole-epic blocked_by. A ticket is runnable
+// only if its own refs and its epic's are all resolved; children never copy an
+// ancestor's blocked_by, the epic's refs are applied here instead. An
+// unreleased whole-epic ref goes into Ticket.ExternalBlockers (rendering the
+// ticket blocked); bad refs and wait cycles set BlockedByErr (rendering it
+// error), the same check ValidateRefs runs. release decides when a whole-epic
+// ref is resolved; archived holds the project's archived epic names, so a
+// blocker on one counts as satisfied.
+func resolveEpicHold(project string, release EpicRelease, epics []Epic, archived map[string]bool) []Epic {
 	g := newProjectGraph(project, epics, archived)
 	g.release = release
 	out := slices.Clone(epics)
@@ -84,7 +79,7 @@ func resolveCrossEpic(project string, release EpicRelease, epics []Epic, archive
 		epicErrs := g.epicBlockedByErrors(*e)
 		for j := range e.Tickets {
 			t := &e.Tickets[j]
-			t.BlockedByErr, t.ExternalBlockers, t.WidenedBlockers = "", nil, nil
+			t.BlockedByErr, t.ExternalBlockers = "", nil
 			errs := g.checkBlockedBy(e.Name, *t)
 			if !t.IsTerminal() {
 				errs = append(errs, g.cycleErrors(e.Name, *t)...)
@@ -94,15 +89,7 @@ func resolveCrossEpic(project string, release EpicRelease, epics []Epic, archive
 				t.BlockedByErr = errors.Join(errs...).Error()
 				continue
 			}
-			for _, ref := range qualifiedRefs(t.BlockedBy) {
-				if key, _ := g.resolveBlocker(e.Name, ref); widened(ref, key) {
-					if t.WidenedBlockers == nil {
-						t.WidenedBlockers = map[string]string{}
-					}
-					t.WidenedBlockers[ref] = key
-				}
-			}
-			for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
+			for _, ref := range qualifiedRefs(e.BlockedBy) {
 				if key, _ := g.resolveBlocker(e.Name, ref); g.blocking(key) {
 					t.ExternalBlockers = append(t.ExternalBlockers, ref)
 				}
@@ -135,20 +122,18 @@ func ValidateRefs(project string, epics []Epic, archived map[string]bool) []erro
 }
 
 // EpicsWaitedOn is the set of epics (by name) that some non-terminal ticket is
-// blocked on as a whole: a whole-epic ref or one widened to its epic, its own
-// or its epic's. Whether the blocker still blocks is not asked.
+// held on as a whole: the whole-epic blocked_by refs of each epic that still
+// has a non-terminal ticket. Whether the blocker still blocks is not asked.
 func EpicsWaitedOn(project string, epics []Epic) map[string]bool {
 	g := newProjectGraph(project, epics, nil)
 	waited := map[string]bool{}
 	for _, e := range epics {
-		for _, t := range e.Tickets {
-			if t.IsTerminal() {
-				continue
-			}
-			for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
-				if key, err := g.resolveBlocker(e.Name, ref); err == nil && isEpicKey(key) {
-					waited[key] = true
-				}
+		if !slices.ContainsFunc(e.Tickets, func(t Ticket) bool { return !t.IsTerminal() }) {
+			continue
+		}
+		for _, ref := range qualifiedRefs(e.BlockedBy) {
+			if key, err := g.resolveBlocker(e.Name, ref); err == nil && isEpicKey(key) {
+				waited[key] = true
 			}
 		}
 	}
@@ -158,21 +143,20 @@ func EpicsWaitedOn(project string, epics []Epic) map[string]bool {
 // CheckBlockedByWrite is the check `tickets add` and `tickets set --blocked-by`
 // run before writing st to path (<project>/<epic>/issues/<file>.md, new or
 // existing): st's refs must resolve project-wide and close no wait cycle on
-// the widened graph. Only st's own faults refuse, so a project already broken
-// elsewhere stays writable. On success it returns one notice per ref that
-// widens to its whole epic. A path outside that layout has no project, so
+// the wait graph. Only st's own faults refuse, so a project already broken
+// elsewhere stays writable. A path outside that layout has no project, so
 // nothing is checked.
-func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
+func CheckBlockedByWrite(path string, st schema.Ticket) error {
 	issuesDir := filepath.Dir(path)
 	number, identifier, _, ok := ParseTicketFilename(filepath.Base(path))
 	if filepath.Base(issuesDir) != "issues" || !ok {
-		return nil, nil
+		return nil
 	}
 	epicDir := filepath.Dir(issuesDir)
 	root := filepath.Dir(epicDir)
 	epics, err := Load(root)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	t := Ticket{
 		Number:     number,
@@ -196,63 +180,45 @@ func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
 	}
 	archived, err := ArchivedEpicNames(root)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	g := newProjectGraph(ProjectName(root), post, archived)
 	errs := g.checkBlockedBy(epic, t)
 	if !t.IsTerminal() {
 		errs = append(errs, g.cycleErrors(epic, t)...)
 	}
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-	return g.widenNotices(epic, t.BlockedBy), nil
+	return errors.Join(errs...)
 }
 
 // CheckEpicBlockedByWrite is CheckBlockedByWrite for an epic's own
 // blocked_by: refs is what `tickets epic set --blocked-by` would write to the
 // epic ticket.md at ticketMD (<project>/<epic>/ticket.md).
-func CheckEpicBlockedByWrite(ticketMD string, refs []string) ([]string, error) {
+func CheckEpicBlockedByWrite(ticketMD string, refs []string) error {
 	epicDir := filepath.Dir(ticketMD)
 	root := filepath.Dir(epicDir)
 	epics, err := Load(root)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	name := filepath.Base(epicDir)
 	post := slices.Clone(epics)
 	i := slices.IndexFunc(post, func(e Epic) bool { return e.Name == name })
 	if i < 0 {
-		return nil, &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
+		return &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
 	}
 	post[i].BlockedBy = refs
 	archived, err := ArchivedEpicNames(root)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	g := newProjectGraph(ProjectName(root), post, archived)
-	if errs := g.epicBlockedByErrors(post[i]); len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-	return g.widenNotices(name, refs), nil
+	return errors.Join(g.epicBlockedByErrors(post[i])...)
 }
 
-// widenNotices is one notice per ref, written in epic, that widens to its
-// whole epic.
-func (g *projectGraph) widenNotices(epic string, refs []string) []string {
-	var notices []string
-	for _, ref := range refs {
-		if key, _ := g.resolveBlocker(epic, ref); widened(ref, key) {
-			notices = append(notices, fmt.Sprintf("`%s` needs commits; waiting for all of `%s`", ref, key))
-		}
-	}
-	return notices
-}
-
-// LoadResolved is Load plus ResolveCrossEpic: the project's epics (dir holds
-// all of project's epics) with cross-epic blockers resolved. Use it wherever
-// status, blockers or counts are read; a plain Load fails closed on a
-// qualified blocker, so a done ticket would read as error.
+// LoadResolved is Load plus resolveEpicHold: the project's epics (dir holds
+// all of project's epics) with each epic's whole-epic blockers resolved. Use
+// it wherever status, blockers or counts are read; a plain Load fails closed
+// on a whole-epic blocker, so a done ticket would read as error.
 func LoadResolved(project, dir string) ([]Epic, error) {
 	epics, err := Load(dir)
 	if err != nil {
@@ -265,5 +231,5 @@ func LoadResolved(project, dir string) ([]Epic, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resolveCrossEpic(project, EpicReleaseOf(pf), epics, archived), nil
+	return resolveEpicHold(project, EpicReleaseOf(pf), epics, archived), nil
 }

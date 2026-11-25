@@ -13,8 +13,7 @@ import (
 // epic's feature branch while that node is unmerged and trunk once it merges,
 // and anything that is not a node ref is a raw branch. Otherwise the base is
 // the one commitful blocker's feature branch, or trunk when there is none. A
-// whole-epic blocker (written or widened) is commitful when any of its
-// tickets is.
+// whole-epic blocker of the epic is commitful when any of its tickets is.
 // Two or more such blockers are ambiguous; see the leaf tickets for pausing
 // on that. Under the on-merge release policy (onMerged) a blocker releases its
 // dependents only once it has merged, so a derived base is always trunk; only
@@ -48,7 +47,7 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onMerge
 		return "", nil
 	}
 	var branches []string
-	for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
+	for _, ref := range qualifiedRefs(e.BlockedBy) {
 		key, err := g.resolveBlocker(epic, ref)
 		if err != nil || !slices.ContainsFunc(g.expand(key), func(k string) bool {
 			return !g.tickets[k].Commitless && !g.tickets[k].IsCancelled()
