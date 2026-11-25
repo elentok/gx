@@ -164,6 +164,23 @@ func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
 	}
 }
 
+func TestExplain_TicketHeldByItsEpicNamesTheBlockerEpic(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "dep", "01", "work", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "held", "")
+	servertest.WriteEpicBlockedBy(t, store, "proj", "epic-a", "dep")
+	h := servertest.StartWithStore(t, store)
+
+	ex, err := h.Client.Reads.Explain(context.Background(), "proj:epic-a/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ex.Verdict != "blocked" || ex.Reason != "dep" {
+		t.Errorf("explain = %+v, want blocked by \"dep\"", ex)
+	}
+}
+
 func TestReads_IterationsAndQueue(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

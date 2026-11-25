@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -197,6 +198,18 @@ func TestFrontier_TicketBlockedOnDraftStaysBlocked(t *testing.T) {
 
 	if got := Frontier(epic); len(got) != 0 {
 		t.Fatalf("Frontier() = %v, want empty: a draft blocker is not done", numbers(got))
+	}
+}
+
+func TestTicketVerdict_TicketHeldByItsEpicNamesTheBlockerEpic(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{
+		UnreleasedBlockers: []string{"dep-a", "dep-b"},
+		Tickets:            []tickets.Ticket{{Number: 1, Status: "open"}},
+	}
+	d := TicketVerdict(epic, WholeEpicScope(), epic.Tickets[0], false, false)
+	if d.Decision != runlog.DecisionBlocked || d.Reason != "dep-a, dep-b" {
+		t.Errorf("verdict = %q %q, want blocked by %q", d.Decision, d.Reason, "dep-a, dep-b")
 	}
 }
 

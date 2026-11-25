@@ -139,12 +139,12 @@ func blocked(id, on string) tickets.Ticket {
 	return t
 }
 
-// heldOn is a ticket held by its epic's unreleased blocker, as the hold
-// resolver leaves it.
-func heldOn(id, epic string) tickets.Ticket {
-	t := tk(id, string(schema.StatusOpen))
-	t.ExternalBlockers = []string{epic}
-	return t
+// heldOn is an epic held by an unreleased blocker epic, as the hold resolver
+// leaves it.
+func heldOn(blocker string, ts ...tickets.Ticket) tickets.Epic {
+	e := epicOf(ts...)
+	e.UnreleasedBlockers = []string{blocker}
+	return e
 }
 
 func inCycle(t tickets.Ticket, msg string) tickets.Ticket {
@@ -174,10 +174,9 @@ func TestStateOf(t *testing.T) {
 		{"paused next to blocked", epicOf(paused("1"), blocked("2", "9")), epics.StatePaused},
 		{"only blocked is a cycle", epicOf(blocked("1", "2"), blocked("2", "1")), epics.StateCycle},
 		{"unknown status counts as paused", epicOf(tk("1", "bogus")), epics.StatePaused},
-		{"unreleased epic blocker waits", epicOf(heldOn("1", "other")), epics.StateWaiting},
-		{"paused beats waiting", epicOf(heldOn("1", "other"), paused("2")), epics.StatePaused},
-		{"running beats waiting", epicOf(heldOn("1", "other"), tk("2", "claimed")), epics.StateRunnable},
-		{"cycle beats waiting", epicOf(inCycle(heldOn("1", "other"), "1 -> 2"), inCycle(blocked("2", "1"), "2 -> 1")), epics.StateCycle},
+		{"unreleased epic blocker waits", heldOn("other", tk("1", "open")), epics.StateWaiting},
+		{"paused beats waiting", heldOn("other", tk("1", "open"), paused("2")), epics.StatePaused},
+		{"cycle beats waiting", heldOn("other", inCycle(tk("1", "open"), "1 -> 2"), inCycle(blocked("2", "1"), "2 -> 1")), epics.StateCycle},
 		{"cycle alone", epicOf(inCycle(blocked("1", "2"), "1 -> 2"), blocked("2", "1")), epics.StateCycle},
 		{"released blocker is runnable", epicOf(tk("1", "open")), epics.StateRunnable},
 	}

@@ -152,11 +152,6 @@ type Ticket struct {
 	// resolveEpicHold. It is not a fault: t still renders StatusBlocked, and the
 	// epic state reads it as Deadlocked rather than Paused.
 	CycleErr string
-
-	// ExternalBlockers are the epic's unreleased whole-epic blocked_by entries,
-	// set in memory by resolveEpicHold. They hold the ticket blocked but are
-	// not listed as ticket blockers or sent on the wire.
-	ExternalBlockers []string
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

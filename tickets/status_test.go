@@ -174,7 +174,7 @@ func TestEpic_UnresolvedBlockers_NoneWhenAllResolved(t *testing.T) {
 }
 
 func TestEpic_RenderedStatus_HeldByEpicBlocker(t *testing.T) {
-	epic := Epic{Tickets: []Ticket{{Number: 1, Status: "open", ExternalBlockers: []string{"a"}}}}
+	epic := Epic{UnreleasedBlockers: []string{"a"}, Tickets: []Ticket{{Number: 1, Status: "open"}}}
 	if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusBlocked {
 		t.Errorf("RenderedStatus = %v, want blocked", got)
 	}

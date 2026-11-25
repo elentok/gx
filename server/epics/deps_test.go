@@ -199,7 +199,7 @@ func TestEpicsDeps_EpicSummariesCarryTheBlockersOfAWaitingEpic(t *testing.T) {
 		{Name: "dep", Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}},
 		{
 			Name: "e", BlockedBy: []string{"dep"}, UnreleasedBlockers: []string{"dep"},
-			Tickets: []tickets.Ticket{{Number: 1, Status: "open", ExternalBlockers: []string{"dep"}}},
+			Tickets: []tickets.Ticket{{Number: 1, Status: "open"}},
 		},
 		{Name: "free", Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}},
 	}}}

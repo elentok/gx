@@ -196,7 +196,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(t.ExternalBlockers) > 0 || len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
+	if len(e.UnreleasedBlockers) > 0 || len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base

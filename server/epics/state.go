@@ -59,7 +59,7 @@ func StateOf(e tickets.Epic) State {
 		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
 			blocked = true
 			hasCycle = hasCycle || t.CycleErr != ""
-			waiting = waiting || len(t.ExternalBlockers) > 0
+			waiting = waiting || len(e.UnreleasedBlockers) > 0
 		default:
 			paused = true
 		}
