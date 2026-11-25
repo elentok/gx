@@ -299,8 +299,8 @@ test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])(
 )
 
 test.each([
-  ["/agents", "No sessions yet"],
-  ["/agents/s-1", "Session not found"],
+  ["/agents", "No chats yet"],
+  ["/agents/s-1", "Agent not found"],
 ])("%s renders the Agents page", async (path, text) => {
   renderAt(path, okFor)
   expect(await screen.findByText(text)).toBeTruthy()

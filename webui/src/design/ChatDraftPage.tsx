@@ -225,7 +225,7 @@ function ChatDraftForm({
 
   const startNow = () => {
     if (blocker || banner || starting) return
-    void start((session) => navigate(agentPath(session)))
+    void start((session) => navigate(agentPath(session), { state: { creating: true } }))
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()

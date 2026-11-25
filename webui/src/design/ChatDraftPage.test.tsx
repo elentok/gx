@@ -155,7 +155,7 @@ test("Start posts the draft and goes to the new chat", async () => {
   await mount(fake)
   await clickStart()
   expect(fake.start).toHaveBeenCalledWith("c1")
-  expect(where()).toBe("/agents/sess-9 ")
+  expect(where()).toBe("/agents/sess-9 creating")
 })
 
 test("Cmd+Enter in the brief starts the chat", async () => {
@@ -163,7 +163,7 @@ test("Cmd+Enter in the brief starts the chat", async () => {
   await mount(fake)
   await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
   expect(fake.start).toHaveBeenCalledWith("c1")
-  expect(where()).toBe("/agents/sess-9 ")
+  expect(where()).toBe("/agents/sess-9 creating")
 })
 
 test("Ctrl+Enter in the brief starts the chat", async () => {
@@ -252,7 +252,7 @@ test("a failed Start shows the error and the worktree, keeps the brief, and Star
   expect(fake.remove).not.toHaveBeenCalled()
   await clickStart()
   expect(fake.start).toHaveBeenCalledTimes(2)
-  expect(where()).toBe("/agents/sess-9 ")
+  expect(where()).toBe("/agents/sess-9 creating")
 })
 
 const control = (name: string) =>
@@ -699,7 +699,7 @@ test("a late save answer after Start changes nothing, and no save goes out while
   await act(async () => void window.dispatchEvent(new Event("pagehide")))
   expect(fake.save).toHaveBeenCalledTimes(1)
   await act(async () => finish({ kind: "started", session: "sess-9" }))
-  expect(where()).toBe("/agents/sess-9 ")
+  expect(where()).toBe("/agents/sess-9 creating")
 })
 
 test("a late conflict from a save sent before Start raises no banner", async () => {
@@ -746,7 +746,7 @@ test("a refused edit keeps the typed text, and the next autosave uses the re-rea
   expect(fake.save).toHaveBeenLastCalledWith({ id: "c1", brief: "typed", revision: 8 })
   await clickStart()
   expect(fake.start).toHaveBeenCalledTimes(2)
-  expect(where()).toBe("/agents/sess-9 ")
+  expect(where()).toBe("/agents/sess-9 creating")
 })
 
 test("changed settings go in Start's edit and unchanged ones stay out", async () => {

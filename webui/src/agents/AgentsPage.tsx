@@ -22,7 +22,7 @@ const CREATING_GRACE_MS = 10_000
 function GoneNotice({ id }: { id: string }) {
   return (
     <>
-      <Text fontWeight="600">Session not found</Text>
+      <Text fontWeight="600">Agent not found</Text>
       <Text color="text.muted">{id} no longer exists.</Text>
     </>
   )
@@ -40,14 +40,14 @@ function EmptyState({ empty, onNew }: { empty: boolean; onNew: () => void }) {
       textAlign="center"
     >
       <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
-        {empty ? "No sessions yet" : "Pick a session"}
+        {empty ? "No chats yet" : "Pick a chat"}
       </Heading>
       <Text color="text.muted" maxW="42ch">
         {empty ? (
-          "Sessions you start here or in the gx Agents tab show up in the sidebar."
+          "Chats you start here or in the gx Agents tab show up in the sidebar."
         ) : (
           <>
-            Choose a session in the sidebar, or press{" "}
+            Choose a chat in the sidebar, or press{" "}
             <Kbd bg="surface" color="text.muted" borderWidth="1px" borderColor="border">
               ⌘K
             </Kbd>{" "}
@@ -118,7 +118,7 @@ export function AgentsPage({
             <Box h="100%" display="flex" flexDirection="column">
               <StateHeader title="Agents" />
               <Box flex="1" minH="0">
-                {creating && <FullScreenLoader label="Creating chat…" />}
+                {creating && <FullScreenLoader label="Starting chat…" />}
                 {gone && <GoneNotice id={selected!} />}
                 {!selected && <EmptyState empty={sessions.length === 0} onNew={openNewAgent} />}
               </Box>
