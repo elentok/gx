@@ -62,6 +62,8 @@ interface FixtureOutput {
   transcripts?: Record<string, string>
   /** The `bg-progress` scenario's task output files a flow grows, by name (`growing-output`). */
   task_files?: Record<string, string>
+  /** The `subagents` scenario's parent session id and Agent tool_use ids by name. */
+  subagents?: { session_id: string; calls: Record<string, string> }
   /** The held Codex worker's sessions dir; only the `limit-burn` scenario prints it. */
   codex_sessions_dir?: string
   /** Only the restart scenarios have the fake restart binary's control dir. */
@@ -242,6 +244,8 @@ export interface Fixture {
   readonly transcripts: Record<string, string>
   /** The `bg-progress` scenario's task output files by name; append lines to the `growing-output` one, then `\n[exited with code 0]\n` to end its shell. Empty elsewhere. */
   readonly taskFiles: Record<string, string>
+  /** The `subagents` scenario's parent session id and Agent call ids by name (`running`, `finished`, `missing`); the subagent files and meta.json are in `taskFiles`. Undefined elsewhere. */
+  readonly subagents?: { sessionId: string; calls: Record<string, string> }
   /** The `limit-burn` scenario's Codex sessions dir; append a `token_count` line to its rollout to make the usage scan save a Codex sample. Empty elsewhere. */
   readonly codexSessionsDir: string
   /** The `dev-mode` scenario's fake pnpm control file; write `{"vite":"crash"}` to take Vite down. Empty elsewhere. */
@@ -408,6 +412,7 @@ async function startFixture(
     releaseRateLimit: () => writeFile(out.ratelimit_release_file ?? "", ""),
     transcripts: out.transcripts ?? {},
     taskFiles: out.task_files ?? {},
+    subagents: out.subagents && { sessionId: out.subagents.session_id, calls: out.subagents.calls },
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
     hostFiles: out.host_files,

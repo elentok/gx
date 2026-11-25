@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/gxfixture/bgtx"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 )
 
 // bgSessionAge puts the session's creation before every seeded task: a task
@@ -51,6 +52,10 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 		if err := bgtx.SetRolloutVersion(path, seed.Version); err != nil {
 			return err
 		}
+	}
+	if seed.Ready != nil {
+		f.subagents = &output.SubagentsOutput{SessionID: id, Calls: seed.Calls}
+		return f.waitFor(id, "the subagent calls", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool { return seed.CallsShown(c) })
 	}
 	return f.waitFor(id, fmt.Sprintf("%d tasks", s.BgTasks), func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
 		return len(c.Tasks) == s.BgTasks && (!seed.Working || c.Current != nil)

@@ -155,6 +155,17 @@ a shell whose output ends `[exited with code 3]` (finished, exit 3, at the file'
 timeout and one event, which turns finished with no outcome once the timeout passes. The Claude session is created a few hours back
 (the other sessions an hour) so no seeded task reads as one of an earlier run. Data: `testutil/gxfixture/spec/bgprogress.go`,
 `bgcodex.go` and `bglines.go`; the seeder is `bgprogress.go`.
+The `subagents` scenario seeds one Working Claude Design session of the map `design-epic` whose transcript and subagent files
+hold subagents (`start("subagents", { shape })`; default `claude`). Output keys: `subagents.sessionId` is the parent session,
+`subagents.calls` has the parent's Agent call ids by name (`running`, `finished`, `missing`; only the names a shape holds),
+`taskFiles` has `subagent-running-file` and `subagent-running-meta` (grow the file, rewrite the meta) and
+`subagent-finished-file` and `subagent-finished-meta`. Every `meta.json` has `toolUseId` equal to its call id; the running one has
+no `finished`, the finished one has `finished: true`. Shapes (this section lists the first four; the rest are added by later
+tickets): `claude` (the mock states `a-parent`, `a-subagent-running`, `a-subagent-finished`, `a-subagent-missing`) holds all
+three below; `foreground-running` is an `Agent` call with no result, "Survey the sessions code", whose file starts with its prompt
+and has model, usage and tool calls; `finished-handback` is "Check the wire types", whose file ends with a `SubagentHandback`
+call and its result, with the report as the parent call's result; `file-gone` is "Read the old notes", a finished call whose
+file does not exist. Data: `testutil/gxfixture/spec/subagents.go` and `bgtx/subagents.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

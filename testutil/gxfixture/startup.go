@@ -260,6 +260,7 @@ func (f *fixture) addScenarioOutput(res *output.Output, sc scenario, transcripts
 	res.PushServiceURL, res.PushControl, res.PushCapture = f.pushURL, f.pushControl, f.pushCapture
 	res.Transcripts = transcripts
 	res.TaskFiles = f.taskFiles
+	res.Subagents = f.subagents
 	if sc.LimitBurn {
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")
 	}

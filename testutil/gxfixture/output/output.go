@@ -10,6 +10,13 @@ import (
 	"strings"
 )
 
+// SubagentsOutput names the parent session and its Agent tool_use ids, by the
+// name the shape gives them (running, finished, missing, ...).
+type SubagentsOutput struct {
+	SessionID string            `json:"session_id"`
+	Calls     map[string]string `json:"calls"`
+}
+
 // Output is the JSON gxfixture prints once the server answers.
 type Output struct {
 	// WebURL is the plain URL: it signs nobody in. Cookie is the web login's
@@ -81,6 +88,9 @@ type Output struct {
 	Transcripts map[string]string `json:"transcripts,omitempty"`
 	// TaskFiles are the bg-progress scenario's task output files a flow grows, by name.
 	TaskFiles map[string]string `json:"task_files,omitempty"`
+	// Subagents is the subagents scenario's session id and call ids; the paths a flow
+	// writes to (the subagent files and their meta.json) are in TaskFiles.
+	Subagents *SubagentsOutput `json:"subagents,omitempty"`
 	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
 	// scenario; empty elsewhere.
 	CodexSessionsDir string `json:"codex_sessions_dir,omitempty"`

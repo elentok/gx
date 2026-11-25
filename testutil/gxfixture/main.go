@@ -17,6 +17,7 @@
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <two-blockers|blocker-not-queued|blocker-paused|picker-open|cycle-refusal|release> picks the Waiting epics and blockers of the epic-waiting scenario (default two-blockers).
 // --shape <claude|single-task|subagent-with-inner-task|many|timed-out-shell|growing-output> picks the background tasks of the bg-progress scenario (default claude).
+// --shape <claude|foreground-running|finished-handback|file-gone> picks the subagents of the subagents scenario (default claude).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
 // `gxfixture stop <scenario|pid>` sends SIGTERM to a fixture started from the same worktree and refuses another worktree's.
@@ -99,6 +100,12 @@ func run(args []string) (err error) {
 		var built bool
 		if sc, built = spec.BgProgressScenario(shape); !built {
 			return fmt.Errorf("bg-progress shape %q: shape not built yet", shape)
+		}
+	}
+	if sc.SubagentsShaped {
+		var built bool
+		if sc, built = spec.SubagentsScenario(shape); !built {
+			return fmt.Errorf("subagents shape %q: shape not built yet", shape)
 		}
 	}
 	if sc.LimitBurn && shape == "live" {
@@ -249,6 +256,7 @@ type fixture struct {
 	keyedTranscripts map[string]string
 	// taskFiles are the task output files of Output.TaskFiles, by name.
 	taskFiles map[string]string
+	subagents *output.SubagentsOutput
 	// restarted is true once the server exited on a web restart: the fixture stays up
 	// for the server that restart started, and stops that one at shutdown.
 	restarted bool

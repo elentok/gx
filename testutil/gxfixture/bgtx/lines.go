@@ -35,6 +35,11 @@ type Seed struct {
 	Version string        // written as the Codex rollout's cli_version when set
 	Age     time.Duration // how long before the seed the session was created; tasks older than the run need a longer one
 	Working bool          // also wait for the chat read's Working row
+	// Ready, when set, replaces the task-count wait: the call descriptions the
+	// parent's tools entries must name. Calls are the call ids by name, printed in
+	// Output.Subagents.
+	Ready []string
+	Calls map[string]string
 }
 
 type entry struct {

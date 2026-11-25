@@ -704,6 +704,10 @@ var Scenarios = map[string]scenario{
 	// background tasks, in the shape --shape names (default claude). run swaps in
 	// spec.BgProgressScenario(shape).
 	"bg-progress": {BgProgressShaped: true},
+	// subagents: a Working Claude Design session whose transcript and subagent files hold
+	// subagents, in the shape --shape names (default claude). run swaps in
+	// spec.SubagentsScenario(shape).
+	"subagents": {SubagentsShaped: true},
 	// dev-mode: a Dev checkout and a fake pnpm in the state --shape names (default running).
 	"dev-mode": {DevMode: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout

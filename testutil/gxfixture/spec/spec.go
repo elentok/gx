@@ -330,6 +330,9 @@ type Scenario struct {
 	// BgProgressShaped marks the bg-progress scenario, whose whole content comes
 	// from the --shape value (BgProgressScenario).
 	BgProgressShaped bool
+	// SubagentsShaped marks the subagents scenario, whose whole content comes from
+	// the --shape value (SubagentsScenario).
+	SubagentsShaped bool
 	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
 	// value names (default running); see DevModeShapes and devmode.go.
 	DevMode bool
