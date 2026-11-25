@@ -85,6 +85,10 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		wire.WriteJSON(w, out)
 		return
 	}
+	if call := r.URL.Query().Get("subagent"); call != "" {
+		c.subagentRead(w, id, dir, meta, call)
+		return
+	}
 	// The page reads only on an event, so a remembered miss from before the
 	// transcript existed would hide the message the event announces.
 	c.transcripts.ForgetMiss(meta.ConversationID)
@@ -105,14 +109,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			out.Tasks, open = c.tasksFor(snap, kind, meta, path)
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
-			for _, t := range open {
-				tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
-				if out.Current == nil {
-					out.Current = &tool
-				} else {
-					out.Others = append(out.Others, tool)
-				}
-			}
+			out.Current, out.Others = currentCalls(open)
 		}
 	}
 	wire.WriteJSON(w, out)

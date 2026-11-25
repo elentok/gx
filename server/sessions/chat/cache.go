@@ -48,6 +48,9 @@ type Snapshot struct {
 	Records []transcript.TaskRecord
 	// InFlight is the current turn's unanswered tool calls, newest first.
 	InFlight []transcript.InFlightTool
+	// Handback is the message of a subagent's SubagentHandback call; "" for
+	// every other transcript.
+	Handback string
 	// Unreadable and CodexVersion are set for a Codex rollout gx cannot read.
 	Unreadable   bool
 	CodexVersion string

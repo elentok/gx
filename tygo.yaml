@@ -2,7 +2,10 @@
 packages:
   - path: "github.com/elentok/gx/server/wire"
     output_path: "webui/src/generated/server.ts"
-    frontmatter: "export * from './ops';"
+    frontmatter: |
+      export * from './ops';
+      export * from './subagent';
+      import type { SessionSubagent } from './subagent';
     include_files:
       - archivedlist.go
       - backlog.go
@@ -33,8 +36,16 @@ packages:
     type_mappings:
       time.Time: "string"
       json.RawMessage: "unknown"
+      subagent.SessionSubagent: "SessionSubagent"
       agent.ContextLevel: '"green" | "yellow" | "orange" | "red"'
       agent.Tier: '"light" | "worker" | "strongest"'
+    enum_style: "union"
+  - path: "github.com/elentok/gx/server/wire/subagent"
+    output_path: "webui/src/generated/subagent.ts"
+    include_files:
+      - subagent.go
+    type_mappings:
+      time.Time: "string"
     enum_style: "union"
   - path: "github.com/elentok/gx/server/wire/ops"
     output_path: "webui/src/generated/ops.ts"

@@ -86,7 +86,16 @@ func newCodexFixture(t *testing.T) *readFixture {
 
 func (f *readFixture) get(t *testing.T, route string) (int, []byte) {
 	t.Helper()
-	res, err := http.Get(f.srv.URL + route + "?session=s1")
+	return f.getQuery(t, route, "")
+}
+
+// getQuery is get with more query parameters, such as "subagent=a1".
+func (f *readFixture) getQuery(t *testing.T, route, extra string) (int, []byte) {
+	t.Helper()
+	if extra != "" {
+		extra = "&" + extra
+	}
+	res, err := http.Get(f.srv.URL + route + "?session=s1" + extra)
 	if err != nil {
 		t.Fatal(err)
 	}

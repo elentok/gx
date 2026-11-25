@@ -2,6 +2,8 @@ package wire
 
 import (
 	"time"
+
+	"github.com/elentok/gx/server/wire/subagent"
 )
 
 // EventSessionChanged announces a new or changed interactive session; its
@@ -147,6 +149,9 @@ type SessionChatResponse struct {
 	// Archived marks a Codex conversation whose rollout is a .jsonl.zst: the
 	// messages stay empty until the archive route decodes it.
 	Archived bool `json:"archived,omitempty"`
+	// Subagent is the header of the page a read with subagent= answers; absent
+	// without it. Messages, Current and Others then belong to the subagent.
+	Subagent *subagent.SessionSubagent `json:"subagent,omitempty"`
 }
 
 // SessionCommandEntry is one row of the command menu. Name has no leading

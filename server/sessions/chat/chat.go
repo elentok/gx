@@ -126,6 +126,8 @@ type Chat struct {
 	// subagentMetas caches each subagent sidecar; subagentScans maps call ids to agent ids per directory.
 	subagentMetas FileCache[subagentMeta]
 	subagentScans subagentScan
+	// subagentPages caches each Claude subagent file as the chat of its page.
+	subagentPages Cache
 	// codexChildren caches each Codex subagent rollout's details.
 	codexChildren FileCache[codexChild]
 	// reads replaces the enrichers' file readers; tests count reads with them.

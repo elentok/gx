@@ -10,6 +10,8 @@ type taskReads struct {
 	codexChild  func(path string) (codexChild, error)
 	// subagentScan is called once per scan of a subagents/ directory.
 	subagentScan func(dir string)
+	// subagentPage is called once per parse of a subagent file for its page.
+	subagentPage func(path string)
 }
 
 // enrichSpec says how one kind of record picks its file and takes the details.
