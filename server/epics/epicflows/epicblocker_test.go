@@ -1,4 +1,4 @@
-package epics
+package epicflows_test
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -14,7 +15,7 @@ const blockerIssue = "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# x\n
 
 // blockerStore builds project p with epics landed (merged), live, other, and
 // target, whose ticket.md holds targetBlockedBy.
-func blockerStore(t *testing.T, targetBlockedBy string) (*Epics, string) {
+func blockerStore(t *testing.T, targetBlockedBy string) (*epics.Epics, string) {
 	t.Helper()
 	store := t.TempDir()
 	write := func(path, body string) {
@@ -33,7 +34,7 @@ func blockerStore(t *testing.T, targetBlockedBy string) (*Epics, string) {
 	}
 	write("target/ticket.md", "---\ntype: epic\nkind: feature\nblocked_by: "+targetBlockedBy+"\n---\n# target\n\nbody text\n")
 	write("target/issues/01-x.md", blockerIssue)
-	return New(Deps{TicketStore: store}), filepath.Join(store, "p", "target", "ticket.md")
+	return epics.New(epics.Deps{TicketStore: store}), filepath.Join(store, "p", "target", "ticket.md")
 }
 
 func readFile(t *testing.T, path string) string {
@@ -45,7 +46,7 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
-func blocker(t *testing.T, e *Epics, address, other string, remove bool) wire.EpicBlockerResult {
+func blocker(t *testing.T, e *epics.Epics, address, other string, remove bool) wire.EpicBlockerResult {
 	t.Helper()
 	res, err := e.EpicBlocker(wire.EpicBlockerRequest{Address: address, Blocker: other, Remove: remove})
 	if err != nil {
