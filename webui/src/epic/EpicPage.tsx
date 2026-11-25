@@ -24,6 +24,7 @@ import type { Entity } from "../actions/entity"
 import { unarchiveOne } from "../actions/useActions"
 import { useEntityActions } from "../workspaces/itemActions"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
+import { BlockedBy } from "./BlockedBy"
 import { EpicRing } from "./EpicRing"
 import { MergeButton, StashMergeButton } from "../epics/MergeButton"
 import { archiveHref, designHref, epicHref } from "../hrefs"
@@ -624,6 +625,7 @@ function EpicPageBody({
               )
             }
           />
+          <BlockedBy detail={detail} />
           <PrActivity entries={detail.pr_activity} />
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">

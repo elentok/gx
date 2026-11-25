@@ -275,6 +275,18 @@ test("the draft row has a menu; removing the open draft from it navigates to /ep
   )
 })
 
+test("a Waiting epic's status span carries the blocker title", async () => {
+  const waiting = row("p:wait", {
+    name: "Held up",
+    waiting_on_epic: true,
+    blockers: [{ name: "A" }, { name: "B" }],
+  })
+  setup("desktop", "/", [waiting])
+  const link = await body().findByRole("link", { name: /Held up/ })
+  const status = within(link).getByText("Waiting")
+  expect(status.getAttribute("title")).toBe("Waiting on A and 1 more")
+})
+
 test("rows show the name and status words; the open epic is current and stays collapsed", async () => {
   setup("desktop", "/e/p:blog")
   const link = await body().findByRole("link", { name: /Blog/ })

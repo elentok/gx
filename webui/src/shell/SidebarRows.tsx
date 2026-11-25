@@ -44,6 +44,7 @@ function Status({ status, dim }: { status: SidebarStatus; dim?: boolean }) {
     <Box
       as="span"
       fontSize="12px"
+      title={status.title}
       color={statusColor(status, dim)}
       whiteSpace="nowrap"
       overflow="hidden"

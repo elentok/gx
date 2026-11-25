@@ -25,6 +25,7 @@ import { RING_KIND, isLive, ringArc, ringProgress } from "../epics/ring"
 import { agentHref, chatDraftHref, designHref, draftHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
+import { waitingWords } from "../epic/waiting"
 import type { Kind, Tone } from "../ui/tone"
 
 export const NEEDS_YOU = "Needs you"
@@ -37,6 +38,8 @@ export interface SidebarStatus {
   words: string
   /** waiting is amber, running blue, muted is the dimmed server word. */
   tone: Extract<Tone, "waiting" | "running" | "muted">
+  /** Tooltip on the status words. */
+  title?: string
 }
 
 export interface SidebarAgent {
@@ -119,6 +122,8 @@ const isCard = (r: EpicListRow) =>
 
 export function cardStatus(r: EpicListRow): SidebarStatus {
   if (r.section === SectionNeedsYou) return { words: NEEDS_YOU, tone: "waiting" }
+  if (r.waiting_on_epic)
+    return { words: "Waiting", tone: "muted", title: waitingWords(r.blockers ?? []) }
   if (isLive(r)) return { words: r.working_word || WORKING, tone: "running" }
   return { words: r.status_words ?? "", tone: "muted" }
 }

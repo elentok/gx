@@ -1415,3 +1415,52 @@ test("a note card's ⋯ comes before its Answer and Fix buttons, which stay reac
   expect(repair[0].getAttribute("aria-label")).toBe("More actions")
   expect(repair.at(-1)?.textContent).toBe("Fix it with an agent")
 })
+
+const hintOf = () => screen.findByTestId("blocked-by-hint")
+const hintTail = " This epic stays put until it is merged."
+const waitingOn = (blockers: EpicDetail["blockers"]) =>
+  render("/e/gx:blog", [], "loop", { ...loop({ state: "waiting-on-epic", blockers }) })
+
+test.each(["ready", "draft", "no-open-tickets"])(
+  "a %s blocker reads not queued, in the dim text",
+  async (state) => {
+    waitingOn([{ address: "gx:a", name: "a", state }])
+    const hint = await hintOf()
+    expect(hint.textContent).toBe(`a is not queued.${hintTail}`)
+    expect(getComputedStyle(hint).color).toBe("var(--chakra-colors-text-dim)")
+  },
+)
+
+test.each([
+  ["Paused", { state: "paused" }],
+  ["Deadlocked", { state: "paused", deadlocked: true }],
+  ["Merge blocked", { state: "merge-blocked" }],
+  ["CI failing", { state: "ci-failing" }],
+  ["PR text failed", { state: "pr-text-failed" }],
+])("a %s blocker reads its label, in the Paused text tone", async (label, over) => {
+  waitingOn([{ address: "gx:a", name: "a", ...over }])
+  const hint = await hintOf()
+  expect(hint.textContent).toBe(`a is ${label}.${hintTail}`)
+  expect(getComputedStyle(hint).color).toBe("var(--chakra-colors-tone-paused-text)")
+})
+
+test("a Waiting blocker names the deeper not-moving epic", async () => {
+  waitingOn([
+    {
+      address: "gx:a",
+      name: "a",
+      state: "queued",
+      hint: { address: "gx:deep", name: "deep", state: "paused", deadlocked: true },
+    },
+  ])
+  expect((await hintOf()).textContent).toBe(`deep is Deadlocked.${hintTail}`)
+})
+
+test.each(["running", "awaiting-merge", "awaiting-pr", "pr-open", "merging"])(
+  "a %s blocker gives no hint",
+  async (state) => {
+    waitingOn([{ address: "gx:a", name: "a", state }])
+    expect(await statsOf()).toContain("Waiting on a")
+    expect(screen.queryByTestId("blocked-by-hint")).toBeNull()
+  },
+)

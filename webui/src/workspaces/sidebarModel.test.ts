@@ -18,7 +18,7 @@ import {
   type SessionPlacement,
 } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
-import { buildSidebar, rowItemKind } from "./sidebarModel"
+import { buildSidebar, NEEDS_YOU, rowItemKind } from "./sidebarModel"
 
 describe("rowItemKind", () => {
   it.each(["chat", "design", "draft", "chat-draft"] as const)("keeps %s", (kind) => {
@@ -55,6 +55,29 @@ const place = (
 ): SessionPlacement => ({ session, kind, ...extra })
 
 describe("buildSidebar", () => {
+  it("a Waiting epic reads Waiting, muted, with the blocker title, and sorts as idle", () => {
+    const blockers = [{ name: "A" }, { name: "B" }]
+    const waiting = row("p:w", { waiting_on_epic: true, blockers, status_words: "Idle" })
+    const s = buildSidebar({ ...base, rows: [waiting], sessions: [], placements: [] })
+    expect(s.rows[0].status).toEqual({
+      words: "Waiting",
+      tone: "muted",
+      title: "Waiting on A and 1 more",
+    })
+    expect(s.rows[0].status.words).not.toBe(NEEDS_YOU)
+    expect(s.rows[0].status.tone).not.toBe("running")
+  })
+
+  it("a Needs you row still reads Needs you", () => {
+    const s = buildSidebar({
+      ...base,
+      rows: [row("p:n", { section: SectionNeedsYou })],
+      sessions: [],
+      placements: [],
+    })
+    expect(s.rows[0].status).toEqual({ words: NEEDS_YOU, tone: "waiting" })
+  })
+
   it("a Design row reads the server's flag and word, never its sessions", () => {
     const placements = [place("d1", "epic", { epic: "p:d" })]
     const working = session("d1", "p", { status: { state: "working" } } as never)

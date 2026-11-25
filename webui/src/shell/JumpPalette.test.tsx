@@ -97,6 +97,7 @@ function setup({
   narrow = false,
   extraSessions = [] as SessionInfo[],
   withChatDrafts = false,
+  extraRows = [] as EpicListRow[],
 } = {}) {
   vi.stubGlobal(
     "fetch",
@@ -106,7 +107,7 @@ function setup({
           JSON.stringify(
             String(url).includes("/v1/workspaces/")
               ? { results: [{ target: "x", status: "done" }], held: [] }
-              : { epics: rows, follow_ups: [] },
+              : { epics: [...rows, ...extraRows], follow_ups: [] },
           ),
           { status: 200 },
         ),
@@ -330,6 +331,15 @@ test("a fuzzy query that is not a substring finds an epic", async () => {
   await waitFor(() => expect(names()).toContain("blog"))
   type("bg")
   expect(names()[0]).toBe("blog")
+})
+
+test("a Waiting epic's trailing status reads Waiting", async () => {
+  setup({
+    extraRows: [row("held-up", { waiting_on_epic: true, blockers: [{ name: "A" }] })],
+  })
+  await open()
+  await waitFor(() => expect(names()).toContain("held-up"))
+  expect(within(option("held-up")).getByText("Waiting")).toBeTruthy()
 })
 
 test("Enter opens the cursor row", async () => {
