@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/diffdir"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
@@ -74,6 +75,8 @@ type QueueDeps struct {
 	Projects *projects.Registry
 	Registry *runs.Registry
 	Host     Host
+	// DiffDirs marks Queue agent rows whose directory can show a diff; nil marks none.
+	DiffDirs *diffdir.Checker
 }
 
 // Queue is the server-wide queue and the pause gate in front of it. It lives in
@@ -92,12 +95,14 @@ type Queue struct {
 	projects *projects.Registry
 	registry *runs.Registry
 	host     Host
+	diffDirs *diffdir.Checker
 }
 
 // Attach hands the queue the parts of the server that only exist after it is
 // loaded.
 func (q *Queue) Attach(d QueueDeps) {
 	q.events, q.guards, q.idx, q.projects, q.registry, q.host = d.Events, d.Guards, d.Index, d.Projects, d.Registry, d.Host
+	q.diffDirs = d.DiffDirs
 }
 
 // EpicQueueable reports whether an epic can be queued: an unqueued, unmerged

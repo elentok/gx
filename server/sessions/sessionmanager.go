@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/diffdir"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -83,6 +84,8 @@ type Manager struct {
 	rollouts codexRollouts
 	// switches are the hand switches that have not reached idle yet.
 	switches switchStates
+	// diffDirs marks the chats whose directory can show a diff.
+	diffDirs *diffdir.Checker
 	// Models caches the harnesses' model lists; Serve runs it to keep them fresh.
 	Models *commandlist.ModelCache
 }
@@ -102,6 +105,8 @@ type ManagerDeps struct {
 	AFK      *queue.AFK
 	Alerts   *notify.ServerChat
 	Queue    agentRows
+	// DiffDirs may be nil, which builds one over the ticket store.
+	DiffDirs *diffdir.Checker
 	Host     Host
 	Prompter Prompter
 	Designs  designCleaner
@@ -131,9 +136,12 @@ func NewManager(d ManagerDeps) *Manager {
 		}
 		d.Models = commandlist.NewModelCache(commandlist.ModelCacheDeps{Dir: dir, Env: d.Env, Log: d.Log})
 	}
+	if d.DiffDirs == nil {
+		d.DiffDirs = diffdir.New(d.Cfg.TicketStore, nil)
+	}
 	return &Manager{
-		Models: d.Models,
-		cfg:    d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
+		Models: d.Models, diffDirs: d.DiffDirs,
+		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,

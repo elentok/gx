@@ -59,6 +59,9 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 		info.AutoQueueAt = &at
 	}
 	info.Failure = mg.chat.Failure(cm)
+	if m.Flow == "" {
+		info.ShowDiffDir = mg.diffDirs.Qualifies(m.Project, m.Dir)
+	}
 	return info
 }
 

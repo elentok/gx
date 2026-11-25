@@ -51,6 +51,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		Pauses:       &s.pauseHold,
 		Sessions:     s.sessions,
 		Diff:         epicDiffRefs{s},
+		WorktreeDir:  s.projects.WorktreeDir,
 
 		Workspaces: s.workspaces,
 		Seen:       epics.OpenSeen(s.cfg.StateDir),

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/devvite"
+	"github.com/elentok/gx/server/diffdir"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
@@ -302,4 +303,7 @@ type Config struct {
 	// Models is the model-list cache; nil builds the real one, which runs the
 	// real harness binaries. Tests set one with fake probes.
 	Models *commandlist.ModelCache
+	// DiffCommonDir reads a session directory's git common dir for the Show
+	// diff marker; nil runs git. Tests count its calls.
+	DiffCommonDir diffdir.CommonDir
 }

@@ -72,6 +72,9 @@ func (q *Queue) queueAgentRow(t runs.TrackedRun) (wire.SessionInfo, bool) {
 		Model:           t.Model,
 		Effort:          t.Effort,
 	}
+	if q.diffDirs != nil {
+		info.ShowDiffDir = q.diffDirs.Qualifies(addr.Project, t.Cwd)
+	}
 	if st.State == agentrunner.StateBlocked {
 		info.Status.Message = st.BlockedReason
 	}

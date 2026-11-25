@@ -691,6 +691,7 @@ func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, e
 		return wire.SessionResult{}, err
 	}
 	mg.events.Publish(wire.EventSessionChanged, req.ID)
+	mg.diffDirs.Forget(meta.Dir)
 	mg.sessionGone(req.ID)
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil

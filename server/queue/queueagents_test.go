@@ -34,6 +34,17 @@ func TestQueueAgentRows_PtyRunListsAWorkingRowWithoutUnreadOrActionable(t *testi
 	}
 }
 
+func TestQueueAgentRows_ShowDiffDirMarksAnIterationWorktreeOfTheProjectRepo(t *testing.T) {
+	t.Parallel()
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateWorking, "")
+
+	servertest.WaitFor(t, 10*time.Second, "a Queue row in the project repo", func() bool {
+		rows := rigs.QueueRows(t, h)
+		return len(rows) == 1 && rows[0].ShowDiffDir
+	})
+}
+
 func TestQueueAgentRows_IterationsNameTheRunnerAndTheRow(t *testing.T) {
 	t.Parallel()
 	h, fake := rigs.StartQueueRows(t, "pty")

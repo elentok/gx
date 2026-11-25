@@ -104,6 +104,10 @@ type Deps struct {
 	// Diff may be nil, which leaves an unmerged epic without View diff.
 	Diff DiffRefs
 
+	// WorktreeDir is where the project's iteration worktrees live; "" when the
+	// project has none. Nil leaves HasWorktree unset.
+	WorktreeDir func(project string) string
+
 	Workspaces Workspaces
 
 	// Seen keeps the last Needs-you or Merged state a person saw per card. Nil

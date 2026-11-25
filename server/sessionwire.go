@@ -62,6 +62,7 @@ func newManager(s *Server) *sessions.Manager {
 		AFK:      s.afk,
 		Alerts:   s.chat,
 		Queue:    s.queue,
+		DiffDirs: s.diffDirs,
 		Host:     sessionHost{s},
 		Prompter: s.prompt,
 		Designs:  s.designs,

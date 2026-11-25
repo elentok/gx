@@ -163,6 +163,8 @@ type TicketDetail struct {
 	Epic      string `json:"epic"`
 	// MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
 	MapEpic bool `json:"map_epic"`
+	// HasWorktree is set when a claimed or paused ticket's iteration worktree is on disk.
+	HasWorktree bool `json:"has_worktree,omitempty"`
 	// ViewDiff is set for a done, non-commitless ticket whose epic shows View diff.
 	ViewDiff `tstype:",extends"`
 	// Body is the whole body markdown, comments included.

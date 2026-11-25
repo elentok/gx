@@ -75,6 +75,10 @@ type SessionInfo struct {
 	// live panel from.
 	Queue  bool   `json:"queue,omitempty"`
 	Holder string `json:"holder,omitempty"`
+	// ShowDiffDir is set when Dir shares the project repo's git common dir (the
+	// repo or a linked worktree of it), so a diff of its snapshot can be read. A
+	// session with a Flow is never marked.
+	ShowDiffDir bool `json:"show_diff_dir,omitempty"`
 	// WaitingLabel is the Queue row's check-lock label (see checkWaitingLabel).
 	WaitingLabel    string        `json:"waiting_label,omitempty"`
 	Status          SessionStatus `json:"status"`

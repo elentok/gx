@@ -424,6 +424,10 @@ export interface TicketDetail extends ViewDiff {
    */
   map_epic: boolean;
   /**
+   * HasWorktree is set when a claimed or paused ticket's iteration worktree is on disk.
+   */
+  has_worktree?: boolean;
+  /**
    * Body is the whole body markdown, comments included.
    */
   body?: string;
@@ -3349,6 +3353,12 @@ export interface SessionInfo {
    */
   queue?: boolean;
   holder?: string;
+  /**
+   * ShowDiffDir is set when Dir shares the project repo's git common dir (the
+   * repo or a linked worktree of it), so a diff of its snapshot can be read. A
+   * session with a Flow is never marked.
+   */
+  show_diff_dir?: boolean;
   /**
    * WaitingLabel is the Queue row's check-lock label (see checkWaitingLabel).
    */

@@ -2,16 +2,31 @@ package epics
 
 import (
 	"net/http"
+	"os"
 	"slices"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
+
+// hasIterationWorktree reports whether ref's iteration worktree is on disk.
+func hasIterationWorktree(worktreeDir func(project string) string, ref queue.TicketRef) bool {
+	if worktreeDir == nil {
+		return false
+	}
+	wtDir := worktreeDir(ref.Addr.Project)
+	if wtDir == "" {
+		return false
+	}
+	_, err := os.Stat(worktree.IterationWorktreePath(wtDir, ref.Addr.Epic, ref.Ticket.Identifier))
+	return err == nil
+}
 
 // resumeBesideAnswerLabel names Resume when the person could answer instead.
 const resumeBesideAnswerLabel = "Resume without answering"
@@ -92,6 +107,9 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 		return wire.TicketDetail{}, err
 	}
 	d.Related = relatedTickets(ref, epics)
+	if t.Status == schema.StatusClaimed || t.Status == schema.StatusPaused {
+		d.HasWorktree = hasIterationWorktree(s.WorktreeDir, ref)
+	}
 	if t.Status == schema.StatusDone && !ref.Ticket.Commitless {
 		applyViewDiff(&d.ViewDiff, s.viewDiffOf(ref.Addr.Project, epics, ref.Epic))
 	}

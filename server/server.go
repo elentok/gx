@@ -18,6 +18,7 @@ import (
 
 	"github.com/elentok/gx/git/pr"
 	schedrec "github.com/elentok/gx/schedules"
+	"github.com/elentok/gx/server/diffdir"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -109,6 +110,9 @@ type Server struct {
 	schedules   *schedules.Schedules
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
+	// diffDirs caches which session directories can show a diff; the session
+	// Manager and the Queue's agent rows share it.
+	diffDirs *diffdir.Checker
 	// prompt holds the auto-advance countdowns and the turn settling.
 	prompt     *sessprompt.Prompt
 	webAttach  *webattach.Attaches
@@ -427,7 +431,8 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("load budget ledger: %w", err)
 	}
 	host := queueHost{sessionHost{s}, s.harness}
-	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
+	s.diffDirs = diffdir.New(cfg.TicketStore, cfg.DiffCommonDir)
+	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host, DiffDirs: s.diffDirs})
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
 	schedState, err := schedules.Open(cfg.StateDir)
 	if err != nil {
