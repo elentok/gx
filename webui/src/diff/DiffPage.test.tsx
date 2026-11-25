@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { DiffRange } from "../generated/server"
 import type { Device } from "../useWide"
@@ -545,4 +545,93 @@ test("a ticket key narrows to that ticket's commits and highlights its row", asy
   expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c2", "c4"])
   fireEvent.click(screen.getByRole("button", { expanded: false, name: /commits$/ }))
   expect(screen.getByRole("button", { current: true }).textContent).toContain("Ticket 03")
+})
+
+const focus = () => act(() => void window.dispatchEvent(new Event("focus")))
+const treePaths = () => screen.getAllByTestId("tree-file").map((n) => n.textContent)
+
+test("focus asks again with the same refs; nothing is fetched without it or while a ref is empty", async () => {
+  const fetchFiles = vi.fn(async () => files(1))
+  const fetchCommits = vi.fn(async () => ({ commits: [], truncated: false }))
+  render(OPEN, fetchFiles, undefined, undefined, { diffCommits: fetchCommits })
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(1))
+  await new Promise((r) => setTimeout(r, 30))
+  expect(fetchFiles).toHaveBeenCalledTimes(1)
+  focus()
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(2))
+  expect(fetchFiles).toHaveBeenLastCalledWith("gx", "main", "dev")
+  expect(fetchCommits).toHaveBeenCalledTimes(2)
+  cleanup()
+  const none = vi.fn(async () => files(1))
+  render("/diff?project=gx&base=main", none)
+  focus()
+  await new Promise((r) => setTimeout(r, 30))
+  expect(none).not.toHaveBeenCalled()
+})
+
+test("a focus refetch keeps the tree node and the open commit list, with no loader", async () => {
+  let paths = ["a.go", "b.go"]
+  const fetchFiles = vi.fn(async () => named(...paths))
+  render(OPEN, fetchFiles, undefined, undefined, { diffCommits: commitsOf })
+  await screen.findByTestId("diff-area")
+  fireEvent.click(screen.getByRole("button", { expanded: false, name: /commits$/ }))
+  const tree = screen.getByTestId("file-tree")
+  paths = ["a.go", "b.go", "c.go"]
+  focus()
+  expect(screen.queryByText("Loading diff")).toBeNull()
+  await waitFor(() => expect(treePaths()).toHaveLength(3))
+  expect(screen.getByTestId("file-tree")).toBe(tree)
+  expect(screen.queryByText("Loading diff")).toBeNull()
+  expect(screen.getByRole("button", { expanded: true, name: /commits$/ })).toBeTruthy()
+})
+
+test("a refetch keeps the selected file when listed and falls back to the first when gone", async () => {
+  let paths = ["a.go", "b.go"]
+  render(`${OPEN}&file=b.go`, async () => named(...paths))
+  await screen.findByTestId("diff-area")
+  expect(selectedPath()).toBe("b.go")
+  focus()
+  await waitFor(() => expect(selectedPath()).toBe("b.go"))
+  paths = ["c.go", "d.go"]
+  focus()
+  await waitFor(() => expect(selectedPath()).toBe("c.go"))
+})
+
+test("a refetch sends the commits= narrowing again and keeps its row highlighted", async () => {
+  const fetchFiles = vi.fn(filesForCommits)
+  render(`${NARROW}&commits=c3`, fetchFiles, undefined, undefined, { diffCommits: commitsOf })
+  await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
+  fireEvent.click(screen.getByRole("button", { expanded: false, name: /commits$/ }))
+  const narrowedCalls = () => fetchFiles.mock.calls.filter((c) => c[3]?.join() === "c3").length
+  expect(narrowedCalls()).toBe(1)
+  focus()
+  await waitFor(() => expect(narrowedCalls()).toBe(2))
+  expect(screen.getByRole("button", { current: true }).textContent).toContain("Ticket 07")
+})
+
+test("a failed refetch keeps the old tree", async () => {
+  const fetchFiles = vi.fn<FetchDiffFiles>().mockResolvedValueOnce(named("a.go", "b.go"))
+  render(OPEN, fetchFiles)
+  await screen.findByTestId("diff-area")
+  fetchFiles.mockRejectedValueOnce(new Error("boom"))
+  focus()
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(2))
+  await new Promise((r) => setTimeout(r, 30))
+  expect(treePaths()).toHaveLength(2)
+  expect(screen.queryByTestId("notice")).toBeNull()
+})
+
+test("an older refetch that answers last does not replace the newer list", async () => {
+  const answers: Array<(r: DiffFilesResult) => void> = []
+  const fetchFiles = vi.fn<FetchDiffFiles>().mockResolvedValueOnce(named("a.go"))
+  render(OPEN, fetchFiles)
+  await screen.findByTestId("diff-area")
+  fetchFiles.mockImplementation(() => new Promise((r) => answers.push(r)))
+  focus()
+  focus()
+  await waitFor(() => expect(answers).toHaveLength(2))
+  await act(async () => answers[1](named("new.go")))
+  await waitFor(() => expect(treePaths()).toEqual(["new.go+1"]))
+  await act(async () => answers[0](named("old.go", "older.go")))
+  expect(treePaths()).toEqual(["new.go+1"])
 })

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { FetchEpicDetail } from "../epic/detail"
+import { useLatest } from "../hooks"
 import { useKeyedFetch } from "../useKeyedFetch"
 import type { FetchDiffCommits, FetchDiffFiles } from "./api"
 import { groupCommits } from "./commitGroups"
@@ -32,7 +33,6 @@ function useTicketTitles(
 /** The data side of the Diff page: the range's files and commits, and the files narrowed to chosen commits. */
 export function useDiffData(
   url: DiffUrl,
-  nonce: number,
   fetchers: {
     fetchFiles: FetchDiffFiles
     fetchCommits: FetchDiffCommits
@@ -43,11 +43,24 @@ export function useDiffData(
   const { fetchFiles, fetchCommits, fetchEpic, fetchArchivedEpic } = fetchers
   const { project, first, second } = url
   const canFetch = !!project && !!first && !!second
-  const key = `${project}\n${first}\n${second}\n${nonce}`
+  const key = `${project}\n${first}\n${second}`
   const titles = useTicketTitles(url.epic, fetchEpic, fetchArchivedEpic)
 
-  const commitsFetch = useKeyedFetch(canFetch ? key : null, () =>
-    fetchCommits(project, first, second),
+  // Only the focus event and an explicit refetch ask again; the old answer stays on screen meanwhile.
+  const [tick, setTick] = useState(0)
+  const refetch = useCallback(() => setTick((n) => n + 1), [])
+  const refetchRef = useLatest(refetch)
+  useEffect(() => {
+    if (!canFetch) return
+    const onFocus = () => refetchRef.current()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [canFetch])
+
+  const commitsFetch = useKeyedFetch(
+    canFetch ? key : null,
+    () => fetchCommits(project, first, second),
+    tick,
   )
   // Only commits the commit call returned can be narrowed to. Until it answers, the URL's SHAs
   // are held back so the file call is not made with a set that may be dropped.
@@ -80,15 +93,27 @@ export function useDiffData(
 
   const narrowedKey =
     canFetch && narrowing?.length && !commitsPending ? `${key}\n${narrowing.join(",")}` : null
-  const narrowedFetch = useKeyedFetch(narrowedKey, () =>
-    fetchFiles(project, first, second, narrowing),
+  const narrowedFetch = useKeyedFetch(
+    narrowedKey,
+    () => fetchFiles(project, first, second, narrowing),
+    tick,
   )
   const narrowedFiles =
     narrowedFetch && "value" in narrowedFetch && narrowedFetch.value.kind === "files"
       ? narrowedFetch.value.files.files
       : []
 
-  const files = useKeyedFetch(canFetch ? key : null, () => fetchFiles(project, first, second))
+  const files = useKeyedFetch(canFetch ? key : null, () => fetchFiles(project, first, second), tick)
 
-  return { canFetch, files, returned, wanted, narrowing, emptyNarrowing, groups, narrowedFiles }
+  return {
+    canFetch,
+    refetch,
+    files,
+    returned,
+    wanted,
+    narrowing,
+    emptyNarrowing,
+    groups,
+    narrowedFiles,
+  }
 }

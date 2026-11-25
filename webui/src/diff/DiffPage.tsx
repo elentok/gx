@@ -483,12 +483,12 @@ export function DiffPage({
     writeView(v)
   }
   const [draft, setDraft] = useState({ first: url.first, second: url.second })
-  const [nonce, setNonce] = useState(0)
   const [editing, setEditing] = useState(false)
 
   const { project, first, second } = url
   const {
     canFetch,
+    refetch,
     files: loaded,
     returned,
     wanted,
@@ -496,7 +496,7 @@ export function DiffPage({
     emptyNarrowing,
     groups,
     narrowedFiles,
-  } = useDiffData(url, nonce, { fetchFiles, fetchCommits, fetchEpic, fetchArchivedEpic })
+  } = useDiffData(url, { fetchFiles, fetchCommits, fetchEpic, fetchArchivedEpic })
 
   useEffect(() => {
     setDraft({ first, second })
@@ -504,8 +504,7 @@ export function DiffPage({
 
   const noRange = !!url.epic && !first && !second
   const fresh = canFetch ? loaded : undefined
-  const retry = () => setNonce((n) => n + 1)
-  const { notice, files, invalid } = noticeOf(fresh, noRange, first, second, retry)
+  const { notice, files, invalid } = noticeOf(fresh, noRange, first, second, refetch)
   const settled = noRange || !canFetch || !!fresh
   useReadyWhen(settled, "ready", "network")
 
@@ -517,7 +516,7 @@ export function DiffPage({
   const apply = () => {
     const next = { ...url, first: draft.first.trim(), second: draft.second.trim() }
     setEditing(false)
-    if (next.first === first && next.second === second) retry()
+    if (next.first === first && next.second === second) refetch()
     else setParams(diffQuery(next))
   }
   const onKeyDown = (e: KeyboardEvent) => {
