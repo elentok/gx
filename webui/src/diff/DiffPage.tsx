@@ -27,7 +27,7 @@ import {
   type FetchDiffFiles,
   type FetchDiffPatch,
 } from "./api"
-import { CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
+import { CommitList, TRUNCATED_TEXT } from "./CommitList"
 import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
@@ -510,7 +510,6 @@ export function DiffPage({
 
   const setNarrowing = (commits: string[] | undefined) =>
     setParams(diffQuery({ ...url, ticket: undefined, commits }))
-  const chipLabel = narrowingLabel(groups, wanted)
   const emptyNotice = emptyNarrowing
     ? returned?.truncated
       ? TRUNCATED_TEXT
@@ -569,7 +568,6 @@ export function DiffPage({
           actions={<ViewToggle view={view} onChange={changeView} />}
         />
       </Box>
-      {chipLabel && <NarrowChip label={chipLabel} onClear={() => setNarrowing(undefined)} />}
       {notice}
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
       {loadedFiles && shown ? (

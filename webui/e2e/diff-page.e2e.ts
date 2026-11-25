@@ -56,22 +56,24 @@ test("Diff page", async ({ page, start }) => {
   await baseRef(page).press("Enter")
   await expect(treeFiles(page)).toHaveCount(allFiles)
 
-  // Entry 12: the commit list is collapsed at load; a ticket narrows the tree and the chip clears it.
+  // Entry 12: the commit list is collapsed at load; a ticket narrows the tree and the highlighted row is the only sign, and All commits clears it.
   const disclosure = page.getByTestId("commits-disclosure")
-  const toggle = disclosure.getByRole("button", { name: /^COMMITS BY TICKET/ })
+  const toggle = disclosure.getByRole("button", { name: /^\d+ commits?$/ })
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await toggle.click()
   await expect(disclosure.getByRole("button", { name: /^All commits/ })).toBeVisible()
   await expect(disclosure.getByRole("button", { name: /^Design/ })).toBeVisible()
   await disclosure.getByRole("button", { name: /^every-commit-stamped/ }).click()
-  const chip = page.getByTestId("narrow-chip")
-  await expect(chip).toContainText("Showing: ")
+  await expect(disclosure.getByRole("button", { name: /^every-commit-stamped/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  )
   // Ticket 01's commits touch the logo, the big file, the list, app.tsx and state.ts.
   const narrowed = 5
   await expect(treeFiles(page)).toHaveCount(narrowed)
-  await chip.getByRole("button", { name: "Clear narrowing" }).click()
-  await expect(chip).toHaveCount(0)
+  await disclosure.getByRole("button", { name: /^All commits/ }).click()
   await expect(treeFiles(page)).toHaveCount(allFiles)
+  await expect(page).not.toHaveURL(/commits=/)
   await disclosure.getByRole("button", { name: /^every-commit-stamped/ }).click()
   await expect(treeFiles(page)).toHaveCount(narrowed)
 
@@ -121,8 +123,13 @@ test("Diff page", async ({ page, start }) => {
   await page.reload()
   await expect(area).toHaveAttribute("data-file", file!)
   await expect(area).toHaveAttribute("data-view", "split")
-  await expect(chip).toContainText("Showing: ")
-  await chip.getByRole("button", { name: "Clear narrowing" }).click()
+  await expect(treeFiles(page)).toHaveCount(narrowed)
+  await toggle.click()
+  await expect(disclosure.getByRole("button", { name: /^every-commit-stamped/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  )
+  await disclosure.getByRole("button", { name: /^All commits/ }).click()
   await expect(treeFiles(page)).toHaveCount(allFiles)
 
   // Entry 18: unified by default at 1200px and a picked Split survives the reload (checked above), the switch changes it, the diff matches the app surface, 12.5px/19px code in the mono font, accents in the done and deadlocked tones.
@@ -213,7 +220,13 @@ test("Diff page", async ({ page, start }) => {
   // Entry 5: a done ticket's page opens the epic's Diff page narrowed to it; the commitless one has no link.
   await go(page, `#/t/${EPIC}/01`)
   await page.getByRole("link", { name: "View diff" }).click()
-  await expect(page.getByTestId("narrow-chip")).toContainText("every-commit-stamped")
+  await page
+    .getByTestId("commits-disclosure")
+    .getByRole("button", { name: /^\d+ commits?$/ })
+    .click()
+  await expect(
+    page.getByTestId("commits-disclosure").getByRole("button", { name: /^every-commit-stamped/ }),
+  ).toHaveAttribute("aria-current", "true")
   await expect(treeFiles(page)).toHaveCount(narrowed)
   await go(page, `#/t/${EPIC}/04`)
   await expect(page.getByRole("link", { name: /^Epic: / })).toBeVisible()

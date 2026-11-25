@@ -519,16 +519,19 @@ test("the narrowing survives a render from the URL and the header counts commits
   render(`${NARROW}&commits=c3`, fetchFiles, undefined, undefined, { diffCommits: commitsOf })
   await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
   expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c3"])
-  expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 07")
+  expect(screen.queryByTestId("narrow-chip")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { expanded: false, name: /commits$/ }))
+  expect(screen.getByRole("button", { current: true }).textContent).toContain("Ticket 07")
   expect(screen.getByTestId("diff-counts").textContent).toMatch(/^1 files /)
 })
 
-test("a ticket key narrows to that ticket's commits and the chip names the ticket", async () => {
+test("a ticket key narrows to that ticket's commits and highlights its row", async () => {
   const fetchFiles = vi.fn(filesForCommits)
   render(`${NARROW}&ticket=gx:e-impl/03`, fetchFiles, undefined, undefined, {
     diffCommits: commitsOf,
   })
   await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
   expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c2", "c4"])
-  expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 03")
+  fireEvent.click(screen.getByRole("button", { expanded: false, name: /commits$/ }))
+  expect(screen.getByRole("button", { current: true }).textContent).toContain("Ticket 03")
 })

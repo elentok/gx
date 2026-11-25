@@ -9,26 +9,6 @@ export const ALL_COMMITS = "All commits"
 const sameShas = (a: string[], b: string[]) =>
   a.length === b.length && a.every((s) => b.includes(s))
 
-/** What the narrowing reads as: its group's label, a single commit's subject, or a count. */
-export function narrowingLabel(
-  groups: CommitGroup[],
-  narrowing: string[] | undefined,
-): string | null {
-  if (!narrowing?.length) return null
-  const group = groups.find((g) =>
-    sameShas(
-      g.commits.map((c) => c.sha),
-      narrowing,
-    ),
-  )
-  if (group) return group.label
-  if (narrowing.length === 1) {
-    const commit = groups.flatMap((g) => g.commits).find((c) => c.sha === narrowing[0])
-    if (commit) return commit.subject
-  }
-  return `${narrowing.length} ${narrowing.length === 1 ? "commit" : "commits"}`
-}
-
 const rowProps = {
   display: "flex",
   alignItems: "center",
@@ -126,7 +106,6 @@ export function CommitList({
   onNarrow: (shas: string[] | undefined) => void
 }) {
   const [open, setOpen] = useState(false)
-  const label = narrowingLabel(groups, narrowing)
   const isNarrowed = (shas: string[]) => !!narrowing && sameShas(shas, narrowing)
   return (
     <Box data-testid="commits-disclosure" mb="3">
@@ -138,24 +117,18 @@ export function CommitList({
         alignItems="center"
         gap="2"
         w="100%"
-        minH="36px"
+        h="34px"
         px="2"
-        fontSize="xs"
-        letterSpacing="0.04em"
+        borderRadius="6px"
+        bg="surface.raised"
+        fontSize="sm"
         color="text.muted"
       >
+        <Box as="span" flex="1" textAlign="left">
+          {`${count} ${count === 1 ? "commit" : "commits"}`}
+        </Box>
         <Box as="span" aria-hidden="true">
           {open ? "▾" : "▸"}
-        </Box>
-        <Box as="span">{`COMMITS BY TICKET (${count})`}</Box>
-        <Box
-          as="span"
-          data-testid="commits-narrowing"
-          flex="1"
-          textAlign="right"
-          color={label ? "tone.running.fg" : "text.faint"}
-        >
-          {label ?? ALL_COMMITS}
         </Box>
       </chakra.button>
       {open && (
@@ -211,42 +184,6 @@ export function CommitList({
           })}
         </Box>
       )}
-    </Box>
-  )
-}
-
-/** The chip row under the ref fields. */
-export function NarrowChip({ label, onClear }: { label: string; onClear: () => void }) {
-  return (
-    <Box data-testid="narrow-chip" mt="3" display="flex" alignItems="center" gap="2" fontSize="sm">
-      <Box
-        as="span"
-        display="inline-flex"
-        alignItems="center"
-        gap="2"
-        pl="3"
-        pr="1"
-        h="28px"
-        border="1px solid"
-        borderColor="tone.running.fg"
-        borderRadius="full"
-        color="tone.running.fg"
-      >
-        {`Showing: ${label}`}
-        <chakra.button
-          type="button"
-          aria-label="Clear narrowing"
-          onClick={onClear}
-          w="22px"
-          h="22px"
-          fontSize="lg"
-          lineHeight="1"
-          borderRadius="full"
-          color="tone.running.fg"
-        >
-          ×
-        </chakra.button>
-      </Box>
     </Box>
   )
 }
