@@ -166,8 +166,8 @@ carries a **Pause reason** that says why. Three levels:
 - An **epic** is Paused when it has no runnable work left but at least one Paused ticket. It keeps
   scheduling everything else, then waits and notifies, releasing its slot in the epic-level
   concurrency cap, rather than exiting. It shows the reason of its first Paused ticket (by ID) and
-  "+N more". A merge-blocked epic shows "Paused: merge blocked" and a **Deadlocked** epic shows
-  "Paused: dependency deadlock". A person resumes the ticket, never the epic, and there is no manual
+  "+N more". A merge-blocked epic shows "Paused: merge blocked". A **Deadlocked** epic shows
+  "Deadlocked" and means a dependency cycle only. A **Waiting** epic is never Paused. A person resumes the ticket, never the epic, and there is no manual
   epic pause.
 - The **queue** is Paused when no new ticket starts. See **Finish and pause**.
 
@@ -225,10 +225,19 @@ merge` does what `land` did, and the UI shows the target ("Merge into the featur
 **Merge ticket** is a ticket whose job is to merge. Epic-level merge states keep their names.
 _Avoid_: land, landing.
 
-**Deadlocked** — an epic state (the server reports it per epic), shown as "Paused: dependency
-deadlock": an epic with no runnable work and no Paused ticket either (an `error` ticket counts as
-Paused here; map epics are never Deadlocked). It is a genuine dependency error, reported as a
-failure and not waited on. Its record names the blocked tickets and what they wait on.
+**Deadlocked** — an epic state (the server reports it per epic), shown as "Deadlocked": an epic
+with no runnable work and no Paused ticket, where a dependency cycle among its own tickets keeps
+the rest blocked. An `error` ticket counts as Paused here, but a ticket whose only fault is a
+`blocked_by` cycle does not. Map epics are never Deadlocked. It is a genuine dependency error,
+reported as a failure and not waited on. Its record names the blocked tickets and what they wait
+on. An epic that waits on an unmerged blocker epic is **Waiting**, not Deadlocked. _Avoid_: Deadlocked
+for a wait on another epic.
+
+**Waiting** — an epic state: the epic's own `blocked_by` names a blocker epic that is not yet
+merged, and nothing runs, no ticket is Paused and no cycle exists among its tickets. The epic
+starts by itself when the blocker is released. Not **Waiting for a slot**, the queue word for an
+epic that has a place in the queue and no free agent slot (web label `STATE_LABELS["waiting"]`,
+wire value `waiting`). _Avoid_: Blocked epic, Deadlocked (for this case).
 
 **Retired terms** — old words and their replacements, for reading old specs, ADRs, logs and retros.
 They survive only in one read shim and a few hidden aliases, until `gx:follow-ups/70` removes them.
@@ -754,9 +763,8 @@ into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
 
 ## Ticket Dependencies
 
-**Blocker** — a ticket, or a whole epic, named in another ticket's `blocked_by` list. A ticket in
-another epic that needs commits is *widened*: it blocks as its whole epic, because its code can't be
-used before that epic merges. Only a commitless ticket in another epic blocks on its own.
+**Blocker** — a ticket named in another ticket's `blocked_by` list, or a whole epic named in an
+epic's own `blocked_by`. A ticket's `blocked_by` names tickets of its own epic only.
 
 **Blocking** — a ticket blocker is *blocking* until its own work is `done` **and** every ticket in
 its fork subtree is likewise no longer blocking. This is the only question `blocked_by` resolution

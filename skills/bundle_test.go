@@ -786,22 +786,18 @@ func TestFollowUpFilesRegressionAfterArchiveDate(t *testing.T) {
 }
 
 // TestCodeReviewDefinesDeferred pins the verdict that routes a finding to
-// gx-follow-up instead of a fix ticket in the epic.
+// gx-follow-up instead of a fix ticket in the epic, and that a finding
+// resolved by amending the spec or docs is deferred, not rejected: a
+// rejection files nothing, so the spec stayed wrong.
 func TestCodeReviewDefinesDeferred(t *testing.T) {
-	raw := readFile(t, "gx-code-review/SKILL.md")
-	if !strings.Contains(raw, "**deferred** — real, but not worth fixing in this epic") {
-		t.Error("gx-code-review must define the deferred verdict")
-	}
-}
-
-// TestCodeReviewFilesSpecEditsAsDeferred pins that a finding resolved by
-// amending the spec or docs is deferred, not rejected: a rejection files
-// nothing, so the spec stayed wrong.
-func TestCodeReviewFilesSpecEditsAsDeferred(t *testing.T) {
 	raw := normalizeSpace(readFile(t, "gx-code-review/SKILL.md"))
-	want := normalizeSpace("Never reject a finding whose reason is to amend the spec or docs")
-	if !strings.Contains(raw, want) {
-		t.Errorf("gx-code-review must route spec/docs-edit findings to deferred: %q", want)
+	for _, want := range []string{
+		"**deferred** — real, but not worth fixing in this epic",
+		"Never reject a finding whose reason is to amend the spec or docs",
+	} {
+		if !strings.Contains(raw, normalizeSpace(want)) {
+			t.Errorf("gx-code-review must contain %q", want)
+		}
 	}
 }
 

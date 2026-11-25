@@ -79,7 +79,7 @@ Fields:
   recursively) is done too. A token naming no ticket in the epic never resolves, since nothing can
   verify it. A ticket names only tickets of its own epic: a ref to another epic fails `gx tickets
   validate` and every write. To wait on another epic, block the whole epic with
-  `gx tickets epic set <epic> --blocked-by <other>`. Cycles fail `validate`, which reports every
+  `gx tickets epic set <epic> --blocked-by <other>` (see "Epic-level blocked_by"). Cycles fail `validate`, which reports every
   edge of the chain. A `type: code-review`
   ticket carries no `blocked_by` at all; see its own frontier rule below.
 - **`parent`** (ticket ID) — the ticket this one was produced from: a mid-flight fork names the
@@ -127,6 +127,23 @@ becomes eligible once the epic's `code-review` ticket is `done` and every same-e
 `blocked_by` is done. Verify tickets without `blocked_by` never wait on other `verify` tickets, and no
 verify ticket waits on children it opened (those name it as their `parent`). It is commitless by design. `gx tickets ensure-verify <epic>` stamps out the epic's verify ticket, and is a
 no-op when one exists.
+
+### Epic-level blocked_by
+
+- An epic's `ticket.md` frontmatter may carry `blocked_by`: a list of whole epics of the same project
+  (a bare `other` or `project:other`). A ticket address (`other/06`) and an epic of another project
+  are refused, with a message that points to this field. A ticket's own `blocked_by` names only
+  tickets of its own epic.
+- Set it with `gx tickets epic set <project:epic> --blocked-by <project:other>`. Use commas for
+  several epics and `--blocked-by ""` to clear it. `RunEpicSet` in `cmd/tickets/tickets_set.go` first
+  runs `tickets.CheckEpicBlockedByWrite`, so a cycle or a bad token writes nothing. The Epic page's
+  "Blocked by" row writes the same field with the same checks.
+- The epic starts only after the blocker is released: the blocker merged to trunk, or it is done
+  under the project's on-done policy. Until then the epic shows as Waiting on the blocker's name. It
+  is Implementing when it is queued and Ready to queue when it is not. It uses no agent slot and is
+  never reported as Deadlocked, Paused or Needs you.
+- A Paused ticket in the waiting epic wins over Waiting. A real cycle among the epic's own tickets
+  reads Deadlocked, even while a blocker is unreleased.
 
 The body of the file (everything after the closing `---`) is free-form markdown: title, "What to
 build", acceptance criteria, test seams, and (appended over time) a `## Comments` section for
@@ -196,7 +213,8 @@ conversation history.
   block at the top of the body may carry the settable epic fields (e.g.
   `destination_unconfirmed: true`); any other field refuses the add. `gx tickets section` and
   `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the
-  epic schema: `set` writes `kind`, `status` and `destination_unconfirmed`, and on a map epic
+  epic schema: `set` writes `kind`, `status`, `destination_unconfirmed` and `blocked_by` (see
+  "Epic-level blocked_by"), and on a map epic
   `design_step` (`--design-step <step>`: chart, resolve-tickets, spec, review, grill-findings,
   create-tickets, branch, done; `branch` means the map's design branch was merged into a new
   `<epic>-impl` branch, step 8 of gx-design; a move to an earlier step needs `--allow-backward`); `completed_at`,
