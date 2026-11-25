@@ -27,7 +27,7 @@ import {
   type FetchDiffFiles,
   type FetchDiffPatch,
 } from "./api"
-import { ALL_COMMITS, CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
+import { CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
 import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
@@ -87,22 +87,22 @@ function ViewToggle({ view, onChange }: { view: DiffView; onChange: (v: DiffView
       role="group"
       aria-label="Diff layout"
       display="flex"
-      border="1px solid"
-      borderColor="border"
-      borderRadius="8px"
-      overflow="hidden"
+      p="2px"
+      bg="surface.raised"
+      borderRadius="6px"
     >
-      {(["split", "unified"] as const).map((v) => (
+      {(["unified", "split"] as const).map((v) => (
         <chakra.button
           key={v}
           type="button"
           aria-pressed={v === view}
           onClick={() => onChange(v)}
-          h="38px"
+          h="28px"
           px="3"
-          fontSize="sm"
-          bg={v === view ? "tone.running.bg" : "transparent"}
-          color={v === view ? "text" : "text.muted"}
+          fontSize="xs"
+          borderRadius="4px"
+          bg={v === view ? "sidebar.current" : "transparent"}
+          color={v === view ? "text" : "text.dim"}
         >
           {v === "split" ? "Split" : "Unified"}
         </chakra.button>
@@ -145,56 +145,43 @@ function Notice({
   )
 }
 
-function FileNav({
-  scope,
-  index,
-  visible,
-  onStep,
-  phone,
-}: {
-  scope: string
-  index: number
-  visible: DiffFile[]
-  onStep: (d: 1 | -1) => void
-  phone: boolean
-}) {
-  const added = visible.reduce((n, f) => n + f.added, 0)
-  const deleted = visible.reduce((n, f) => n + f.deleted, 0)
-  const hint = (k: string) => (
-    <Box as="span" aria-hidden="true" fontFamily="mono" color="text.muted" mr="2">
-      {k}
-    </Box>
-  )
+function RangeChip({ base, tip }: { base: string; tip: string }) {
   return (
     <Box
-      data-testid="file-nav"
-      display="flex"
+      data-testid="range-chip"
+      display="inline-flex"
       alignItems="center"
-      gap="2"
-      flexWrap={phone ? "wrap" : "nowrap"}
+      gap="1.5"
+      h="28px"
+      px="3"
+      borderRadius="full"
+      bg="surface.raised"
+      color="text.muted"
+      fontSize="sm"
+      minW="0"
+      maxW="100%"
     >
-      <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(-1)}>
-        {hint("p")}
-        Prev
-      </Button>
-      <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(1)}>
-        {hint("n")}
-        Next
-      </Button>
-      <Box
-        as="span"
-        fontSize="sm"
-        color="text.muted"
-        minW="0"
-        flexBasis={phone ? "100%" : "auto"}
-        overflow="hidden"
-        textOverflow="ellipsis"
-        whiteSpace={phone ? "normal" : "nowrap"}
-      >
-        {`${scope} · ${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
-        <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
-        <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
+      <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
+        {base}
       </Box>
+      <Box as="span" aria-hidden="true" color="text.faint">
+        →
+      </Box>
+      <Box as="span" fontFamily="mono" fontSize="xs" color="text" truncate minW="0">
+        {tip}
+      </Box>
+    </Box>
+  )
+}
+
+function Counts({ files }: { files: DiffFile[] }) {
+  const added = files.reduce((n, f) => n + f.added, 0)
+  const deleted = files.reduce((n, f) => n + f.deleted, 0)
+  return (
+    <Box data-testid="diff-counts" as="span" fontSize="sm" color="text.dim">
+      {`${files.length} files `}
+      <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
+      <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
     </Box>
   )
 }
@@ -240,15 +227,12 @@ function FilesBrowser({
   fetchCommitPatches,
   commits,
   commitList,
-  scope,
   emptyNotice,
   view,
   selectedPath,
   onSelect,
   phone,
 }: {
-  /** What the view is narrowed to, as the commit disclosure names it. */
-  scope: string
   files: DiffFile[]
   range: PatchRange
   fetchPatch: FetchDiffPatch
@@ -314,8 +298,7 @@ function FilesBrowser({
   )
   const right = (
     <Box minW="0">
-      <FileNav scope={scope} index={index} visible={order} onStep={step} phone={phone} />
-      <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4">
+      <Box data-testid="diff-area" data-view={view} data-file={selected}>
         {!selectedFile && order.length === 0 && (
           <Box data-testid="no-files" fontSize="sm" color="text.muted">
             No files in this selection.
@@ -496,18 +479,25 @@ export function DiffPage({
       : "No commits of this ticket in this range"
     : undefined
 
-  const subtitle = [
-    url.epic,
-    returned
-      ? `${returned.commits.length} ${returned.commits.length === 1 ? "commit" : "commits"}`
-      : null,
-    files === null ? null : `${files} files`,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  const loadedFiles =
+    !notice && files && fresh && "value" in fresh && fresh.value.kind === "files"
+      ? fresh.value.files
+      : undefined
+  const shown = loadedFiles ? (wanted ? narrowedFiles : loadedFiles.files) : undefined
   return (
     <DetailPage title={{ kind: "Diff", name: url.epic }}>
-      <PageHeader title="Diff" subtitle={subtitle} />
+      <Box data-testid="diff-header">
+        <PageHeader
+          title="Diff"
+          inline={
+            <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" minW="0" flex="1 1 0">
+              <RangeChip base={first} tip={second} />
+              {shown && <Counts files={shown} />}
+            </Box>
+          }
+          actions={<ViewToggle view={view} onChange={setView} />}
+        />
+      </Box>
       <Box
         data-testid="ref-bar"
         mt="4"
@@ -538,15 +528,13 @@ export function DiffPage({
         <Button emphasis="secondary" onClick={reload}>
           Reload
         </Button>
-        <ViewToggle view={view} onChange={setView} />
       </Box>
       {chipLabel && <NarrowChip label={chipLabel} onClear={() => setNarrowing(undefined)} />}
       {notice}
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
-      {!notice && fresh && "value" in fresh && fresh.value.kind === "files" && files ? (
+      {loadedFiles && shown ? (
         <FilesBrowser
-          files={wanted ? narrowedFiles : fresh.value.files.files}
-          scope={chipLabel ?? ALL_COMMITS}
+          files={shown}
           commits={wanted ? narrowing : undefined}
           commitList={
             returned && (
@@ -563,8 +551,8 @@ export function DiffPage({
           fetchCommitPatches={fetchCommitPatches}
           range={{
             project,
-            firstSha: fresh.value.files.first_sha,
-            secondSha: fresh.value.files.second_sha,
+            firstSha: loadedFiles.first_sha,
+            secondSha: loadedFiles.second_sha,
           }}
           fetchPatch={fetchPatch}
           fetchBlob={fetchBlob}

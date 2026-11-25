@@ -62,7 +62,19 @@ test("the fields fill from the URL with ... between them", async () => {
   expect((await base()).value).toBe("main")
   expect(tip().value).toBe("dev")
   expect(screen.getByTestId("ref-bar").textContent).toContain("...")
-  expect(await screen.findByText("0 commits · 2 files")).toBeTruthy()
+  expect((await screen.findByTestId("diff-counts")).textContent).toBe("2 files +2 −0")
+})
+
+test("the header holds the range chip, the signed counts and the toggle; no Prev, Next or subtitle", async () => {
+  render(OPEN, async () => files(2))
+  const counts = await screen.findByTestId("diff-counts")
+  const header = screen.getByTestId("diff-header")
+  expect(screen.getByTestId("range-chip").textContent).toBe("main→dev")
+  expect(header.contains(screen.getByTestId("range-chip"))).toBe(true)
+  expect(header.contains(counts)).toBe(true)
+  expect(header.contains(screen.getByTestId("view-toggle"))).toBe(true)
+  expect(screen.queryByRole("button", { name: /Prev|Next/ })).toBeNull()
+  expect(screen.queryByTestId("page-header-subtitle")).toBeNull()
 })
 
 test("Reload writes the URL and asks again with the typed refs; no polling", async () => {
@@ -173,61 +185,56 @@ const named = (...paths: string[]): DiffFilesResult => ({
   files: { ...range(), files: paths.map((path) => ({ ...file, path })) },
 })
 const TREE = () => named("README.md", "src/a.go", "src/b.go") // tree order: a.go, b.go, README.md
-const counter = () => screen.getByTestId("file-nav").textContent
+const selectedPath = () => screen.getByTestId("diff-area").getAttribute("data-file")
 const press = (key: string, target: Element = document.body) => fireEvent.keyDown(target, { key })
 
-test("n and p walk the visible rows with wrap-around and the counter follows", async () => {
+test("n and p walk the visible rows with wrap-around and the file goes to the URL", async () => {
   const router = render(OPEN, async () => TREE())
-  await screen.findByTestId("file-nav")
-  expect(counter()).toContain("1 of 3")
+  await screen.findByTestId("diff-area")
+  expect(selectedPath()).toBe("src/a.go")
   press("n")
   await waitFor(() => {
-    expect(counter()).toContain("2 of 3")
+    expect(selectedPath()).toBe("src/b.go")
     expect(router.state.location.search).toContain("file=src%2Fb.go")
   })
   press("n")
-  await waitFor(() => expect(counter()).toContain("3 of 3"))
+  await waitFor(() => expect(selectedPath()).toBe("README.md"))
   press("n")
-  await waitFor(() => expect(counter()).toContain("1 of 3"))
+  await waitFor(() => expect(selectedPath()).toBe("src/a.go"))
   press("p")
-  await waitFor(() => expect(counter()).toContain("3 of 3"))
-  fireEvent.click(screen.getByRole("button", { name: "Next" }))
-  await waitFor(() => expect(counter()).toContain("1 of 3"))
+  await waitFor(() => expect(selectedPath()).toBe("README.md"))
 })
 
-test("a filter narrows the counter and p/n do nothing while it has focus", async () => {
+test("a filter narrows the walk and p/n do nothing while it has focus", async () => {
   render(OPEN, async () => TREE())
-  await screen.findByTestId("file-nav")
+  await screen.findByTestId("diff-area")
   const input = screen.getByTestId("file-filter")
   fireEvent.change(input, { target: { value: "src" } })
-  expect(counter()).toContain("1 of 2")
+  expect(screen.getAllByTestId("tree-file")).toHaveLength(2)
   press("n", input)
-  expect(counter()).toContain("1 of 2")
+  expect(selectedPath()).toBe("src/a.go")
   press("n")
-  await waitFor(() => expect(counter()).toContain("2 of 2"))
+  await waitFor(() => expect(selectedPath()).toBe("src/b.go"))
 })
 
 test("a filter that matches nothing selects no file and says so", async () => {
   render(OPEN, async () => TREE())
-  await screen.findByTestId("file-nav")
+  await screen.findByTestId("diff-area")
   fireEvent.change(screen.getByTestId("file-filter"), { target: { value: "zzzz" } })
-  expect(counter()).toContain("0 files")
-  expect(counter()).not.toContain("0 of")
+  expect(selectedPath()).toBeNull()
   expect(screen.getByTestId("no-files").textContent).toBe("No files in this selection.")
   expect(screen.getByTestId("file-tree").textContent).toBe('No files match "zzzz".')
   expect(screen.queryByTestId("file-card-header")).toBeNull()
-  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true)
-  expect((screen.getByRole("button", { name: "Prev" }) as HTMLButtonElement).disabled).toBe(true)
 })
 
 test("the selected file is in the URL and a fresh render from that URL picks it", async () => {
   render(`${OPEN}&file=src%2Fb.go`, async () => TREE())
-  await screen.findByTestId("file-nav")
-  expect(counter()).toContain("2 of 3")
+  await screen.findByTestId("diff-area")
+  expect(selectedPath()).toBe("src/b.go")
   cleanup()
   render(`${OPEN}&file=nope.go`, async () => TREE())
-  await screen.findByTestId("file-nav")
-  expect(counter()).toContain("1 of 3")
+  await screen.findByTestId("diff-area")
+  expect(selectedPath()).toBe("src/a.go")
 })
 
 test("on a phone the Files and Diff tabs show one pane each and picking a file opens Diff", async () => {
@@ -235,24 +242,24 @@ test("on a phone the Files and Diff tabs show one pane each and picking a file o
   const files = await screen.findByRole("tab", { name: "Files 3" })
   expect(screen.getByRole("tab", { name: "Diff" })).toBeTruthy()
   expect(screen.queryByTestId("dir-count")).toBeNull()
-  expect(screen.queryByTestId("file-nav")).toBeNull()
+  expect(screen.queryByTestId("diff-area")).toBeNull()
   fireEvent.click(files)
   fireEvent.click(screen.getAllByTestId("tree-file")[1])
-  expect(await screen.findByTestId("file-nav")).toBeTruthy()
+  expect(await screen.findByTestId("diff-area")).toBeTruthy()
   expect(screen.queryByTestId("file-tree")).toBeNull()
 })
 
 test("desktop has no tabs", async () => {
   render(OPEN, async () => TREE())
-  await screen.findByTestId("file-nav")
+  await screen.findByTestId("diff-area")
   expect(screen.queryByRole("tab")).toBeNull()
 })
 
-test("the Split/Unified switch is in the ref bar", async () => {
+test("the Split/Unified switch is in the header", async () => {
   render(OPEN, async () => files(1))
   await base()
   const toggle = screen.getByTestId("view-toggle")
-  expect(screen.getByTestId("ref-bar").contains(toggle)).toBe(true)
+  expect(screen.getByTestId("diff-header").contains(toggle)).toBe(true)
   expect(screen.getByRole("button", { name: "Split" }).getAttribute("aria-pressed")).toBe("true")
   fireEvent.click(screen.getByRole("button", { name: "Unified" }))
   expect(screen.getByRole("button", { name: "Unified" }).getAttribute("aria-pressed")).toBe("true")
@@ -380,7 +387,7 @@ test("the narrowing survives a render from the URL and the header counts commits
   await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
   expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c3"])
   expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 07")
-  expect(screen.getByText("gx:e-impl · 5 commits · 3 files")).toBeTruthy()
+  expect(screen.getByTestId("diff-counts").textContent).toMatch(/^1 files /)
 })
 
 test("a ticket key narrows to that ticket's commits and the chip names the ticket", async () => {

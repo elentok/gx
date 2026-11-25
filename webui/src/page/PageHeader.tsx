@@ -12,6 +12,7 @@ export function PageHeader({
   icon,
   subtitle,
   actions,
+  inline,
   meta,
   metaFlush,
   children,
@@ -23,6 +24,8 @@ export function PageHeader({
   subtitle?: ReactNode
   /** Page controls at the right edge: the progress ring or status icon first, then the "..." menu. */
   actions?: ReactNode
+  /** Content on the title's row, right after the title. The title stops growing so it sits next to it. */
+  inline?: ReactNode
   /** The meta bar under a hairline. Nothing renders when it is empty. */
   meta?: ReactNode
   /** Drops the room under the hairline, for a meta bar that has nothing to show. */
@@ -48,7 +51,7 @@ export function PageHeader({
       {title}
     </Heading>
   )
-  const rich = icon || subtitle || actions || shell
+  const rich = icon || subtitle || actions || inline || shell
   return (
     <Box mt="4">
       {rich ? (
@@ -71,7 +74,7 @@ export function PageHeader({
             </Box>
           ) : null}
           {/* A wide action (the Design session button) wraps below instead of squeezing the title. */}
-          <Box minW="0" flex="1 1 140px">
+          <Box minW="0" flex={inline ? "0 0 auto" : "1 1 140px"}>
             {h1}
             {subtitle ? (
               <Box
@@ -87,6 +90,7 @@ export function PageHeader({
               </Box>
             ) : null}
           </Box>
+          {inline}
           {actions ? (
             <Box
               data-testid="page-header-actions"

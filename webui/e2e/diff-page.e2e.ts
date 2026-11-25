@@ -11,7 +11,6 @@ const go = (page: Page, hash: string) => page.evaluate((h) => (location.hash = h
 const baseRef = (page: Page) => page.getByRole("textbox", { name: "Base ref" })
 const tipRef = (page: Page) => page.getByRole("textbox", { name: "Tip ref" })
 const treeFiles = (page: Page) => page.getByTestId("tree-file")
-const counter = (page: Page) => page.getByTestId("file-nav")
 
 /** Opens the epic page at `address` and follows its View diff link. */
 async function openDiff(page: Page, hash: string) {
@@ -71,7 +70,9 @@ test("Diff page", async ({ page, start }) => {
   await expect(treeFiles(page)).toHaveCount(narrowed)
 
   // Entry 16: p and n move and wrap, the counter follows, and a focused filter ignores the keys.
-  await expect(counter(page)).toContainText(`1 of ${narrowed}`)
+  const area = page.getByTestId("diff-area")
+  const first = (await area.getAttribute("data-file"))!
+  expect(first).toBeTruthy()
   await filter.focus()
   await page.keyboard.press("n")
   await expect(filter).toHaveValue("n")
@@ -81,24 +82,22 @@ test("Diff page", async ({ page, start }) => {
   await expect(treeFiles(page)).toHaveCount(narrowed)
   await filter.blur()
   await page.keyboard.press("n")
-  await expect(counter(page)).toContainText(`2 of ${narrowed}`)
+  await expect(area).not.toHaveAttribute("data-file", first)
   await page.keyboard.press("p")
-  await expect(counter(page)).toContainText(`1 of ${narrowed}`)
+  await expect(area).toHaveAttribute("data-file", first)
   await page.keyboard.press("p")
-  await expect(counter(page)).toContainText(`${narrowed} of ${narrowed}`)
+  await expect(area).not.toHaveAttribute("data-file", first)
   await page.keyboard.press("n")
-  await expect(counter(page)).toContainText(`1 of ${narrowed}`)
+  await expect(area).toHaveAttribute("data-file", first)
 
   // Entry 16: the URL holds the file and the narrowing; the one declared reload shows the same file.
   await page.keyboard.press("n")
-  await expect(counter(page)).toContainText(`2 of ${narrowed}`)
+  await expect(area).not.toHaveAttribute("data-file", first)
   await expect(page).toHaveURL(/file=/)
   await expect(page).toHaveURL(/commits=/)
-  const area = page.getByTestId("diff-area")
   const file = await area.getAttribute("data-file")
   expect(file).toBeTruthy()
   await page.reload()
-  await expect(counter(page)).toContainText(`2 of ${narrowed}`)
   await expect(area).toHaveAttribute("data-file", file!)
   await expect(chip).toContainText("Showing: ")
   await chip.getByRole("button", { name: "Clear narrowing" }).click()
