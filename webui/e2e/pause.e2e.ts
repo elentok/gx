@@ -524,6 +524,256 @@ test.describe("213. Question card, long question and One-off Cancel", () => {
   })
 })
 
+const LONG = "demo:long-question-epic"
+const answerPage = (page: Page) => page.getByRole("form", { name: "Answer" })
+const answerFooter = (page: Page) => page.locator('[data-mock-part="answer-footer"]')
+const sendAnswer = (page: Page) => page.getByRole("button", nav("Send answer"))
+const noteField = (page: Page) => page.getByPlaceholder("Note on this question")
+const openNote = async (page: Page) => {
+  await answerPage(page).getByRole("button", { name: /^Note/ }).click()
+  return noteField(page)
+}
+const optionA = (page: Page) => page.getByRole("button", { name: /Keep the current layout/ })
+const optionB = (page: Page) => page.getByRole("button", { name: /Clamp the title and fold/ })
+// The first bullet of ticket 01's question body.
+const QUESTION_BODY = "clamp the title to three lines and show the rest on a tap"
+const QUESTION_TITLE = "Should the queue card clamp a long question title"
+
+test.describe("214. Answer page, history, note and Send", () => {
+  test("a long question is answered on its own page", async ({ page, start }) => {
+    test.setTimeout(120_000)
+    const fixture = await start("long-question", { reloads: 3 })
+    await page.setViewportSize({ width: 1100, height: 700 })
+    await openTicket(page, "01", "long-question-epic")
+    await expect(page.getByText("Paused · Waiting for your answer", { exact: true })).toBeVisible()
+    const answer = page.getByRole("button", nav("Answer question"))
+    const back = page.getByRole("link", nav("← Ticket"))
+
+    await test.step("1. Answer question pushes the page", async () => {
+      await answer.click()
+      await expect(page).toHaveURL(/#\/answer\/demo:/)
+      await expect(back).toBeVisible()
+      await expect(page.getByRole("heading", { name: "Answer question" })).toBeVisible()
+    })
+
+    await test.step("2. reading and order", async () => {
+      await expect(page.getByText(QUESTION_BODY)).toHaveCount(1)
+      await expect(page.getByText(QUESTION_TITLE)).toHaveCount(1)
+      await expect(page.getByText("THE AGENT ASKS", { exact: true })).toBeVisible()
+      await expect(page.getByText("Agent's notes")).toHaveCount(0)
+      await expect(page.getByText(/^(agent|web)$/i)).toHaveCount(0)
+      await expect(page.getByRole("button", { name: /Earlier rounds/ })).toBeVisible()
+      await back.click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      await expect(page.getByText(QUESTION_TITLE)).toHaveCount(1)
+      await expect(page.getByText("Agent's notes").first()).toBeVisible()
+    })
+
+    await test.step("3. footer outside the scroll, narrow column", async () => {
+      await answer.click()
+      await expect(sendAnswer(page)).toBeDisabled()
+      const scroller = answerPage(page).locator("> div").first()
+      const column = scroller.locator("> div").first()
+      await expect(scroller).toBeVisible()
+      await expect(column).toBeVisible()
+      await expect
+        .poll(async () => {
+          const c = (await column.boundingBox())!
+          return c.width < page.viewportSize()!.width
+        })
+        .toBe(true)
+      const before = (await sendAnswer(page).boundingBox())!
+      await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight))
+      await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+      await expect
+        .poll(async () => {
+          const after = (await sendAnswer(page).boundingBox())!
+          return after.y === before.y && after.x === before.x
+        })
+        .toBe(true)
+      await expect(answerFooter(page)).toContainText("Send answer")
+    })
+
+    await test.step("4. history keeps one ticket entry", async () => {
+      await back.click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      await answer.click()
+      await expect(page).toHaveURL(/#\/answer\//)
+      await page.goBack()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      await page.goBack()
+      await expect(page).not.toHaveURL(/#\/(t|answer)\/demo:long-question-epic\/01$/)
+      await page.goForward()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+    })
+
+    await test.step("5. the note survives a round trip, a reload clears it", async () => {
+      await answer.click()
+      await optionB(page).click()
+      await expect(optionB(page)).toHaveAttribute("aria-pressed", "true")
+      await (await openNote(page)).fill("Keep it short")
+      await back.click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      await answer.click()
+      await expect(optionB(page)).toHaveAttribute("aria-pressed", "true")
+      await expect(noteField(page)).toHaveValue("Keep it short")
+      await page.reload()
+      await expect(optionB(page)).toHaveAttribute("aria-pressed", "false")
+      await expect(answerPage(page).getByPlaceholder("Note on this question")).toHaveCount(0)
+      // A reload opened the page cold, so leaving replaces it with the ticket page.
+      await back.click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+    })
+
+    // Step 9 of the plan runs before the send: the send answers the only question this ticket has.
+    await test.step("9. the phone keyboard keeps Send in view", async () => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await answer.click()
+      await expect(back).toBeVisible()
+      const note = await openNote(page)
+      await note.focus()
+      await page.evaluate(() => {
+        const vv = window.visualViewport!
+        Object.defineProperty(vv, "height", {
+          configurable: true,
+          get: () => window.innerHeight - 300,
+        })
+        vv.dispatchEvent(new Event("resize"))
+      })
+      await expect(back).toBeHidden()
+      await expect
+        .poll(async () => {
+          const box = await sendAnswer(page).boundingBox()
+          const visible = await page.evaluate(() => window.visualViewport!.height)
+          return box !== null && box.y + box.height <= visible + 4
+        })
+        .toBe(true)
+      await page.evaluate(() => {
+        const vv = window.visualViewport!
+        Object.defineProperty(vv, "height", { configurable: true, get: () => window.innerHeight })
+        vv.dispatchEvent(new Event("resize"))
+      })
+      await note.blur()
+      await expect(back).toBeVisible()
+      await page.setViewportSize({ width: 1100, height: 700 })
+    })
+
+    await test.step("6. Send lands on the ticket page with the Answer sent card", async () => {
+      await optionA(page).click()
+      await noteField(page).fill("Do not touch the layout")
+      await sendAnswer(page).click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      const sent = page.getByRole("group", { name: "Answered question" })
+      await expect(sent).toBeVisible()
+      await expect(sent).toContainText("Answer sent")
+      await expect(sent).toContainText(QUESTION_TITLE)
+      await expect(sent).toContainText("A: Keep the current layout")
+      await expect(sent).toContainText("Note: Do not touch the layout")
+      await expect(page.getByText(/^(agent|web)$/i)).toHaveCount(0)
+      await expect
+        .poll(async () => {
+          const notes = await page.getByText("Agent's notes").first().boundingBox()
+          const card = await sent.boundingBox()
+          return notes !== null && card !== null && notes.y < card.y
+        })
+        .toBe(true)
+      await sent.getByRole("button", { name: /Show question/ }).click()
+      await expect(sent.getByText(QUESTION_BODY)).toBeVisible()
+      await page.goBack()
+      await expect(page).not.toHaveURL(/#\/answer\//)
+      await page.goForward()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/01$/)
+      const shown = await fixture.cli("server", "tickets", "detail", `${LONG}/01`)
+      // `detail` lists each round's state and title, not the answer text.
+      expect(shown).toContain(`round 5 (agent, answered): ${QUESTION_TITLE}`)
+    })
+
+    await test.step("7. a queued answer keeps its card after a reload", async () => {
+      // No live agent: the send is queued.
+      await expect(page.getByRole("status", { name: "Answer result" })).toContainText("Queued")
+      await page.reload()
+      await expect(page.getByRole("group", { name: "Answered question" })).toBeVisible()
+    })
+
+    await test.step("8. a deep link send replaces the entry", async () => {
+      await page.goto(`${page.url().split("#")[0]}#/answer/${LONG}/02`)
+      await expect(page).toHaveURL(/#\/answer\/demo:long-question-epic\/02$/)
+      await optionA(page).click()
+      await sendAnswer(page).click()
+      await expect(page).toHaveURL(/#\/t\/demo:long-question-epic\/02$/)
+      await expect(page.getByRole("group", { name: "Answered question" })).toBeVisible()
+      await page.goBack()
+      await expect(page).not.toHaveURL(/#\/answer\//)
+    })
+  })
+})
+
+test.describe("215. Answer page, stale and permission refusal", () => {
+  test("a stale or refused send keeps the answer", async ({ page, start }) => {
+    test.setTimeout(150_000)
+    const long = await start("long-question")
+    await page.setViewportSize({ width: 1100, height: 700 })
+    await openTicket(page, "01", "long-question-epic")
+    const answer = page.getByRole("button", nav("Answer question"))
+    await answer.click()
+    await expect(page).toHaveURL(/#\/answer\/demo:long-question-epic\/01$/)
+
+    await test.step("a CLI answer makes the send stale", async () => {
+      await optionA(page).click()
+      await (await openNote(page)).fill("Typed before the CLI answered")
+      await long.cli("server", "tickets", "answer", `${LONG}/01`, "--choice", "b")
+      // The event stream shows the stale banner and drops Send before the person can click it.
+      await expect(page.getByText("This question was answered elsewhere")).toBeVisible()
+      await expect(noteField(page)).toHaveValue("Typed before the CLI answered")
+      await expect(answerFooter(page).getByRole("button")).toHaveText(["Back to ticket"])
+      await expect(sendAnswer(page)).toHaveCount(0)
+    })
+
+    // The fixture has no way to replace a question under an open page (story 23), so that step is not here.
+
+    await test.step("answered and missing addresses", async () => {
+      await page.evaluate((hash) => (location.hash = hash), `#/answer/${LONG}/01`)
+      await expect(page.getByText("This question was answered elsewhere")).toBeVisible()
+      await expect(page.getByRole("button", nav("Back to ticket"))).toBeVisible()
+      await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:missing-epic/01")
+      await expect(page.getByText("Ticket not found")).toBeVisible()
+    })
+
+    await test.step("a blocked permission prompt refuses the send", async () => {
+      const blocked = await start("permission")
+      // The page only reads the prompt with the detail, so open it once the agent is blocked.
+      await expect
+        .poll(
+          () => blocked.cli("server", "tickets", "detail", "--json", "demo:permission-epic/01"),
+          gateWait(),
+        )
+        .toMatch(/"permission":/)
+      await openTicket(page, "01", "permission-epic")
+      const permission = page.getByRole("group", { name: "Permission request" })
+      await expect(permission).toBeVisible(gateWait())
+      await answer.click()
+      await expect(page).toHaveURL(/#\/answer\/demo:permission-epic\/01$/)
+      const firstOption = answerPage(page).locator("button[data-answer]").first()
+      await firstOption.click()
+      await (await openNote(page)).fill("Answer while blocked")
+      await sendAnswer(page).click()
+      await expect(
+        page.getByText("Approve the agent's prompt first, then send again."),
+      ).toBeVisible()
+      await expect(noteField(page)).toHaveValue("Answer while blocked")
+      await expect(page).toHaveURL(/#\/answer\//)
+      await page.getByRole("link", nav("← Ticket")).click()
+      await expect(page).toHaveURL(/#\/t\/demo:permission-epic\/01$/)
+      await expect(permission).toBeVisible()
+      await expect(answer).toBeVisible()
+      await permission.getByRole("button", nav("Allow once")).click()
+      await expect(permission).toHaveCount(0)
+      // The send after the approval is not asserted: the fake agent stays busy and refuses it (Spec deviations).
+      await expect(answer).toBeVisible()
+    })
+  })
+})
+
 const fixDialog = (page: Page) => page.getByRole("dialog", { name: "Fix it with an agent" })
 const fixPrompt = "/gx-investigate demo:paused-epic/07 is paused for repair: Run failed"
 

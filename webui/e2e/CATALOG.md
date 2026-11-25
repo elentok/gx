@@ -201,7 +201,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (163). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (165). Before you add a flow, add a step to a flow on the same scenario
 (see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -283,6 +283,8 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **Unknown skill.**
 - **A model-mismatch pause resumes on the worker tier.** No "Answer question" button, "Resume on worker" is main, and `#/answer/demo:mismatch-epic/01` shows "This question is answered on the ticket page." with Back to ticket.
 - **213. Question card, long question and One-off Cancel** (scenarios `long-question`, `one-off-question`): the long title clamps to three lines in a static card with "Answer question" main and "Resume without answering" secondary at 1100 px and 390 px (both buttons inside the viewport); Earlier rounds sits below the card; a One-off's "Cancel run" and its confirm cancel the ticket.
+- **214. Answer page, history, note and Send** (scenario `long-question`, declares 3 reloads): "Answer question" pushes `/answer/<address>` with "← Ticket" and the heading; the question shows once with its asker label, no Agent's notes and no bubbles; the Send footer does not move when the body scrolls and the column is narrower than the viewport; "← Ticket" and the back button each go back one entry; the pick and note survive a ticket round trip and a reload clears them; at 390 px with a shortened visual viewport the header hides and "Send answer" stays in view; Send lands on the ticket page with the "Answer sent" card (title, `A: <label>`, note, Agent's notes above, Show question) and back does not return to the form; `gx server tickets show` lists the answer; a reload keeps the card; a deep-linked send of ticket 02 replaces the entry.
+- **215. Answer page, stale and permission refusal** (scenarios `long-question`, then `permission`): a CLI answer shows the stale banner at once (text kept, only "Back to ticket", no Send); the answered address shows the banner and a missing one "Ticket not found"; with the live agent blocked at a permission prompt the send is refused with the answer kept, the ticket page shows the Permission request card, "Allow once" clears it (the send after the approval is not covered: the fake agent stays busy). The fixture cannot replace a question under an open page, so the fresh-form step is not covered.
 - **Copy, start, and refuse a second agent.**
 - **Retry lifts the pause.**
 - **Names the Claude app.**

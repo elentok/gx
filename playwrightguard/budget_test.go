@@ -86,7 +86,9 @@ import (
 // Show screen and the later good send need the fixture's fake agents; DeliveryCard.test.tsx covers each card alone.
 // Question card flow (+1): the long title at 390px, the static button row and a One-off's Cancel need real layout and a
 // real server, and flow 3 is near the 45 s slow limit; ActionCard.test.tsx covers each render alone.
-const maxFlows = 163
+// Answer page flows (+2): the footer outside the scroll, the history stack, a reload and the keyboard viewport need a
+// real browser and a server round trip; AnswerForm.test.tsx and the route tests cover each rule alone.
+const maxFlows = 165
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
