@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.52.0 - 2026-11-25
+
+- Added a dedicated answer page at `/answer/<address>` for questions from epics, cleanup and pause flows. It sends the answer and returns to the ticket page. It keeps your draft, and it shows clear states when the question is stale, refused, answered elsewhere or not answerable. A needs-answer push tap opens this page and replaces the history entry. On a phone, the header clears the sidebar button and hides while the keyboard is open. A stale pick is kept, and the page resets on an in-place route change. The sent state drops the outer frame and mutes earlier rounds.
+- Changed the ticket page question card. It is now one compact card with a main Answer question button. A long title is clamped to three lines, and the buttons stack full-width on a phone. After an answer, the page shows an Answer sent card.
+- Changed ticket detail to report how a round was answered. It also labels Resume and loads the permission card for an open question.
+- Added fixture scenarios for long questions, One-off questions and permission requests, plus a `questionseed` knob and ask-permission behaviour.
+- Added Playwright flows 213 to 215 for the question card, gx-asked questions, One-off Cancel, the answer page, history, the stale state and permission refusal.
+- Changed the web composer to hide the working and blocked reason lines.
+- Fixed the ticketsflow review-bundle to support repos whose trunk is `master`.
+- Changed docs: the queue-question-layout spec was amended after two design reviews, and its verification headings and mock-state lines now parse for verify-plan.
+
 ## v0.51.15 - 2026-11-24
 
 - Added an entity action registry for the web UI. Every entity action is declared once and turned into ready actions with one hook. These surfaces now read it: sidebar row menus, ItemMenu, entity chords and the Chord box, page-header menus (ticket, epic, archived epic, Design, chat, Design draft and chat draft pages), the footer Start over / Cancel run / Remove buttons, the command palette (which lists the open entity's actions) and the Jump palette. Workspace-less availability and Hold's server-decided confirm also come from the registry. Old per-surface code was removed (`useSessionManage`, `useCardActions`, `planBulk`).
