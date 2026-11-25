@@ -80,7 +80,7 @@ func (c *Chat) codexSubagentRead(w http.ResponseWriter, id, dir string, meta Met
 // missingCodexPage answers a call whose child rollout cannot be found. A
 // rollout Codex compressed is not read yet.
 func (c *Chat) missingCodexPage(id string, meta Meta, rec transcript.TaskRecord) wire.SessionChatResponse {
-	out := c.missingSubagentPage(id, meta, rec)
+	out := missingSubagentPage(c.clock(), id, meta, rec)
 	out.Subagent.Prompt = codexPromptUnreadable
 	if rec.ID != "" {
 		if home, err := c.src.CodexHome(); err == nil {

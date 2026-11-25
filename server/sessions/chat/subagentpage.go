@@ -53,7 +53,7 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 			http.Error(w, noSuchSubagent, http.StatusNotFound)
 			return
 		}
-		wire.WriteJSON(w, c.missingSubagentPage(id, meta, rec))
+		wire.WriteJSON(w, missingSubagentPage(c.clock(), id, meta, rec))
 		return
 	}
 	if err != nil {
@@ -224,13 +224,13 @@ func (c *Chat) nestedCall(parentRecords []transcript.TaskRecord, parentPath stri
 // missingSubagentPage answers a call the parent holds but whose file is
 // missing: the header comes from the parent's call alone. resolveTask decides
 // whether the call still counts as running, so the file is only late.
-func (c *Chat) missingSubagentPage(id string, meta Meta, rec transcript.TaskRecord) wire.SessionChatResponse {
+func missingSubagentPage(now time.Time, id string, meta Meta, rec transcript.TaskRecord) wire.SessionChatResponse {
 	head := &subagent.SessionSubagent{
 		CallID: rec.CallID, RootSessionID: id, Title: rec.Label, Type: rec.SubagentType,
 		Prompt: rec.Prompt, Status: subagent.SubagentStatusRunning,
 		Unavailable: subagent.SubagentUnavailableStarting,
 	}
-	if resolveTask(rec, meta, c.clock()).finished {
+	if resolveTask(rec, meta, now).finished {
 		head.Status, head.Unavailable = subagent.SubagentStatusNotAvailable, subagent.SubagentUnavailableGone
 	}
 	return wire.SessionChatResponse{
