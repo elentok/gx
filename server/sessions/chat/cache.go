@@ -144,7 +144,11 @@ func SnapshotOf(read chatreader.Result, kind agentrunner.Kind, ref FlowRef, fina
 		for _, im := range m.Images {
 			images = append(images, wire.SessionChatImage{ID: im.ID, Placeholder: im.Placeholder})
 		}
-		snap.Msgs = append(snap.Msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls, Images: images})
+		var subagents []wire.SessionChatSubagentCall
+		for _, s := range m.SubagentCalls {
+			subagents = append(subagents, wire.SessionChatSubagentCall{Index: s.Index, CallID: s.CallID, Type: s.Type, Description: s.Description})
+		}
+		snap.Msgs = append(snap.Msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls, SubagentCalls: subagents, Images: images})
 	}
 	return snap
 }

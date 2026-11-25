@@ -2729,10 +2729,17 @@ export interface SessionChatMessage {
    * Calls is one line per folded tool call: the tool and its command or target.
    */
   calls?: string[];
+  subagent_calls?: SessionChatSubagentCall[];
   /**
    * Images are the Prompt images a person message carries, in chip order.
    */
   images?: SessionChatImage[];
+}
+export interface SessionChatSubagentCall {
+  index: number /* int */;
+  call_id: string;
+  type?: string;
+  description?: string;
 }
 /**
  * SessionChatImage is one image of a chat message. ID names the saved image

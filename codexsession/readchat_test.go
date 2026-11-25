@@ -2,11 +2,32 @@ package codexsession
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/transcript"
 )
+
+func TestReadChat_MarksSpawnAgentInRootOnly(t *testing.T) {
+	rollout := `{"timestamp":"2026-03-06T18:40:00.000Z","type":"session_meta","payload":{"cli_version":"0.99.0"}}` + "\n" +
+		`{"timestamp":"2026-03-06T18:40:01.000Z","ordinal":1,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":"sp1","arguments":"{\"task_name\":\"review\"}"}}` + "\n"
+	root, err := ReadChat(strings.NewReader(rollout), "")
+	if err != nil || len(root.Messages) != 1 {
+		t.Fatalf("ReadChat = %+v, %v", root, err)
+	}
+	want := []transcript.SubagentCall{{Index: 0, CallID: "sp1", Description: "review"}}
+	if got := root.Messages[0].SubagentCalls; !reflect.DeepEqual(got, want) {
+		t.Errorf("root SubagentCalls = %+v, want %+v", got, want)
+	}
+	child, err := ReadChatFromOrdinal(strings.NewReader(rollout), "", 1)
+	if err != nil || len(child.Messages) != 1 {
+		t.Fatalf("ReadChatFromOrdinal = %+v, %v", child, err)
+	}
+	if got := child.Messages[0].SubagentCalls; got != nil {
+		t.Errorf("child SubagentCalls = %+v, want none", got)
+	}
+}
 
 func TestReadChatFromOrdinal_CutsParentHistoryCopy(t *testing.T) {
 	msg := func(ord int, role, kind, text string) string {

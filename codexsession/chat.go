@@ -172,6 +172,11 @@ func readChat(r io.Reader, imagesDir string, startOrdinal *int) (Chat, error) {
 				// A custom tool call's input is free text, such as a patch.
 				args = map[string]any{"command": firstLine(p.Input)}
 			}
+			// A child's own spawn_agent calls get no link: no Codex grandchildren.
+			if p.Name == "spawn_agent" && p.CallID != "" && startOrdinal == nil {
+				desc, _ := args["task_name"].(string)
+				run.SubagentCalls = append(run.SubagentCalls, transcript.SubagentCall{Index: len(run.Calls), CallID: p.CallID, Description: desc})
+			}
 			run.Calls = append(run.Calls, transcript.SummarizeCall(p.Name, args))
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
 			var raw []string

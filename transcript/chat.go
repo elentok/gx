@@ -47,9 +47,21 @@ type ChatMessage struct {
 	LastTool  string
 	// Calls is one short line per tool call of a tools entry: the tool and its command or target.
 	Calls []string
+	// SubagentCalls marks the entries of Calls that launch a subagent the
+	// reader can link to; every other call has no mark.
+	SubagentCalls []SubagentCall
 	// Images are the Prompt images a person message carries, in chip order.
 	Images []ChatImage
 	At     time.Time
+}
+
+// SubagentCall marks Calls[Index] as a subagent launch. Type is empty when the
+// call names none.
+type SubagentCall struct {
+	Index       int
+	CallID      string
+	Type        string
+	Description string
 }
 
 // ChatImage is one image of a person message. ID names the saved image gx can
@@ -221,6 +233,11 @@ func readChat(r io.Reader, imagesDir string, subagentFile bool) (msgs []ChatMess
 			}
 			run.ToolCount++
 			run.LastTool = call.Name
+			if (call.Name == "Agent" || call.Name == "Task") && call.ID != "" {
+				var in taskUse
+				_ = json.Unmarshal(call.Input, &in)
+				run.SubagentCalls = append(run.SubagentCalls, SubagentCall{Index: len(run.Calls), CallID: call.ID, Type: in.SubagentType, Description: in.Description})
+			}
 			run.Calls = append(run.Calls, call.Summary())
 		}
 	}

@@ -156,3 +156,28 @@ func TestReadChat_ToolRunKeepsOneLinePerCall(t *testing.T) {
 		t.Errorf("tools entry = %+v, want 3 calls %v", msgs[0], want)
 	}
 }
+
+func TestReadChat_MarksSubagentCalls(t *testing.T) {
+	lines := []string{
+		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[` +
+			`{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},` +
+			`{"type":"tool_use","id":"t2","name":"Agent","input":{"description":"Survey","subagent_type":"Explore","prompt":"p"}},` +
+			`{"type":"tool_use","id":"t3","name":"Task","input":{"description":"Old"}},` +
+			`{"type":"tool_use","name":"Agent","input":{"description":"No id"}}]}}`,
+	}
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
+	if err != nil || len(msgs) != 1 {
+		t.Fatalf("ReadChatFrom = %+v, %v", msgs, err)
+	}
+	wantCalls := []string{"Bash: ls", "Agent: Survey", "Task: Old", "Agent: No id"}
+	if !reflect.DeepEqual(msgs[0].Calls, wantCalls) {
+		t.Errorf("Calls = %v, want %v", msgs[0].Calls, wantCalls)
+	}
+	wantMarks := []SubagentCall{
+		{Index: 1, CallID: "t2", Type: "Explore", Description: "Survey"},
+		{Index: 2, CallID: "t3", Type: "", Description: "Old"},
+	}
+	if !reflect.DeepEqual(msgs[0].SubagentCalls, wantMarks) {
+		t.Errorf("SubagentCalls = %+v, want %+v", msgs[0].SubagentCalls, wantMarks)
+	}
+}

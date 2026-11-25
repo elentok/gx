@@ -96,9 +96,17 @@ type SessionChatMessage struct {
 	ToolCount int    `json:"tool_count,omitempty"`
 	LastTool  string `json:"last_tool,omitempty"`
 	// Calls is one line per folded tool call: the tool and its command or target.
-	Calls []string `json:"calls,omitempty"`
+	Calls         []string                  `json:"calls,omitempty"`
+	SubagentCalls []SessionChatSubagentCall `json:"subagent_calls,omitempty"`
 	// Images are the Prompt images a person message carries, in chip order.
 	Images []SessionChatImage `json:"images,omitempty"`
+}
+
+type SessionChatSubagentCall struct {
+	Index       int    `json:"index"`
+	CallID      string `json:"call_id"`
+	Type        string `json:"type,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // SessionChatImage is one image of a chat message. ID names the saved image
