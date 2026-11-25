@@ -1,0 +1,15 @@
+language js(jsx)
+
+or {
+  `<form $props>$children</form>`,
+  `<chakra.form $props>$children</chakra.form>`,
+  `<$tag $props>$children</$tag>` where { $props <: contains `as="form"` }
+} as $el where {
+  $children <: contains or {
+    `<input $a />` where { not $a <: contains or { `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"` } },
+    `<chakra.input $a />` where { not $a <: contains or { `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"` } },
+    `<Input $a />` where { not $a <: contains or { `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"` } },
+    `<textarea $a />`, `<chakra.textarea $a />`, `<Textarea $a />`
+  },
+  register_diagnostic(span=$el, message="R3 form holds a text box.", severity="error")
+}

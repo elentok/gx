@@ -1,0 +1,12 @@
+language js(jsx)
+
+or {
+  `<input $props />`,
+  `<chakra.input $props />`,
+  `<Input $props />`
+} as $el where {
+  not $props <: contains or {
+    `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"`, `type="range"`, `type="button"`, `type="submit"`
+  },
+  register_diagnostic(span=$el, message="R1 raw text input. Use the standard text box.", severity="error")
+}

@@ -1,0 +1,5 @@
+language js(jsx)
+
+or { `<textarea $props />`, `<chakra.textarea $props />`, `<Textarea $props />` } as $el where {
+  register_diagnostic(span=$el, message="R1 raw textarea. Use the standard text box.", severity="error")
+}

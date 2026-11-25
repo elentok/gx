@@ -1,0 +1,7 @@
+language js(jsx)
+
+or { `<textarea $props />`, `<chakra.textarea $props />`, `<Textarea $props />`, `<input $props />`, `<chakra.input $props />`, `<Input $props />` } as $el where {
+  not $props <: contains or { `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"` },
+  not $props <: contains or { r"aria-label.*", r"aria-labelledby.*", r"id=.*" },
+  register_diagnostic(span=$el, message="R2 text box without aria-label, aria-labelledby or id.", severity="error")
+}

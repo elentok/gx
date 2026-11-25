@@ -1,0 +1,43 @@
+import { chakra, Input, Textarea, Box } from "@chakra-ui/react"
+
+export function Fixture() {
+  return (
+    <div>
+      <input type="file" />
+      <input type="checkbox" />
+      <input type="hidden" />
+      <input />
+      <input type="text" />
+      <input type="search" />
+      <textarea />
+      <chakra.input />
+      <chakra.input type="file" />
+      <chakra.textarea aria-label="x" />
+      <Input />
+      <Input type="file" />
+      <Textarea />
+      <chakra.form onSubmit={() => {}}>
+        <chakra.input aria-label="a" />
+      </chakra.form>
+      <Box as="form">
+        <div />
+      </Box>
+      <Box as="form" onSubmit={() => {}}>
+        <chakra.textarea aria-label="b" data-focus-ring="none" />
+      </Box>
+      <form>
+        <input type="checkbox" />
+      </form>
+      <label htmlFor="q">Q</label>
+      <input id="q" />
+      <label>
+        Wrapped <input />
+      </label>
+      <input aria-label="lbl" />
+      <input aria-labelledby="z" />
+      <textarea data-focus-ring="inset" />
+      <Box as="input" />
+      <Box as="textarea" />
+    </div>
+  )
+}

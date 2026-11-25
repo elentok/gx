@@ -1,0 +1,34 @@
+import { ChakraProvider } from "@chakra-ui/react"
+import { render } from "@testing-library/react"
+import { expect, it } from "vitest"
+import { galleryEntries } from "../gallery/registry"
+import { system } from "../ui/theme"
+
+const NON_TEXT = new Set(["file", "hidden", "checkbox", "radio", "range", "button", "submit"])
+it("probe", () => {
+  const out: string[] = []
+  let boxes = 0
+  let errs = 0
+  for (const e of galleryEntries)
+    for (const c of e.cases) {
+      let view
+      try {
+        view = render(<ChakraProvider value={system}>{c.node}</ChakraProvider>)
+      } catch {
+        errs++
+        continue
+      }
+      for (const el of view.container.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")) {
+        if (el instanceof HTMLInputElement && NON_TEXT.has(el.type)) continue
+        boxes++
+        const labelled = (el.labels?.length ?? 0) > 0 || el.hasAttribute("aria-label") || el.hasAttribute("aria-labelledby")
+        if (!labelled) out.push(`${e.name}: unlabelled ${el.tagName}`)
+        if (el.closest("form")) out.push(`${e.name}: in form`)
+        if (!el.hasAttribute("data-focus-ring") && !el.closest("[data-focus-ring]")) out.push(`${e.name}: no focus ring`)
+      }
+      view.unmount()
+    }
+  console.log("BOXES", boxes, "RENDER_ERRORS", errs, "CASES", galleryEntries.reduce((n, e) => n + e.cases.length, 0))
+  console.log(out.join("\n"))
+  expect(true).toBe(true)
+})

@@ -1,0 +1,16 @@
+import { chakra } from "@chakra-ui/react"
+const common = { "aria-label": "x" }
+export function A(props: object) {
+  return (
+    <>
+      <chakra.input {...props} />
+      <chakra.input type={kind} />
+      {/* biome-ignore lint/plugin: wrapper is the standard component */}
+      <chakra.input aria-label="ok" data-focus-ring="none" />
+      <chakra.input {...common} data-focus-ring="none" />
+    </>
+  )
+}
+const Field = chakra("input")
+const Area = chakra("textarea")
+export const X = () => <Field /> 

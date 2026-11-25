@@ -1,0 +1,6 @@
+language js(jsx)
+
+`<$tag $props />` as $el where {
+  $props <: contains or { `as="input"`, `as="textarea"` },
+  register_diagnostic(span=$el, message="R1 text box through as= prop.", severity="error")
+}
