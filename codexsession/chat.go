@@ -105,7 +105,22 @@ var imageOpenRE = regexp.MustCompile(`^<image\b[^>]*\bpath="([^"]*)"`)
 // line's ordinal ("o20"), or "l<line>" when the line has none. imagesDir is the
 // session's images folder; "" means none.
 func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
+	return readChat(r, imagesDir, nil)
+}
+
+// ReadChatFromOrdinal reads a Codex child's rollout as the child's own
+// conversation. A child rollout starts with a copy of the parent's history, so
+// it skips every line before the first line whose ordinal is at least
+// startOrdinal (the child's subagent_history_start_ordinal). A line without an
+// ordinal is skipped too until that first line is reached, and kept after it.
+// The session_meta line is always read, so Version is set.
+func ReadChatFromOrdinal(r io.Reader, imagesDir string, startOrdinal int) (Chat, error) {
+	return readChat(r, imagesDir, &startOrdinal)
+}
+
+func readChat(r io.Reader, imagesDir string, startOrdinal *int) (Chat, error) {
 	var chat Chat
+	reached := startOrdinal == nil
 	var run *transcript.ChatMessage
 	flush := func() {
 		if run != nil {
@@ -123,6 +138,12 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 		id := fmt.Sprintf("l%d", n)
 		if line.Ordinal != nil {
 			id = fmt.Sprintf("o%d", *line.Ordinal)
+			if !reached && *line.Ordinal >= *startOrdinal {
+				reached = true
+			}
+		}
+		if !reached && line.Type != "session_meta" {
+			return
 		}
 		at, _ := time.Parse(time.RFC3339Nano, line.Timestamp)
 		p := line.Payload

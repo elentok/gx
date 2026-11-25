@@ -1,11 +1,51 @@
 package codexsession
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/transcript"
 )
+
+func TestReadChatFromOrdinal_CutsParentHistoryCopy(t *testing.T) {
+	msg := func(ord int, role, kind, text string) string {
+		return fmt.Sprintf(`{"timestamp":"2026-03-06T18:40:03.291Z","ordinal":%d,"type":"response_item","payload":{"type":"message","role":"%s","content":[{"type":"%s","text":"%s"}]}}`, ord, role, kind, text)
+	}
+	lines := []string{
+		`{"timestamp":"2026-03-06T18:40:00.000Z","type":"session_meta","payload":{"cli_version":"0.99.0"}}`,
+		msg(1, "user", "input_text", "parent prompt"),
+		msg(2, "assistant", "output_text", "parent answer"),
+		`{"timestamp":"2026-03-06T18:40:03.291Z","ordinal":3,"type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":\"ls\"}"}}`,
+		`{"timestamp":"2026-03-06T18:40:03.291Z","ordinal":4,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"NEW_TASK child header"}]}}`,
+		msg(5, "assistant", "output_text", "child answer"),
+		msg(6, "assistant", "output_text", "child more"),
+	}
+	rollout := strings.Join(lines, "\n") + "\n"
+
+	chat, err := ReadChatFromOrdinal(strings.NewReader(rollout), "", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chat.Version != "0.99.0" {
+		t.Errorf("Version = %q, want 0.99.0", chat.Version)
+	}
+	var ids []string
+	for _, m := range chat.Messages {
+		ids = append(ids, m.ID)
+	}
+	if got := strings.Join(ids, ","); got != "o5,o6" {
+		t.Errorf("message ids = %q, want o5,o6", got)
+	}
+
+	all, err := ReadChat(strings.NewReader(rollout), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Messages) != 6 {
+		t.Errorf("default read gave %d messages, want 6", len(all.Messages))
+	}
+}
 
 func TestReadChat_SlashAndGxMessagesAreCommands(t *testing.T) {
 	user := func(text string) string {
