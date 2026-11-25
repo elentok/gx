@@ -35,7 +35,6 @@ import { designHref } from "../hrefs"
 import { postOpenDesign, type OpenDesign } from "./open"
 import { saveUnsaved, type Restored } from "./unsaved"
 import { useDesignWrite } from "./SessionControls"
-import { useWide } from "../useWide"
 import { useViMode } from "../vimode"
 import { useReadyWhen } from "../useReady"
 import { ModeText } from "../ui/expandable-text/ModeText"
@@ -62,10 +61,9 @@ const realDrafts: DraftsClient = {
   removeImage: removeDraftImage,
 }
 
-/** Why Start is unavailable, or undefined when it is ready. */
+/** The Start blocker's tooltip text. The empty prompt and empty slug block with no text. */
 function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined {
-  if (!draft.idea.trim()) return "Write a prompt first"
-  if (!draft.slug.trim()) return "Name the epic to start."
+  if (!draft.idea.trim() || !draft.slug.trim()) return undefined
   const problem = slugProblem(draft.slug)
   if (problem) return problem
   if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
@@ -178,7 +176,6 @@ function DraftForm({
   drafts: DraftsClient
   loaded: Loaded
 }) {
-  const sheetMode = !useWide()
   const shell = useShell()
   const navigate = useNavigate()
   const slugInput = useRef<HTMLInputElement | null>(null)
@@ -280,8 +277,12 @@ function DraftForm({
     { immediate: true },
   )
 
+  const reason = startBlocker(draft, imgs)
+  const blocked = !draft.idea.trim() || !draft.slug.trim() || !!reason
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    // Start uses aria-disabled, so Enter in the slug field still submits the form.
+    if (pending || blocked || banner) return
     const slug = draft.slug.trim()
     run(
       () =>
@@ -305,13 +306,7 @@ function DraftForm({
     )
   }
 
-  const reason = startBlocker(draft, imgs)
   const slugError = slugProblem(draft.slug)
-  const reasonText = reason && (
-    <Text fontSize="12px" color="tone.waiting.fg">
-      {reason}
-    </Text>
-  )
 
   return (
     <DetailPage fill title={{ kind: "Design draft", name: label }}>
@@ -430,15 +425,10 @@ function DraftForm({
         <Box flexShrink="0">
           <DraftImages state={imgs} />
         </Box>
-        {sheetMode && reason && (
-          <Box pb="2" flexShrink="0">
-            {reasonText}
-          </Box>
-        )}
         <DraftFooter
           canAttach={attachIcon}
-          reasonText={!sheetMode && reasonText}
-          startDisabled={pending || !!reason || !!banner}
+          startReason={reason}
+          startDisabled={pending || blocked || !!banner}
           pending={pending}
           onAttach={() => fileInput.current?.click()}
           onRemove={draftMenu.remove}

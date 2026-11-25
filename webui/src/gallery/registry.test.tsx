@@ -17,9 +17,13 @@ import { galleryEntries } from "./registry"
 
 // Every primitive is src/ui/<folder>/<Name>.tsx; tests and non-component files don't match.
 // CodeEditor is LargeEditor's lazy chunk, shown through LargeEditor; PhoneMenu is Menu's phone mode.
+// TipPopup is the tooltip InfoTip and Start share, shown through InfoTip.
 const primitiveFiles = Object.keys(import.meta.glob("../ui/*/[A-Z]*.tsx")).filter(
   (f) =>
-    !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx") && !f.endsWith("/PhoneMenu.tsx"),
+    !f.endsWith(".test.tsx") &&
+    !f.endsWith("/CodeEditor.tsx") &&
+    !f.endsWith("/PhoneMenu.tsx") &&
+    !f.endsWith("/TipPopup.tsx"),
 )
 const primitiveNames = primitiveFiles.map((f) => f.split("/").pop()?.replace(".tsx", "") ?? f)
 

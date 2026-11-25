@@ -10,6 +10,7 @@ import type { DraftResult, DraftsClient } from "./drafts"
 import type { OpenDesign } from "./open"
 import { DraftPage } from "./DraftPage"
 import { designHref } from "../hrefs"
+import { slugProblem } from "./draftSlug"
 import type { DesignDraftPickResult, DraftHistoryEntry } from "../generated/ops"
 import type { ListHistory, PickDesignHistory } from "../history/api"
 
@@ -150,11 +151,17 @@ const type = (name: string, value: string) =>
   })
 const wait = (ms: number) => act(async () => void vi.advanceTimersByTime(ms))
 const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement
+const startBlocked = () => start().getAttribute("aria-disabled") === "true"
+/** The text Start's aria-describedby points at, or null without a reason. */
+const startReason = () => {
+  const id = start().getAttribute("aria-describedby")
+  return id ? document.getElementById(id)?.textContent : null
+}
 
 test("the page has its header, fields and footer, and no dialog", async () => {
   await mount(fakeDrafts())
   expect(screen.getByRole("heading", { name: "Untitled design" })).toBeTruthy()
-  for (const name of ["Rename", "Remove", "Start design"])
+  for (const name of ["Rename", "Remove draft", "Start design"])
     expect(screen.getByRole("button", { name })).toBeTruthy()
   expect(screen.getByRole("combobox", { name: "Project" })).toBeTruthy()
   expect(screen.getByRole("textbox", { name: "Epic slug" })).toBeTruthy()
@@ -193,14 +200,50 @@ test("a bookmarked draft that was started goes to its Design page", async () => 
   expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
 })
 
-test("Start names its reason: prompt, then epic, then the slug", async () => {
+test("an empty prompt or slug blocks Start with no reason text; a bad slug names itself", async () => {
   await mount(fakeDrafts())
-  expect(screen.getByText("Write a prompt first")).toBeTruthy()
-  expect(start().disabled).toBe(true)
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBeNull()
+  expect(screen.queryByText("Write a prompt first")).toBeNull()
   type("Prompt", "an idea")
-  expect(screen.getByText("Name the epic to start.")).toBeTruthy()
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBeNull()
+  expect(screen.queryByText("Name the epic to start.")).toBeNull()
+  type("Epic slug", "My Epic")
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBe(slugProblem("My Epic"))
   type("Epic slug", "my-epic")
-  expect(start().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
+  expect(startReason()).toBeNull()
+  expect(start().getAttribute("disabled")).toBeNull()
+})
+
+test("the footer holds only buttons: no reason text, Remove is an icon, Start does not wrap", async () => {
+  await mount(fakeDrafts({ slug: "My Epic", idea: "y" }))
+  const remove = screen.getByRole("button", { name: "Remove draft" })
+  expect(remove.getAttribute("title")).toBe("Remove draft")
+  expect(remove.textContent).toBe("")
+  expect(getComputedStyle(start()).whiteSpace).toBe("nowrap")
+})
+
+test("a blocked Start does nothing on click or Enter in the slug field", async () => {
+  const open = vi.fn<OpenDesign>(async () => ({ refused: false }) as never)
+  await mount(fakeDrafts({ slug: "", idea: "an idea" }), { open })
+  await act(async () => void fireEvent.click(start()))
+  const slug = screen.getByRole("textbox", { name: "Epic slug" })
+  await act(async () => void fireEvent.submit(slug.closest("form")!))
+  expect(open).not.toHaveBeenCalled()
+})
+
+test("a blocked Start with a reason opens a tooltip on focus; with no reason it has none", async () => {
+  await mount(fakeDrafts({ slug: "My Epic", idea: "y" }))
+  await act(async () => start().focus())
+  expect(await screen.findAllByText(slugProblem("My Epic")!)).not.toHaveLength(0)
+  expect(document.querySelector("[role=tooltip]")).toBeTruthy()
+  cleanup()
+  await mount(fakeDrafts())
+  await act(async () => start().focus())
+  expect(document.querySelector("[role=tooltip]")).toBeNull()
 })
 
 test("Start posts new_design with the draft's fields", async () => {
@@ -211,12 +254,6 @@ test("Start posts new_design with the draft's fields", async () => {
   expect(open).toHaveBeenCalledWith(
     expect.objectContaining({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" }),
   )
-})
-
-test("the reason sits above the footer on a phone", async () => {
-  await mount(fakeDrafts(), { device: "phone" })
-  const reason = screen.getByText("Write a prompt first")
-  expect(reason.parentElement).not.toBe(start().parentElement)
 })
 
 test("typing saves after 800 ms with the revision and only the prompt", async () => {
@@ -436,26 +473,26 @@ test("a pasted image uploads at once", async () => {
 test("Start names a held upload and a failed one, and a refused file is never uploaded", async () => {
   const fake = fakeDrafts({ slug: "x", idea: "y" })
   await mount(fake)
-  expect(start().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
   let land: (id: string) => void = () => {}
   vi.mocked(fake.client.uploadImage).mockImplementationOnce(
     () => new Promise<string>((ok) => (land = ok)),
   )
   addImages(png())
-  await screen.findByText("Wait for the upload to finish")
-  expect(start().disabled).toBe(true)
+  await waitFor(() => expect(startReason()).toBe("Wait for the upload to finish"))
+  expect(startBlocked()).toBe(true)
   await act(async () => land("i9"))
-  expect(screen.queryByText("Wait for the upload to finish")).toBeNull()
-  expect(start().disabled).toBe(false)
+  expect(startReason()).toBeNull()
+  expect(startBlocked()).toBe(false)
 
   vi.mocked(fake.client.uploadImage).mockClear()
   addImages(big())
   await screen.findByText("Too large, max 20 MB")
-  expect(screen.getByText("Remove the failed image first")).toBeTruthy()
-  expect(start().disabled).toBe(true)
+  expect(startReason()).toBe("Remove the failed image first")
+  expect(startBlocked()).toBe(true)
   expect(fake.client.uploadImage).not.toHaveBeenCalled()
   fireEvent.click(screen.getAllByRole("button", { name: "Remove image" }).at(-1)!)
-  expect(start().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
 })
 
 test("a conflict shows the banner with its two ways out", async () => {
@@ -507,7 +544,7 @@ test("a slug changed elsewhere updates the field and raises no banner", async ()
 test("Remove on an empty draft deletes at once and goes to the Epics page", async () => {
   const fake = fakeDrafts()
   await mount(fake)
-  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove draft" })))
   expect(screen.queryByText("Remove this draft and its images?")).toBeNull()
   expect(fake.client.remove).toHaveBeenCalledTimes(1)
   expect(fake.client.remove).toHaveBeenCalledWith("d1")
@@ -522,7 +559,7 @@ test.each([
   async (_n, over) => {
     const fake = fakeDrafts(over)
     await mount(fake)
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove draft" }))
     const popover = await screen.findByRole("alertdialog")
     expect(screen.queryByText("Remove this draft and its images?")).toBeNull()
     expect(within(popover).queryByRole("button", { name: "Keep" })).toBeNull()
@@ -530,7 +567,7 @@ test.each([
     fireEvent.click(within(popover).getByRole("button", { name: /^Cancel/ }))
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
     expect(fake.client.remove).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove draft" }))
     const again = await screen.findByRole("alertdialog")
     await act(
       async () => void fireEvent.click(within(again).getByRole("button", { name: /^Remove/ })),
@@ -578,7 +615,7 @@ test("Remove on a draft with only an image asks first", async () => {
   await mount(fake)
   addImages(png())
   await screen.findByText("1 of 10 images")
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  fireEvent.click(screen.getByRole("button", { name: "Remove draft" }))
   expect(await screen.findByRole("alertdialog")).toBeTruthy()
 })
 
@@ -663,7 +700,9 @@ describe("leaving the page", () => {
   test("unmounting after Remove or Start sends none", async () => {
     const removed = fakeDrafts()
     await mount(removed)
-    await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+    await act(
+      async () => void fireEvent.click(screen.getByRole("button", { name: "Remove draft" })),
+    )
     await leaveApp()
     expect(removed.client.removeIfEmpty).not.toHaveBeenCalled()
 

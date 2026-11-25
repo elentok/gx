@@ -140,6 +140,12 @@ const typeBrief = (value: string) => fireEvent.change(brief(), { target: { value
 const wait = (ms: number) => act(async () => void vi.advanceTimersByTime(ms))
 
 const startButton = () => screen.getByRole("button", { name: "Start chat" }) as HTMLButtonElement
+const startBlocked = () => startButton().getAttribute("aria-disabled") === "true"
+/** The text Start's aria-describedby points at, or null without a reason. */
+const startReason = () => {
+  const id = startButton().getAttribute("aria-describedby")
+  return id ? document.getElementById(id)?.textContent : null
+}
 const clickStart = () => act(async () => fireEvent.click(startButton()))
 
 test("Start posts the draft and goes to the new chat", async () => {
@@ -173,18 +179,50 @@ test("plain Enter and Cmd+Enter on a blank brief do not start", async () => {
   expect(fake.start).not.toHaveBeenCalled()
 })
 
-test("Start is disabled for a blank brief and while a save is in flight, and says why", async () => {
+test("Start is blocked for a blank brief and while a save is in flight, with no reason text", async () => {
   vi.useFakeTimers()
   await mount(fakeDrafts())
-  expect(startButton().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
+  expect(startButton().getAttribute("disabled")).toBeNull()
   typeBrief("   ")
-  expect(startButton().disabled).toBe(true)
-  expect(screen.getByText("Write a brief to start.")).toBeTruthy()
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBeNull()
+  expect(screen.queryByText("Write a brief to start.")).toBeNull()
   typeBrief("Something")
-  expect(startButton().disabled).toBe(true)
-  expect(screen.getByText("Saving the draft...")).toBeTruthy()
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBeNull()
+  expect(screen.queryByText("Saving the draft...")).toBeNull()
   await wait(800)
-  expect(startButton().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
+})
+
+test("Cmd+Enter does nothing while Start is blocked, and a click on blocked Start does not start", async () => {
+  const fake = fakeDrafts({ brief: "" })
+  await mountOpen(fake)
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
+  await act(async () => fireEvent.click(startButton()))
+  expect(fake.start).not.toHaveBeenCalled()
+})
+
+test("the footer's Remove is an icon button named Remove draft, and Start does not wrap", async () => {
+  await mount(fakeDrafts())
+  const remove = screen.getByRole("button", { name: "Remove draft" })
+  expect(remove.getAttribute("title")).toBe("Remove draft")
+  expect(remove.textContent).toBe("")
+  expect(getComputedStyle(startButton()).whiteSpace).toBe("nowrap")
+})
+
+test("a blocked Start with a reason opens a tooltip on focus", async () => {
+  const upload = vi.spyOn(chatDraftImages, "upload").mockImplementation(() => new Promise(() => {}))
+  await mount(fakeDrafts())
+  await act(async () =>
+    fireEvent.paste(brief(), { clipboardData: { files: [png()], types: ["Files"] } }),
+  )
+  await waitFor(() => expect(startReason()).toBe("Uploading images..."))
+  await act(async () => startButton().focus())
+  expect(await screen.findAllByText("Uploading images...")).not.toHaveLength(0)
+  expect(document.querySelector("[role=tooltip]")).toBeTruthy()
+  upload.mockRestore()
 })
 
 test("a failed Start shows the error and the worktree, keeps the brief, and Start posts again", async () => {
@@ -236,7 +274,7 @@ test("the settings and the brief render and Start is enabled", async () => {
   expect(control("Effort").value).toBe("high")
   expect(control("Name").value).toBe("split-auth")
   expect(brief().value).toBe("Split the auth work out.")
-  expect(startButton().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
 })
 
 test("a long Name ends in an ellipsis instead of a hard clip", async () => {
@@ -457,10 +495,10 @@ test("a pasted image uploads, and Start waits for an upload in flight", async ()
     fireEvent.paste(brief(), { clipboardData: { files: [png()], types: ["Files"] } }),
   )
   await waitFor(() => expect(upload).toHaveBeenCalledWith("c1", expect.any(File)))
-  expect(startButton().disabled).toBe(true)
-  expect(screen.getByText("Uploading images...")).toBeTruthy()
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBe("Uploading images...")
   await act(async () => finish("img1"))
-  expect(startButton().disabled).toBe(false)
+  expect(startBlocked()).toBe(false)
   upload.mockRestore()
 })
 
@@ -480,11 +518,11 @@ test("an empty draft opens with the placeholder, a disabled Start and its blocke
   )
   expect(brief().value).toBe("")
   expect(brief().placeholder).toBe("What should the new chat start from?")
-  expect(startButton().disabled).toBe(true)
-  expect(screen.getByText("Write a brief to start.")).toBeTruthy()
+  expect(startBlocked()).toBe(true)
+  expect(startReason()).toBeNull()
   expect(control("Model").value).toBe("")
   // The draft has no brief and no images, so Remove asks nothing.
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove draft" })))
   expect(screen.queryByRole("alertdialog")).toBeNull()
   await waitFor(() => expect(where()).toBe("/epics This draft was removed."))
 })
@@ -556,13 +594,13 @@ test("a failed save shows Not saved and retries", async () => {
 test("Remove asks, then deletes the draft and goes to the Epics page with the note", async () => {
   const fake = fakeDrafts()
   await mount(fake)
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  fireEvent.click(screen.getByRole("button", { name: "Remove draft" }))
   const popover = await screen.findByRole("alertdialog")
   expect(fake.remove).not.toHaveBeenCalled()
   fireEvent.click(within(popover).getByRole("button", { name: /^Cancel/ }))
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   expect(fake.remove).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  fireEvent.click(screen.getByRole("button", { name: "Remove draft" }))
   const again = await screen.findByRole("alertdialog")
   await act(async () => fireEvent.click(within(again).getByRole("button", { name: /^Remove/ })))
   await waitFor(() => expect(fake.remove).toHaveBeenCalledWith("c1"))
@@ -572,7 +610,7 @@ test("Remove asks, then deletes the draft and goes to the Epics page with the no
 test("an empty chat draft removes with no confirm", async () => {
   const fake = fakeDrafts({ brief: "", images: [] })
   await mount(fake)
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove draft" })))
   expect(screen.queryByRole("alertdialog")).toBeNull()
   await waitFor(() => expect(fake.remove).toHaveBeenCalledWith("c1"))
 })
@@ -591,7 +629,7 @@ test("with workspaces the ⋯ lists Rename, Move to workspace, Remove, and Remov
 test("a chat draft with an image and no brief asks before Remove", async () => {
   const fake = fakeDrafts({ brief: "", images: ["img1"] })
   await mount(fake)
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove draft" })))
   expect(await screen.findByRole("alertdialog")).toBeTruthy()
   expect(fake.remove).not.toHaveBeenCalled()
 })

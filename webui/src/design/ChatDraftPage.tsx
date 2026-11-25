@@ -170,15 +170,13 @@ function ChatDraftForm({
     url: chatDraftImages.url,
   })
   // An empty draft is a normal state: it opens with the placeholder and cannot start yet.
-  const blocker = !brief.trim()
-    ? "Write a brief to start."
-    : imgs.uploading
-      ? "Uploading images..."
-      : imgs.failed
-        ? "Remove or retry the failed images."
-        : status === "saving"
-          ? "Saving the draft..."
-          : null
+  // The empty brief and a pending save block Start with no reason text.
+  const startReason = imgs.uploading
+    ? "Uploading images..."
+    : imgs.failed
+      ? "Remove or retry the failed images."
+      : undefined
+  const blocker = !brief.trim() || !!startReason || status === "saving"
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   // The mascot toggle leads this header, so the shell drops its floating one.
@@ -406,14 +404,8 @@ function ChatDraftForm({
         <DraftFooter
           startLabel="Start chat"
           canAttach
-          reasonText={
-            blocker && (
-              <Text fontSize="12px" color="tone.waiting.fg">
-                {blocker}
-              </Text>
-            )
-          }
-          startDisabled={!!blocker || banner || starting}
+          startReason={startReason}
+          startDisabled={blocker || banner || starting}
           pending={starting}
           onAttach={() => fileInput.current?.click()}
           onRemove={draftMenu.remove}
