@@ -402,6 +402,9 @@ to every page:
 Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra menu" in
 `webui/README.md`.
 
+Before adding or changing a text box (an input or textarea a person types in), read
+`docs/text-boxes.md`.
+
 Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`. The webui has no `typecheck` pnpm script.
