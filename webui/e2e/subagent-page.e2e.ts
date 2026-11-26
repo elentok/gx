@@ -1,9 +1,14 @@
 import { appendFileSync } from "node:fs"
 import type { Page } from "@playwright/test"
+import type { SessionChatResponse } from "../src/generated/server"
 import { expect, test } from "./fixture"
 import { go, sessions } from "./agentsKit"
 
 const DESIGN = "#/d/demo:design-epic"
+const FINISHED = "Check the wire types"
+const TICKETS = "Explore tickets package"
+const NAMES = "Find where task rows lose the name"
+const PROBE = "Probe Codex rollout format"
 const RUNNING = "Survey the sessions code"
 const MISSING = "Read the old notes"
 const NESTED = "Map the server packages"
@@ -112,16 +117,88 @@ test("216. Subagent page", async ({ page, start }) => {
   await noSideScroll(page)
   await page.setViewportSize({ width: 1280, height: 800 })
 
-  // 3. A finished call: its log link stays and opens the page.
+  // 3. A finished call: the Design page and the folded chat log link it once, and the link opens the page.
   const ended = await start("subagents", { shape: "finished-handback" })
   const endedSub = ended.subagents!
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
+  await expect(callLink(page, FINISHED)).toHaveCount(1)
   await go(page, `#/agents/${endedSub.sessionId}`)
+  await expect(page).toHaveURL(new RegExp(`#/agents/${endedSub.sessionId}$`))
+  await expect(callLink(page, FINISHED)).toBeVisible()
   await openTools(page)
-  await callLink(page, "Check the wire types").click()
+  await expect(page.getByTestId("tool-calls").getByRole("link")).toHaveCount(1)
+  await expect(callLink(page, FINISHED)).toHaveCount(1)
+  await callLink(page, FINISHED).click()
   await expect(page).toHaveURL(
     new RegExp(`#/agents/${endedSub.sessionId}/subagents/${endedSub.calls.finished}$`),
   )
-  await title(page, "Check the wire types")
+  await title(page, FINISHED)
+
+  // 9. Two running calls around a finished one: only the finished one is a log link, on both pages.
+  const two = await start("subagents", { shape: "card-two-running" })
+  const ts = two.subagents!
+  const chatUrl = new RegExp(`#/agents/${ts.sessionId}$`)
+  const card = page.locator("[data-mock-part='card']")
+  const states = async () => {
+    const chat: SessionChatResponse = JSON.parse(
+      await two.cli("agents", "chat", ts.sessionId, "--json"),
+    )
+    return Object.fromEntries(
+      chat.messages.flatMap((m) => m.subagent_calls ?? []).map((c) => [c.call_id, c.state]),
+    )
+  }
+  expect(await states()).toEqual({
+    [ts.calls.tickets]: "running",
+    [ts.calls.names]: "finished",
+    [ts.calls.probe]: "running",
+  })
+
+  await go(page, `#/agents/${ts.sessionId}`)
+  await expect(page).toHaveURL(chatUrl)
+  await expect(callLink(page, NAMES)).toBeVisible()
+  for (const name of [TICKETS, PROBE]) {
+    await expect(cardLink(page, name)).toBeVisible()
+    await expect(callLink(page, name)).toHaveCount(0)
+    await expect(page.getByText(`Agent · Explore · ${name}`)).toHaveCount(0)
+  }
+  await openTools(page)
+  await expect(page.getByTestId("tool-calls").getByRole("link")).toHaveCount(1)
+  await expect(callLink(page, NAMES)).toHaveCount(1)
+  for (const name of [TICKETS, PROBE])
+    await expect(page.getByText(`Agent · Explore · ${name}`, { exact: true })).toBeVisible()
+
+  await go(page, `#/agents/${ts.sessionId}/subagents/${ts.calls.tickets}`)
+  await title(page, TICKETS)
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toHaveText(
+    "Working · Read tickets/frontier.go",
+  )
+  await expect(card).toHaveCount(0)
+
+  // 10. One subagent ends while the Design page is open: its log link appears with no reload, and the chat page agrees.
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
+  await expect(callLink(page, NAMES)).toHaveCount(1)
+  await expect(cardLink(page, TICKETS)).toBeVisible()
+  await expect(callLink(page, TICKETS)).toHaveCount(0)
+  await expect(callLink(page, PROBE)).toHaveCount(0)
+  appendFileSync(
+    ts.parentPath,
+    `${JSON.stringify({
+      type: "user",
+      timestamp: new Date().toISOString(),
+      message: { content: [{ type: "tool_result", tool_use_id: ts.calls.tickets, content: "ok" }] },
+      toolUseResult: { status: "completed" },
+    })}\n`,
+  )
+  await expect(callLink(page, TICKETS)).toBeVisible()
+  await expect(cardLink(page, TICKETS)).toHaveCount(0)
+  await expect(cardLink(page, PROBE)).toBeVisible()
+  await expect(callLink(page, PROBE)).toHaveCount(0)
+  await go(page, `#/agents/${ts.sessionId}`)
+  await expect(page).toHaveURL(chatUrl)
+  await expect(callLink(page, TICKETS)).toBeVisible()
+  expect((await states())[ts.calls.tickets]).toBe("finished")
 
   // 4. Nested Claude subagent: a link of the same shape, the back links, and a direct open with the breadcrumb.
   const nested = await start("subagents", { shape: "nested" })
@@ -179,4 +256,35 @@ test("216. Subagent page", async ({ page, start }) => {
   const entry = page.getByTestId("tool-calls")
   await expect(entry.getByText("spawn_agent", { exact: true })).toBeVisible()
   await expect(entry.getByRole("link")).toHaveCount(0)
+})
+
+// Why a flow: an old Codex rollout reaches the chat read and two pages through the server, which decides that the call
+// has no record. ChatLog.test.tsx, AgentChat.test.tsx and codexchild_internal_test.go each cover one half with given
+// input.
+test("221. Subagent call with no record", async ({ page, start }) => {
+  const fixture = await start("subagents", { shape: "codex-old-call" })
+  const { sessionId, calls } = fixture.subagents!
+  const line = page.getByText(/^Agent · /)
+
+  const chat: SessionChatResponse = JSON.parse(
+    await fixture.cli("agents", "chat", sessionId, "--json"),
+  )
+  expect(chat.messages.flatMap((m) => m.subagent_calls ?? [])).toMatchObject([
+    { call_id: calls.spawn, state: "no_record" },
+  ])
+
+  await go(page, `#/agents/${sessionId}`)
+  await expect(page).toHaveURL(new RegExp(`#/agents/${sessionId}$`))
+  await expect(page.getByTestId("tool-calls")).toBeVisible()
+  await expect(line).toHaveCount(0)
+  await openTools(page)
+  await expect(line).toHaveText("Agent · review")
+  await expect(line.getByRole("link")).toHaveCount(0)
+  await expect(page.getByRole("link", { name: /↗/ })).toHaveCount(0)
+
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
+  await expect(line).toHaveText("Agent · review")
+  await expect(page.getByTestId("tool-calls")).toHaveCount(0)
+  await expect(page.getByRole("link", { name: /↗/ })).toHaveCount(0)
 })

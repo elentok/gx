@@ -119,7 +119,10 @@ import (
 //
 // Working card pages flow (+1): a real server feeds one card to the Design, Triage and chat pages and the Questions
 // view; SteppedPage.test.tsx and WorkingCard.test.tsx render given props.
-const maxFlows = 177
+//
+// Subagent call with no record flow (+1): an old Codex rollout through the server to the chat read and two pages; no
+// other flow starts that scenario shape, and the vitest and Go tests each see one half.
+const maxFlows = 178
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
