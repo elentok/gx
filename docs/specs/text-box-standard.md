@@ -60,7 +60,7 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 33. As a maintainer adding a setting, I want a server-side test to fail on an editable setting labelled with "name", so that a registry entry cannot break the settings page.
 34. As a person using gx in production, I want a broken rule to leave the page working, so that a wording mistake does not block me.
 35. As a maintainer, I want a broken rule found in production to be filed as one follow-up per rule and broken value, so that I learn about it without reading logs.
-36. As a maintainer, I want a repeat to add at most one "Seen again" line a day to the open draft, so that a busy page does not flood the ticket.
+36. As a maintainer, I want repeats from one source on one day to share one "Seen again" line with a count in the open draft, so that I see how often a problem happens without a flooded ticket.
 37. As a maintainer, I want a repeat after the draft was closed or opened for work to file a new draft, so that a returning bug is not lost.
 38. As the owner of the gx server, I want the report endpoint behind the web login, rate limited and size limited, so that nobody outside can write into my ticket store.
 39. As an agent, I want a standing doc linked from the project's agent index, so that I read the rules and their reasons before adding a text box.
@@ -170,8 +170,11 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 - The server logs every accepted report.
 - The target is the epic in `recovery.follow-ups`, default `gx:follow-ups`. A bare epic name means that epic in project `gx`. If the target project is not registered, the server only logs.
 - Filing reuses the existing follow-up writer: a draft research ticket of category bug, in an epic created as draft if missing. The dedupe key is made of the rule id and the broken value.
-- Only an open draft takes a repeat, as one "Seen again" line, at most one a day. If the draft was closed or opened for work, the next report files a new draft.
-- The writer takes a description of where the repeat was seen, in place of requiring a ticket address, so that web reports and ticket callers share it. Ticket callers keep their current text.
+- Only an open draft takes a repeat. If the draft was closed or opened for work, the next report files a new draft.
+- The shared writer keeps one "Seen again" line per source per day, for every caller. The first repeat adds the line. A later repeat with the same source and date updates that line to end in a count, as in `Seen again in the web UI on 2026-11-26 (3 times).` The count is of repeats, so the report that filed the draft is not in it, and a line with no count means one repeat.
+- The "bad question block" follow-up keeps its own detailed entries.
+- The writer takes a source, a description of where the repeat was seen, in place of requiring a ticket address, so that web reports and ticket callers share it. Ticket callers pass their ticket address, so their line reads as today, apart from the count. Web reports pass the fixed source "the web UI".
+- A browser sends each rule and value once per page load, so the web count is roughly the number of page loads that hit the broken rule.
 - Two reports of the same pair that arrive together file one draft.
 - Text from the report is bounded in length and written so that it cannot add a heading, a section or a second dedupe line to the ticket.
 - The web listener owns the request checks. The follow-up code owns the filing. They meet through the listener's host interface.
@@ -195,7 +198,7 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 - Only `TextBox` gets new attribute tests. Each move ticket updates the tests of the pages it touches, mostly to the new wording.
 - A fixture test runs the lint plugin on bad and allowed examples, with the examples kept in a file that normal lint skips.
 - The ignore-comment scan has planted examples for each suppression form. The prior art is the raw style guard test.
-- Server route tests cover the report: login required, limits, refusals, URL cleaning, target resolution, an unregistered project, a first filing, a repeat on the same day and on a later day, a closed draft, concurrent reports, and text that tries to add a section. The prior art is the client error route tests and the recovery follow-up tests. The web-only route list and the web allowlist tests include the new route.
+- Server route tests cover the report: login required, limits, refusals, URL cleaning, target resolution, an unregistered project, a first filing, repeats on the same day (one line whose count rises) and on a later day, repeats from two ticket sources, a closed draft, concurrent reports, and text that tries to add a section. The prior art is the client error route tests and the recovery follow-up tests. The web-only route list and the web allowlist tests include the new route.
 - A registry test covers the setting label rule.
 - The gallery shows each kind, look and size. There is no new entry per moved screen.
 - Existing e2e flows are updated to the new wording and to the search box role. No new flow is needed, because Vitest and Go tests cover every new rule.
@@ -254,7 +257,7 @@ Name rule (stories 32 to 34)
 Broken rule report (stories 35 to 38)
 
 - Server: `gx brief go-test ./server/web ./server/recovery` exits 0 and holds the route and filing tests.
-- Browser check on a temporary server with `recovery.follow-ups` set to `demo:follow-ups`: from a signed-in page, post one report twice. `gx tickets show demo:follow-ups` on the server's ticket store lists one draft. A report with no login cookie is refused. The server log holds a line for each accepted report.
+- Browser check on a temporary server with `recovery.follow-ups` set to `demo:follow-ups`: from a signed-in page, post one report three times. `gx tickets show demo:follow-ups` on the server's ticket store lists one draft, and its Evidence holds one "Seen again" line ending in "(2 times).". A report with no login cookie is refused. The server log holds a line for each accepted report.
 
 Standing doc (stories 39 to 39)
 
