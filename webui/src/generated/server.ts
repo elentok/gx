@@ -2881,8 +2881,8 @@ export const ReasonFocusNotConnected = "not-connected";
  */
 export const EventSessionFocus = "session-focus";
 /**
- * FocusReport is a TUI's terminal focus, the session it has on screen (empty
- * for none) and its terminal app. Client names the TUI's event stream
+ * FocusReport is a TUI's or web page's focus, the session it has on screen
+ * (empty for none) and its terminal app. Client names its event stream
  * (/v1/events?client=); the report counts only while that stream is open.
  */
 export interface FocusReport {
@@ -2890,6 +2890,14 @@ export interface FocusReport {
   focused?: boolean;
   session?: string;
   term_program?: string;
+  /**
+   * Card: the page shows the session's working card.
+   */
+  card?: boolean;
+  /**
+   * Seq grows within one client; an older web report is ignored.
+   */
+  seq?: number /* int64 */;
 }
 /**
  * ReasonSessionReadOnly refuses input to a Queue agent: its loop owns it.

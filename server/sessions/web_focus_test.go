@@ -2,7 +2,7 @@ package sessions_test
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -49,8 +49,8 @@ func startWebFocus(t *testing.T) *webFocus {
 		step: func(c agentfake.Control, state string) { reach(ctx, t, h, evs, id, conv, c, state) }}
 }
 
-// openTab opens the web tab's event stream.
-func (f *webFocus) openTab(t *testing.T, client string) {
+// openTab opens the web tab's event stream and returns its close.
+func (f *webFocus) openTab(t *testing.T, client string) context.CancelFunc {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
@@ -67,12 +67,21 @@ func (f *webFocus) openTab(t *testing.T, client string) {
 		defer resp.Body.Close()
 		_, _ = io.Copy(io.Discard, resp.Body)
 	}()
+	return cancel
 }
 
 func (f *webFocus) report(t *testing.T, client string, focused bool, session string) string {
 	t.Helper()
-	body := fmt.Sprintf(`{"client":%q,"focused":%t,"session":%q}`, client, focused, session)
-	code, res := servertest.WebPostJSON(t, f.base+"/v1/sessions/focus", body, f.cookie, "", servertest.JSONPost(f.base))
+	return f.send(t, wire.FocusReport{Client: client, Focused: focused, Session: session})
+}
+
+func (f *webFocus) send(t *testing.T, r wire.FocusReport) string {
+	t.Helper()
+	body, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, res := servertest.WebPostJSON(t, f.base+"/v1/sessions/focus", string(body), f.cookie, "", servertest.JSONPost(f.base))
 	if code != http.StatusOK {
 		t.Fatalf("web focus = %d %s", code, res)
 	}
@@ -169,6 +178,44 @@ func TestWebFocus_FocusedReportMarksSessionRead(t *testing.T) {
 	f.reportOnceConnected(t, "web-1", true, f.id)
 	if sessionUnread(ctx, t, f.h, f.id) {
 		t.Error("session still unread after a focused web report")
+	}
+}
+
+func TestWebFocus_OlderReportIsIgnored(t *testing.T) {
+	t.Parallel()
+	f := startWebFocus(t)
+	ctx := t.Context()
+	closeTab := f.openTab(t, "web-1")
+	// The newer report has no session on screen, so applying the older one
+	// would silence the banner and read the session.
+	newer := wire.FocusReport{Client: "web-1", Focused: true, Seq: 2}
+	older := wire.FocusReport{Client: "web-1", Focused: true, Session: f.id, Seq: 1}
+	waitFor(t, func() bool { return !strings.Contains(f.send(t, newer), wire.ReasonFocusNotConnected) })
+	if res := f.send(t, older); strings.TrimSpace(res) != "{}" {
+		t.Errorf("older report = %s, want an empty result", res)
+	}
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
+	f.chat.PostsAfterAlert(f.h, f.started)
+	if banners := f.h.Banners.Sent(); len(banners) != 1 {
+		t.Errorf("banners = %+v, want one: the stored report changed", banners)
+	}
+	f.send(t, older)
+	if !sessionUnread(ctx, t, f.h, f.id) {
+		t.Fatal("older report read the session")
+	}
+
+	closeTab()
+	waitFor(t, func() bool { return strings.Contains(f.send(t, older), wire.ReasonFocusNotConnected) })
+	f.openTab(t, "web-1")
+	waitFor(t, func() bool { return !strings.Contains(f.send(t, older), wire.ReasonFocusNotConnected) })
+	if !sessionUnread(ctx, t, f.h, f.id) {
+		t.Fatal("older report read the session after a reconnect")
+	}
+
+	older.Seq = 3
+	f.send(t, older)
+	if sessionUnread(ctx, t, f.h, f.id) {
+		t.Error("session still unread after a newer report")
 	}
 }
 

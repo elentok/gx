@@ -16,6 +16,9 @@ type FocusReports struct {
 	// overlap the stream it replaces.
 	streams map[string]int
 	reports map[string]wire.FocusReport
+	// seqs is each client's last applied report number. It outlives the
+	// client's streams, so a late report cannot win after a reconnect.
+	seqs map[string]int64
 	// lastFocused is the client focused most recently; banner clicks go to it.
 	lastFocused string
 	// lastTerm outlives its client's disconnect, so a banner sent with no TUI
@@ -26,7 +29,7 @@ type FocusReports struct {
 }
 
 func NewFocusReports() *FocusReports {
-	return &FocusReports{streams: map[string]int{}, reports: map[string]wire.FocusReport{}}
+	return &FocusReports{streams: map[string]int{}, reports: map[string]wire.FocusReport{}, seqs: map[string]int64{}}
 }
 
 func (f *FocusReports) Connect(client string) {
@@ -58,12 +61,27 @@ func (f *FocusReports) connected(client string) bool {
 	return f.streams[client] > 0
 }
 
-// report saves r, reporting false when its client has no open stream.
-func (f *FocusReports) report(r wire.FocusReport) bool {
+type reportOutcome int
+
+const (
+	reportApplied reportOutcome = iota
+	reportNotConnected
+	reportStale
+)
+
+// report saves r, unless its client has no open stream or r is a web report
+// older than the last one applied.
+func (f *FocusReports) report(r wire.FocusReport) reportOutcome {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.streams[r.Client] == 0 {
-		return false
+		return reportNotConnected
+	}
+	if r.Web && r.Seq != 0 {
+		if r.Seq < f.seqs[r.Client] {
+			return reportStale
+		}
+		f.seqs[r.Client] = r.Seq
 	}
 	f.reports[r.Client] = r
 	// Web reports never move the click target.
@@ -71,7 +89,20 @@ func (f *FocusReports) report(r wire.FocusReport) bool {
 		f.lastFocused = r.Client
 		f.lastTerm = cmp.Or(r.TermProgram, f.lastTerm)
 	}
-	return true
+	return reportApplied
+}
+
+// watchedSession is the session whose working card the client's focused web
+// page shows.
+func (f *FocusReports) watchedSession(client string) (string, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	// A report exists only while its client has an open stream.
+	r := f.reports[client]
+	if !r.Web || !r.Focused || !r.Card || r.Session == "" {
+		return "", false
+	}
+	return r.Session, true
 }
 
 // focusedClient is the most recently focused TUI, or empty when it has
@@ -151,8 +182,11 @@ func (mg *Manager) reportFocus(req wire.FocusReport) (wire.SessionResult, error)
 			return res, err
 		}
 	}
-	if !mg.focus.report(req) {
+	switch mg.focus.report(req) {
+	case reportNotConnected:
 		return Refusal(wire.ReasonFocusNotConnected, "client "+req.Client+" has no open event stream"), nil
+	case reportStale:
+		return wire.SessionResult{}, nil
 	}
 	if !req.Focused || req.Session == "" {
 		return wire.SessionResult{}, nil

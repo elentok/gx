@@ -225,14 +225,18 @@ const ReasonFocusNotConnected = "not-connected"
 // id and its Client the TUI.
 const EventSessionFocus = "session-focus"
 
-// FocusReport is a TUI's terminal focus, the session it has on screen (empty
-// for none) and its terminal app. Client names the TUI's event stream
+// FocusReport is a TUI's or web page's focus, the session it has on screen
+// (empty for none) and its terminal app. Client names its event stream
 // (/v1/events?client=); the report counts only while that stream is open.
 type FocusReport struct {
 	Client      string `json:"client"`
 	Focused     bool   `json:"focused,omitempty"`
 	Session     string `json:"session,omitempty"`
 	TermProgram string `json:"term_program,omitempty"`
+	// Card: the page shows the session's working card.
+	Card bool `json:"card,omitempty"`
+	// Seq grows within one client; an older web report is ignored.
+	Seq int64 `json:"seq,omitempty"`
 	// Web marks a web tab's report. Only the web mux sets it, never the body.
 	Web bool `json:"-"`
 }

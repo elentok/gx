@@ -9,6 +9,43 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
+func TestWatchedSession(t *testing.T) {
+	t.Parallel()
+	watching := wire.FocusReport{Client: "web-1", Web: true, Focused: true, Session: "s1", Card: true}
+	tests := []struct {
+		name   string
+		change func(*wire.FocusReport)
+		closed bool
+		want   string
+	}{
+		{name: "web page showing the card", want: "s1"},
+		{name: "TUI report", change: func(r *wire.FocusReport) { r.Web = false }},
+		{name: "unfocused", change: func(r *wire.FocusReport) { r.Focused = false }},
+		{name: "no card", change: func(r *wire.FocusReport) { r.Card = false }},
+		{name: "no session", change: func(r *wire.FocusReport) { r.Session = "" }},
+		{name: "closed stream", closed: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := watching
+			if tc.change != nil {
+				tc.change(&r)
+			}
+			focus := NewFocusReports()
+			focus.Connect(r.Client)
+			focus.report(r)
+			if tc.closed {
+				focus.Disconnect(r.Client)
+			}
+			got, ok := focus.watchedSession(r.Client)
+			if got != tc.want || ok != (tc.want != "") {
+				t.Errorf("watchedSession = %q, %t; want %q", got, ok, tc.want)
+			}
+		})
+	}
+}
+
 func TestOpenOnScreen(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
