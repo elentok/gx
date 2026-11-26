@@ -86,6 +86,21 @@ test.each([
   expect(screen.getByLabelText("Answer to question 1")).toHaveProperty("rows", rows)
 })
 
+test("a picked text row's box has fixed wording and the option text stays on its button", () => {
+  const option = "Tell Claude what to change"
+  renderThemed(
+    <Question
+      card={card({ kind: "options", options: [{ id: "other", label: option, text: true }] })}
+      answer={{ choice: "other" }}
+      onChange={() => {}}
+      onPicked={() => {}}
+    />,
+  )
+  const box = screen.getByRole("textbox", { name: "Answer to question 1" })
+  expect(box.getAttribute("placeholder")).toBe("Your answer")
+  expect(screen.getByRole("button", { name: option, pressed: true }).textContent).toContain(option)
+})
+
 function KindHarness({ kind, seen }: { kind: string; seen: Answers[] }) {
   const [answers, setAnswers] = useState<Answers>({})
   return (

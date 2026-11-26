@@ -58,7 +58,7 @@ test("multi-select's Other row answers with the id other and asks for its text",
   expect(onChange).toHaveBeenLastCalledWith({ choices: ["other"], huh: false })
   cleanup()
   show(options({ kind: "multi-select" }), { answer: { choices: ["other"] } })
-  expect(screen.getByRole("textbox", { name: /Other \(question 1\)/ })).toBeTruthy()
+  expect(screen.getByRole("textbox", { name: "Answer to question 1" })).toBeTruthy()
 })
 
 test("the note field shows only when the card takes notes", () => {
@@ -74,7 +74,9 @@ test("the note field shows only when the card takes notes", () => {
 
 test("a picked text row shows its text field", () => {
   show(options(), { answer: { choice: "other" } })
-  expect(screen.getByRole("textbox", { name: /Other \(question 1\)/ })).toBeTruthy()
+  const box = screen.getByRole("textbox", { name: "Answer to question 1" })
+  expect(box.getAttribute("placeholder")).toBe("Your answer")
+  expect(screen.getByRole("button", { name: "Other" }).getAttribute("aria-pressed")).toBe("true")
   cleanup()
   show(options(), { answer: { choice: "a" } })
   expect(screen.queryByRole("textbox")).toBeNull()

@@ -227,10 +227,10 @@ export function Question({
             <PromptBox
               size="sm"
               rows={big ? 5 : 2}
-              label={`${textRow.label} (question ${card.label})`}
+              label={`Answer to question ${card.label}`}
               name="question-row-text"
               title={`${textRow.label} - ${nameOf(card)}`}
-              placeholder={textRow.label}
+              placeholder="Your answer"
               value={answer.text ?? ""}
               onChange={(t) => onChange({ ...answer, huh: false, text: t })}
             />

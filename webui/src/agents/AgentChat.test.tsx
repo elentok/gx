@@ -181,7 +181,7 @@ test("a multi-select card posts option ids, and the Other row posts other with i
   await screen.findByText(/Pick one\?/)
   fireEvent.click(screen.getByRole("button", { name: /Alpha/ }))
   fireEvent.click(screen.getByRole("button", { name: /Other/ }))
-  fireEvent.change(screen.getByRole("textbox", { name: /Other/ }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Answer to question 1" }), {
     target: { value: "mine" },
   })
   fireEvent.click(submitButton())
@@ -322,7 +322,7 @@ test("a plan card shows its plan text and a text row that needs text", async () 
   expect(await screen.findByText("The plan text")).toBeTruthy()
   fireEvent.click(screen.getByRole("button", { name: /Other/ }))
   expect(submitButton().disabled).toBe(true)
-  fireEvent.change(screen.getByRole("textbox", { name: /Other/ }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Answer to question 1" }), {
     target: { value: "change it" },
   })
   expect(submitButton().disabled).toBe(false)

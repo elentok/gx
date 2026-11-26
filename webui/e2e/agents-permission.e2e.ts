@@ -219,7 +219,11 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Answer in the terminal" })).toBeVisible()
   await sheet.getByRole("button", { name: "Other", exact: true }).first().click()
-  await sheet.getByPlaceholder("Other", { exact: true }).first().fill("Postgres")
+  // The pick has already moved the sheet on, so the picked row's slide is aria-hidden.
+  await sheet
+    .getByRole("textbox", { name: /^Answer to question/, includeHidden: true })
+    .first()
+    .fill("Postgres")
   await expect(sheet).toContainText("1 of 3 answered")
   // Picking an answer moves to the next question.
   await sheet.getByRole("button", { name: "Note on question 2" }).click()
@@ -252,7 +256,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled()
   await sheet.getByRole("button", { name: /Tell Claude what to change/ }).click()
   await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled()
-  await sheet.getByPlaceholder("Tell Claude what to change").fill("fewer steps")
+  await sheet.getByRole("textbox", { name: /^Answer to question/ }).fill("fewer steps")
   await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeEnabled()
 
   // Codex question card: Note, no Huh?; the Queue agent's ticket ask: Submit only; the printed round: Huh? and nothing else.
@@ -367,7 +371,10 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
     }).toPass(SLOW)
   await revisitUntil("Which size?")
   await sheet.getByRole("button", { name: "Other", exact: true }).first().click()
-  await sheet.getByPlaceholder("Other", { exact: true }).first().fill("draft text")
+  await sheet
+    .getByRole("textbox", { name: /^Answer to question/ })
+    .first()
+    .fill("draft text")
   await fixture.controlClaude(askedConv, {
     action: "block",
     waiting_for: "input needed",
@@ -375,7 +382,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   })
   await revisitUntil("Which shape?")
   await sheet.getByRole("button", { name: "Other", exact: true }).first().click()
-  await expect(sheet.getByPlaceholder("Other", { exact: true }).first()).toHaveValue("")
+  await expect(sheet.getByRole("textbox", { name: /^Answer to question/ }).first()).toHaveValue("")
   await sheetDismiss(page).click()
   await leavesBlocked(fixture, asked.id)
 
