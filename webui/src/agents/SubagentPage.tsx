@@ -1,6 +1,7 @@
 import { Box, Link, Text } from "@chakra-ui/react"
 import { Fragment, useEffect, useState, type ReactNode } from "react"
-import { ChatMessages, WorkingRow } from "../design/ChatCore"
+import { ChatMessages } from "../design/ChatCore"
+import { WorkingRow } from "../design/WorkingRow"
 import { formatElapsed, tokenText } from "../design/taskRows"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import {
@@ -283,13 +284,12 @@ export function SubagentPage({
           ) : (
             <ChatMessages
               chat={chat}
-              busy={running}
               sessionId={session.id}
               showTools
               topAnchor
               head={prompt}
               tail={result}
-              working={<WorkingRow current={chat.current} others={chat.others} />}
+              bottom={running && <WorkingRow current={chat.current} others={chat.others} />}
             />
           )}
         </Box>

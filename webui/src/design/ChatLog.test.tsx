@@ -331,10 +331,7 @@ test("the task list shows the tasks under the chat", async () => {
       }),
     ),
   )
-  const toggle = await screen.findByRole("button", { name: /1 of 2 tasks done/ })
-  expect(toggle.getAttribute("aria-expanded")).toBe("false")
-  fireEvent.click(toggle)
-  const list = screen.getByRole("list", { name: "Tasks" })
+  const list = await screen.findByRole("list", { name: "Tasks" })
   expect(within(list).getByText("make web-test")).toBeTruthy()
   expect(within(list).getByRole("img", { name: "done" })).toBeTruthy()
 })
@@ -358,8 +355,7 @@ test("a task row opens to its details line and a Codex row shows only what it ca
       }),
     ),
   )
-  fireEvent.click(await screen.findByRole("button", { name: /1 of 2 tasks done/ }))
-  const list = screen.getByRole("list", { name: "Tasks" })
+  const list = await screen.findByRole("list", { name: "Tasks" })
   expect(within(list).getAllByRole("button").length).toBe(1)
   const row = within(list).getByRole("button", { name: /git status/ })
   expect(row.getAttribute("aria-expanded")).toBe("false")
@@ -370,15 +366,14 @@ test("a task row opens to its details line and a Codex row shows only what it ca
   expect(screen.queryByText(/no output yet/)).toBeNull()
 })
 
-const openTaskList = async (tasks: import("../generated/server").SessionTask[]) => {
+const taskRows = async (tasks: import("../generated/server").SessionTask[]) => {
   renderChat([session()], okChat(chatOf([], { tasks })))
-  fireEvent.click(await screen.findByRole("button", { name: /of \d+ tasks done/ }))
-  return screen.getByRole("list", { name: "Tasks" })
+  return screen.findByRole("list", { name: "Tasks" })
 }
 
 test("an open shell row shows its command in a capped block with Show all", async () => {
   const command = Array.from({ length: 16 }, (_, i) => `echo ${i + 1}`).join("\n")
-  const list = await openTaskList([
+  const list = await taskRows([
     { kind: "shell", label: "echo", started_at: ago(0), command },
     { kind: "shell", label: "short", started_at: ago(0), command: "ls\npwd" },
     { kind: "shell", label: "bare", started_at: ago(0) },
@@ -404,7 +399,7 @@ test("an open shell row shows its command in a capped block with Show all", asyn
 })
 
 test("a python -c command shows its script body", async () => {
-  const list = await openTaskList([
+  const list = await taskRows([
     {
       kind: "shell",
       label: "python3 -c …",
@@ -423,21 +418,25 @@ test("an older Codex turn names its agent call in flight", async () => {
     [session({ status: { state: "working" } })],
     okChat(chatOf([msg({ text: "hi" })], { current })),
   )
-  await waitFor(() =>
-    expect(screen.getByRole("status").textContent).toBe("Working · waiting for sub-agent: survey"),
-  )
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Working · survey"))
 })
 
-test("a busy turn keeps the tasks out of the Working row, also in the Questions view", async () => {
+test("a busy turn shows one card, the Working row over the tasks, in the Chat and Questions views", async () => {
   const tasks = [{ kind: "shell", label: "make test", started_at: ago(0) }]
   const working = [session({ status: { state: "working" } })]
+  const expectCard = () => {
+    const card = screen
+      .getByRole("list", { name: "Tasks" })
+      .closest<HTMLElement>("[data-mock-part='card']")!
+    expect(within(card).getByRole("status").textContent).toBe("Working")
+  }
   renderChat(working, okChat(chatOf([msg({ text: "hi" })], { tasks })))
   await screen.findByRole("list", { name: "Tasks" })
-  expect(screen.getByRole("status").textContent).toBe("Working")
+  expectCard()
   cleanup()
   renderChat(working, roundChat({ tasks }))
   await screen.findByRole("group", { name: "Questions" })
-  expect(screen.getByRole("list", { name: "Tasks" })).toBeTruthy()
+  expectCard()
 })
 
 test("an event for the session refetches and a new conversation replaces the chat", async () => {

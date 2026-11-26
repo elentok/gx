@@ -2,7 +2,8 @@ import { Box, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import { BlockingCard } from "../design/BlockingCard"
 import { DeliveryCard, tailCard } from "../design/DeliveryCard"
-import { ChatMessages, WorkingRow } from "../design/ChatCore"
+import { ChatMessages } from "../design/ChatCore"
+import { WorkingCard } from "../design/WorkingCard"
 import { sheetCardsOf } from "../design/chat"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { FailureBanner, visibleFailure } from "../design/FailureBanner"
@@ -166,11 +167,18 @@ export function AgentChat({
       <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
         <ChatMessages
           chat={chat}
-          busy={busy}
           sessionId={session.id}
           end={<SwitchLine session={session} />}
           showTools
-          working={<WorkingRow current={chat.current} others={chat.others} />}
+          bottom={
+            <WorkingCard
+              working={busy ? {} : undefined}
+              tasks={chat.tasks}
+              current={chat.current}
+              others={chat.others}
+              sessionId={session.id}
+            />
+          }
         />
         {session.first_prompt_pending && (
           <Text role="status" fontSize="sm" color="fg.muted">

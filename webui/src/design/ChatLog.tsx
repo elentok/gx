@@ -4,8 +4,9 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionChatResponse, SessionInfo } from "../generated/server"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { hasChat, roundKeyOf, roundOf } from "./chat"
-import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
-import { TaskList } from "./TaskList"
+import { ChatMessages } from "./ChatCore"
+import { WorkingCard } from "./WorkingCard"
+import type { WorkingStep } from "./WorkingRow"
 import type { AutoMenuState } from "./AutoMenu"
 import { BlockingCard } from "./BlockingCard"
 import { DeliveryCard, tailCard } from "./DeliveryCard"
@@ -267,6 +268,15 @@ function ChatBody({
     return () => window.removeEventListener("keydown", onKey, true)
   }, [questions, onQuestions])
   const busy = session.status.state === "working" && !session.status.background
+  const card = (
+    <WorkingCard
+      working={busy ? step : undefined}
+      tasks={chat.tasks}
+      current={chat.current}
+      others={chat.others}
+      sessionId={session.id}
+    />
+  )
   return (
     <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
       <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
@@ -289,16 +299,12 @@ function ChatBody({
                 {logTail && <Box flexShrink="0">{logTail}</Box>}
               </>
             }
-            busy={busy}
             sessionId={session.id}
             end={<SwitchLine session={session} />}
-            working={step && <WorkingRow {...step} current={chat.current} others={chat.others} />}
+            bottom={card}
           />
         )}
-        {questions && busy && step && (
-          <WorkingRow {...step} current={chat.current} others={chat.others} />
-        )}
-        {questions && <TaskList tasks={chat.tasks} sessionId={session.id} />}
+        {questions && card}
         <ChatTail
           session={session}
           chat={chat}

@@ -64,7 +64,7 @@ import (
 // RestScreen.test.tsx and the Go rest tests cover each rule alone but cannot see either.
 // Task list flow (+1): the chat read from fixture transcripts and rollouts to the page, the same rows on the Design and
 // Agents pages, a real clock ticking with no request, and layout at 390px need a real server and browser;
-// TaskList.test.tsx (vitest) covers summary, order, marks, formats, tick, details and command alone but cannot see them.
+// WorkingCard.test.tsx (vitest) covers order, marks, formats, tick, details and command alone but cannot see them.
 //
 // Chat draft page flow (+1): the Start round trip to a new chat on the draft's exact model and effort, the redirect and
 // the failed Start with its leftover worktree need a real server, the fixture's fake agents and a real page;
@@ -98,7 +98,7 @@ import (
 // Subagent page flow (+1): the chat read from fixture transcripts, meta.json files and rollouts to the page, the journey
 // across the Agents, Design and subagent pages with the browser Back button and a reload, a live file growth seen with
 // no reload and layout at 390px need a real server and browser; SubagentPage.test.tsx, AgentsPage.sessionView.test.tsx,
-// TaskList.test.tsx, ChatLog.test.tsx and the Go server tests cover each rule alone but cannot see them together.
+// WorkingCard.test.tsx, ChatLog.test.tsx and the Go server tests cover each rule alone but cannot see them together.
 //
 // Nav buttons flow (+1): history moves, reload, three layouts, hover in WebKit and a touch tap need a real browser;
 // component tests cover each rule alone.

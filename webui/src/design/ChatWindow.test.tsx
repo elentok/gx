@@ -26,9 +26,7 @@ const shown = (c: HTMLElement) => c.textContent?.match(/message number \d+/g) ??
 
 describe("the chat window", () => {
   it("mounts only the newest messages and grows on request", () => {
-    const { container } = renderThemed(
-      <ChatMessages chat={chatOf(150)} busy={false} sessionId="s1" />,
-    )
+    const { container } = renderThemed(<ChatMessages chat={chatOf(150)} sessionId="s1" />)
     expect(shown(container)).toHaveLength(60)
     expect(container.textContent).toContain("message number 150")
     expect(container.textContent).not.toContain("message number 90 ")
@@ -40,9 +38,7 @@ describe("the chat window", () => {
   })
 
   it("shows a short chat whole, with no button", () => {
-    const { container } = renderThemed(
-      <ChatMessages chat={chatOf(60)} busy={false} sessionId="s1" />,
-    )
+    const { container } = renderThemed(<ChatMessages chat={chatOf(60)} sessionId="s1" />)
     expect(shown(container)).toHaveLength(60)
     expect(screen.queryByRole("button", { name: /earlier messages/ })).toBeNull()
   })
@@ -56,7 +52,6 @@ describe("the chat window", () => {
             ...chatOf(0),
             messages: [{ ...msg(1), text: "see a/b.go" }],
           }}
-          busy={false}
           sessionId="s1"
         />
       </FileLinkProvider>,

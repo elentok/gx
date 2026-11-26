@@ -70,6 +70,9 @@ test("a running subagent shows its header, the working row and no result card", 
     expect(screen.getByText(t)).toBeTruthy()
   expect(screen.getByText(/Working/)).toBeTruthy()
   expect(screen.getByText(/go test \.\/\.\.\./)).toBeTruthy()
+  // The page keeps the bare row: no working card.
+  expect(document.querySelector("[data-mock-part]")).toBeNull()
+  expect(screen.getByRole("status").textContent).toBe("Working · running shell: go test ./...")
   expect(screen.queryByText("Result handed back to the parent")).toBeNull()
 })
 

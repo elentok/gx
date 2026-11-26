@@ -44,10 +44,6 @@ export function elapsedText(t: SessionTask, now: number): string {
   return [lead, d].filter(Boolean).join(" · ")
 }
 
-export function kindWord(kind: string): string {
-  return kind === "call" ? "shell" : kind
-}
-
 /** Running rows first, then the finished ones; each group keeps the server's launch order. */
 export function orderRows<R extends { item: SessionTask }>(rows: R[]): R[] {
   return [...rows.filter((r) => !r.item.finished), ...rows.filter((r) => r.item.finished)]
@@ -87,11 +83,6 @@ export function taskDetails(
     if (running && t.last_line) parts.push(lastLineText(t.last_line))
   } else if (t.kind === "call") {
     if (!running && exit) parts.push(exit)
-  } else if (t.kind === "subagent") {
-    if (t.model) parts.push(t.model)
-    if (t.tokens) parts.push(`${tokenText(t.tokens)} tokens`)
-    if (t.tool_calls) parts.push(plural(t.tool_calls, "tool call"))
-    if (running && t.current_call) parts.push(`now: ${t.current_call}`)
   } else if (t.kind === "monitor") {
     const n = t.event_count ?? 0
     parts.push(plural(n, "event"))
@@ -106,17 +97,4 @@ export function taskDetails(
 
 export function taskKey(t: SessionTask): string {
   return `${t.started_at}|${t.kind}|${t.label}`
-}
-
-export function taskSummary(tasks: SessionTask[], now: number) {
-  const done = tasks.filter((t) => t.finished).length
-  const running = tasks.filter((t) => !t.finished)
-  const longest = running.length
-    ? Math.max(...running.map((t) => now - Date.parse(t.started_at)))
-    : undefined
-  return {
-    done,
-    total: tasks.length,
-    longest: longest === undefined ? undefined : formatElapsed(longest),
-  }
 }

@@ -21,11 +21,15 @@ const KIND_WORDS: Record<string, string> = {
 export function InFlightTools({
   current,
   others = [],
+  plainAgent,
 }: {
   current: SessionInFlightTool
   others?: SessionInFlightTool[]
+  /** An agent call reads its label alone. */
+  plainAgent?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const verb = plainAgent && current.kind === "agent" ? "" : (VERBS[current.kind] ?? "")
   return (
     // With a path, no minW 0: the call shrinks before the text in front of it, down to its tool and file name.
     <Box
@@ -34,7 +38,7 @@ export function InFlightTools({
       gap="1"
       {...(current.path ? { flexShrink: 1000 } : { minW: "0" })}
     >
-      <CallLabel label={`${VERBS[current.kind] ?? ""}${current.label}`} path={current.path} />
+      <CallLabel label={`${verb}${current.label}`} path={current.path} />
       {others.length > 0 && (
         <>
           {" "}

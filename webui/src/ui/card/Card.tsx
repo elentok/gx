@@ -8,9 +8,17 @@ interface CardProps {
   // Runs a light round the border in the tone's color, for an epic with work in flight.
   live?: boolean
   children: ReactNode
+  /** Names the card's outer box for the mock check. */
+  "data-mock-part"?: string
 }
 
-export function Card({ title, tone = "muted", live, children }: CardProps) {
+export function Card({
+  title,
+  tone = "muted",
+  live,
+  children,
+  "data-mock-part": mockPart,
+}: CardProps) {
   const body = (
     <>
       {title && (
@@ -25,6 +33,7 @@ export function Card({ title, tone = "muted", live, children }: CardProps) {
     return (
       <Box
         data-tone={tone}
+        data-mock-part={mockPart}
         bg="surface.raised"
         borderWidth="1px"
         borderColor="border"
@@ -40,6 +49,7 @@ export function Card({ title, tone = "muted", live, children }: CardProps) {
     <Box
       data-tone={tone}
       data-live
+      data-mock-part={mockPart}
       borderRadius="md"
       p="1px"
       animation="orbit 6s linear infinite"

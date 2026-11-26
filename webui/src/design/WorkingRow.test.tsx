@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import { renderThemed } from "../ui/render"
-import { WorkingRow } from "./ChatCore"
+import { WorkingRow } from "./WorkingRow"
 
 afterEach(cleanup)
 

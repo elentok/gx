@@ -1,8 +1,7 @@
-import { Box, chakra, Spinner as ChakraSpinner, Text } from "@chakra-ui/react"
+import { Box, chakra, Text } from "@chakra-ui/react"
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "../ui/button/Button"
 import { fetchArchive } from "./chat"
-import { TaskList } from "./TaskList"
 import type {
   SessionChatImage,
   SessionChatMessage,
@@ -11,7 +10,6 @@ import type {
 } from "../generated/server"
 import { subagentHref } from "../hrefs"
 import { ImageViewer } from "./ImageViewer"
-import { InFlightTools } from "./InFlightTools"
 import { withKeys } from "../uniqueKeys"
 import { sessionImageUrl } from "./sessionImages"
 import { LinkedText } from "../files/LinkedText"
@@ -344,44 +342,6 @@ function CommandOutput({ text }: { text: string }) {
   )
 }
 
-export interface WorkingStep {
-  step?: string
-  title?: string
-}
-
-// Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
-export function WorkingRow({
-  step,
-  title,
-  current,
-  others,
-}: WorkingStep & Pick<SessionChatResponse, "current" | "others">) {
-  return (
-    <Box
-      role="status"
-      display="flex"
-      alignItems="center"
-      gap="2"
-      fontSize="sm"
-      color="text.muted"
-      minW="0"
-    >
-      <ChakraSpinner size="sm" flexShrink="0" />
-      {/* A flex row with minW 0, so a long step, title or tool label ends in an ellipsis instead of widening the page. */}
-      {/* overflow hidden: a file name wider than the whole row is cut here too. */}
-      <Text as="span" display="flex" minW="0" flex="1" overflow="hidden">
-        <Text as="span" minW="0" truncate whiteSpace="pre">
-          Working
-          {step && `: ${step}`}
-          {title && ` · ${title}`}
-          {current && " · "}
-        </Text>
-        {current && <InFlightTools current={current} others={others} />}
-      </Text>
-    </Box>
-  )
-}
-
 // The messages scroll alone. They open at the newest one and follow the content as it grows (a new message,
 // streamed text, a folded tool run, an image that loads) until the reader scrolls up.
 function ChatScroller({
@@ -502,11 +462,10 @@ function CodexNotices({
   )
 }
 
-/** The scrolling messages, then, below them and outside the scroll, the task list and the caller's working row. */
+/** The scrolling messages, then, below them and outside the scroll, the caller's bottom block. */
 export function ChatMessages({
   chat,
-  busy,
-  working,
+  bottom,
   sessionId,
   showTools = false,
   head,
@@ -519,15 +478,14 @@ export function ChatMessages({
   chat: SessionChatResponse
   /** The first entry of the log, above the messages. */
   head?: ReactNode
-  /** Entries after the messages, before the working row. */
+  /** Entries after the messages. */
   tail?: ReactNode
-  /** The last entry, after the working row. */
+  /** The last entry, after `tail`. */
   end?: ReactNode
   /** Shows each folded run of tool calls; the Design page leaves them out. */
   showTools?: boolean
-  busy: boolean
-  /** Shown at the bottom while `busy`. */
-  working?: ReactNode
+  /** The block under the log: the working card, or the subagent page's Working row. */
+  bottom?: ReactNode
   /** The session the chat belongs to: the archive route needs it. */
   sessionId: string
 }) {
@@ -553,13 +511,6 @@ export function ChatMessages({
   const limit = more.key === windowKey ? more.limit : CHAT_WINDOW
   const hiddenCount = Math.max(0, messages.length - limit)
   const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
-  const strip =
-    (busy && working) || (chat.tasks?.length ?? 0) > 0 ? (
-      <Box flexShrink="0" display="flex" flexDirection="column" gap="3">
-        {busy && working}
-        <TaskList tasks={chat.tasks} sessionId={sessionId} />
-      </Box>
-    ) : null
   return (
     <>
       <ChatScroller key={windowKey} topAnchor={topAnchor}>
@@ -591,11 +542,11 @@ export function ChatMessages({
         ))}
         {tail}
         {end}
-        {/* A top-anchored log keeps the strip right under the messages, not at the pane bottom. */}
-        {topAnchor && strip}
+        {/* A top-anchored log keeps the block right under the messages, not at the pane bottom. */}
+        {topAnchor && bottom}
       </ChatScroller>
-      {/* Outside the scroller: the Working row and tasks come and go without moving the messages. */}
-      {!topAnchor && strip}
+      {/* Outside the scroller: the block comes and goes without moving the messages. */}
+      {!topAnchor && bottom}
     </>
   )
 }
