@@ -1,8 +1,9 @@
-import { chakra, Heading, Text } from "@chakra-ui/react"
+import { Box, chakra, Heading, Text } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Button } from "../ui/button/Button"
+import { TextBox } from "../ui/text-box/TextBox"
 import { AuthCard } from "./AuthCard"
-import { ErrorLine, Field, formValues } from "./AuthFields"
+import { ErrorLine, formValues } from "./AuthFields"
 import type { AuthResult, AuthState } from "./authState"
 import { AddAuthenticator } from "./AddAuthenticator"
 import { TrustHelp } from "./cert"
@@ -68,31 +69,41 @@ export function LoginCard({
         </Heading>
         {error && <ErrorLine>{error}</ErrorLine>}
         {setupCodeRequired && (
-          <Field
-            part="setup-code"
-            label="Setup code"
-            name="setup_code"
-            placeholder="XXXX-XXXX"
-            defaultValue={setupCode}
-          />
+          <Box data-mock-part="setup-code">
+            <TextBox
+              kind="line"
+              verbatim
+              size="lg"
+              label="Setup code"
+              name="setup_code"
+              placeholder="XXXX-XXXX"
+              defaultValue={setupCode}
+            />
+          </Box>
         )}
-        <Field
-          part="password"
-          label="Password"
-          name="password"
-          type="password"
-          defaultValue={password}
-          autoFocus
-        />
-        {totpOn && (
-          <Field
-            part="code"
-            label="Code from your authenticator app"
-            name="totp_code"
-            placeholder="123456"
-            inputMode="numeric"
-            autoComplete="one-time-code"
+        <Box data-mock-part="password">
+          <TextBox
+            kind="credential"
+            autoComplete="current-password"
+            size="lg"
+            label="Password"
+            name="password"
+            defaultValue={password}
+            autoFocus
           />
+        </Box>
+        {totpOn && (
+          <Box data-mock-part="code">
+            <TextBox
+              kind="credential"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              size="lg"
+              label="Code from your authenticator app"
+              name="totp_code"
+              placeholder="123456"
+            />
+          </Box>
         )}
         <Button
           type="submit"

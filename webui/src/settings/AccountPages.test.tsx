@@ -47,10 +47,6 @@ const auth =
 const NEXT = { secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP" }
 
 const type = (el: HTMLElement, value: string) => fireEvent.change(el, { target: { value } })
-// The "New password" label also holds its hint, so look the inputs up by name.
-const input = (container: HTMLElement, name: string) =>
-  container.querySelector(`input[name="${name}"]`) as HTMLElement
-
 describe("ChangePasswordView", () => {
   it("counts the other devices before submit, and says nothing with none", () => {
     for (const [count, text] of [
@@ -81,12 +77,12 @@ describe("ChangePasswordView", () => {
 
   it("does not submit when the new passwords differ", () => {
     const onSubmit = vi.fn()
-    const { container, getByLabelText, getByRole, getByText } = renderThemed(
+    const { getByLabelText, getByRole, getByText } = renderThemed(
       <ChangePasswordView otherDevices={2} totpOn={false} onSubmit={onSubmit} />,
     )
     type(getByLabelText("Current password"), "old")
-    type(input(container, "new_password"), "correct horse battery")
-    type(input(container, "new_password_again"), "correct horse batterX")
+    type(getByLabelText("New password"), "correct horse battery")
+    type(getByLabelText("New password again"), "correct horse batterX")
     fireEvent.click(getByRole("button", { name: "Change password" }))
     expect(getByText("The new passwords don't match.")).toBeTruthy()
     expect(onSubmit).not.toHaveBeenCalled()
@@ -114,12 +110,12 @@ describe("ChangePasswordPage", () => {
       reason: "password-too-short",
       message: "The password needs at least 6 characters.",
     }))
-    const { container, findByText, getByLabelText, getByRole } = renderPage({ change })
+    const { findByText, getByLabelText, getByRole } = renderPage({ change })
     expect(await findByText("The 2 other devices will be signed out.")).toBeTruthy()
     type(getByLabelText("Current password"), "old")
     type(getByLabelText("Code from your authenticator app"), "123456")
-    type(input(container, "new_password"), "short pass word")
-    type(input(container, "new_password_again"), "short pass word")
+    type(getByLabelText("New password"), "short pass word")
+    type(getByLabelText("New password again"), "short pass word")
     fireEvent.click(getByRole("button", { name: "Change password" }))
     expect(await findByText("The password needs at least 6 characters.")).toBeTruthy()
     expect(change).toHaveBeenCalledWith({

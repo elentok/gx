@@ -1,43 +1,5 @@
-import { Box, chakra, Text } from "@chakra-ui/react"
+import { Box } from "@chakra-ui/react"
 import type { ReactNode } from "react"
-
-export function Field({
-  label,
-  part,
-  error,
-  hint,
-  ...input
-}: {
-  label: string
-  part?: string
-  error?: boolean
-  hint?: string
-} & Omit<React.ComponentProps<typeof chakra.input>, "label">) {
-  return (
-    <chakra.label display="block" data-mock-part={part}>
-      <Text fontSize="sm" color="text.muted" mb="1">
-        {label}
-      </Text>
-      <chakra.input
-        w="100%"
-        h="44px"
-        px="3"
-        bg="surface"
-        color="text"
-        borderWidth="1px"
-        borderColor={error ? "tone.paused.fg" : "border"}
-        borderRadius="md"
-        fontSize="base"
-        {...input}
-      />
-      {hint && (
-        <Text fontSize="xs" color="text.dim" mt="1">
-          {hint}
-        </Text>
-      )}
-    </chakra.label>
-  )
-}
 
 /** The form's named fields by name. A field the form does not hold is undefined. */
 export const formValues = (form: HTMLFormElement) =>

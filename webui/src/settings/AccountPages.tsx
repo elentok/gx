@@ -1,7 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState, type FormEvent, type ReactNode } from "react"
 import { AddAuthenticator } from "../auth/AddAuthenticator"
-import { ErrorLine, Field, formValues } from "../auth/AuthFields"
+import { ErrorLine, formValues } from "../auth/AuthFields"
 import { fetchAuthState, type AuthState } from "../auth/authState"
 import { MIN_PASSWORD, PASSWORD_HINT } from "../auth/refusals"
 import { SETTINGS_HREF } from "../hrefs"
@@ -9,6 +9,7 @@ import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { useWrite } from "../useWrite"
@@ -57,6 +58,38 @@ function OtherDevicesNote({ count }: { count: number }) {
   )
 }
 
+function CurrentPasswordBox() {
+  return (
+    <Box data-mock-part="current-password">
+      <TextBox
+        kind="credential"
+        autoComplete="current-password"
+        size="lg"
+        label="Current password"
+        name="password"
+        required
+      />
+    </Box>
+  )
+}
+
+function CodeBox({ label }: { label: string }) {
+  return (
+    <Box data-mock-part="code">
+      <TextBox
+        kind="credential"
+        autoComplete="one-time-code"
+        inputMode="numeric"
+        size="lg"
+        label={label}
+        name="totp_code"
+        placeholder="123456"
+        required
+      />
+    </Box>
+  )
+}
+
 function Submit({ pending, children }: { pending: boolean; children: ReactNode }) {
   return (
     <Box data-mock-part="submit">
@@ -101,43 +134,30 @@ export function ChangePasswordView({
         {(error || mismatch) && (
           <ErrorLine>{mismatch ? "The new passwords don't match." : error}</ErrorLine>
         )}
-        <Field
-          part="current-password"
-          label="Current password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-        {totpOn && (
-          <Field
-            part="code"
-            label="Code from your authenticator app"
-            name="totp_code"
-            placeholder="123456"
-            inputMode="numeric"
-            autoComplete="one-time-code"
+        <CurrentPasswordBox />
+        {totpOn && <CodeBox label="Code from your authenticator app" />}
+        <Box data-mock-part="new-password">
+          <TextBox
+            kind="credential"
+            autoComplete="new-password"
+            size="lg"
+            label="New password"
+            name="new_password"
+            minLength={MIN_PASSWORD}
+            hint={PASSWORD_HINT}
             required
           />
-        )}
-        <Field
-          part="new-password"
-          label="New password"
-          name="new_password"
-          type="password"
-          autoComplete="new-password"
-          minLength={MIN_PASSWORD}
-          hint={PASSWORD_HINT}
-          required
-        />
-        <Field
-          part="new-password-again"
-          label="New password again"
-          name="new_password_again"
-          type="password"
-          autoComplete="new-password"
-          required
-        />
+        </Box>
+        <Box data-mock-part="new-password-again">
+          <TextBox
+            kind="credential"
+            autoComplete="new-password"
+            size="lg"
+            label="New password again"
+            name="new_password_again"
+            required
+          />
+        </Box>
         <OtherDevicesNote count={otherDevices} />
         <Submit pending={pending}>Change password</Submit>
       </Form>
@@ -201,25 +221,8 @@ export function AuthenticatorView({
           }}
         >
           {error && <ErrorLine>{error}</ErrorLine>}
-          <Field
-            part="current-password"
-            label="Current password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-          {mode === "replace" && (
-            <Field
-              part="code"
-              label="Code from the current app"
-              name="totp_code"
-              placeholder="123456"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-            />
-          )}
+          <CurrentPasswordBox />
+          {mode === "replace" && <CodeBox label="Code from the current app" />}
           <OtherDevicesNote count={otherDevices} />
           <Submit pending={pending}>Next</Submit>
         </Form>

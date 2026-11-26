@@ -2,8 +2,9 @@ import { Box, chakra, Heading, Text } from "@chakra-ui/react"
 import { useEffect, useState, type FormEvent } from "react"
 import { Button } from "../ui/button/Button"
 import { ProgressBar } from "../ui/progress-bar/ProgressBar"
+import { TextBox } from "../ui/text-box/TextBox"
 import { AuthCard } from "./AuthCard"
-import { ErrorLine, Field, formValues } from "./AuthFields"
+import { ErrorLine, formValues } from "./AuthFields"
 import type { AuthResult, AuthState } from "./authState"
 import { AddAuthenticator } from "./AddAuthenticator"
 import { TrustHelp } from "./cert"
@@ -52,15 +53,19 @@ export function SetupCodeCard({ totpOn, error, code, onSubmit }: SetupCodeCardPr
           see it.
         </Text>
         {error && <ErrorLine>{error}</ErrorLine>}
-        <Field
-          part="setup-code"
-          label="Setup code"
-          name="code"
-          placeholder="XXXX-XXXX"
-          defaultValue={code}
-          key={code}
-          autoFocus
-        />
+        <Box data-mock-part="setup-code">
+          <TextBox
+            kind="line"
+            verbatim
+            size="lg"
+            label="Setup code"
+            name="code"
+            placeholder="XXXX-XXXX"
+            defaultValue={code}
+            key={code}
+            autoFocus
+          />
+        </Box>
         <Button type="submit" data-mock-part="submit">
           Continue
         </Button>
@@ -96,22 +101,26 @@ export function SetupPasswordCard({ totpOn, error, onSubmit }: SetupPasswordCard
           Choose a password
         </Heading>
         {error && <ErrorLine>{error}</ErrorLine>}
-        <Field
-          part="password"
-          label="Password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          hint={PASSWORD_HINT}
-          autoFocus
-        />
-        <Field
-          part="password-again"
-          label="Password again"
-          name="again"
-          type="password"
-          autoComplete="new-password"
-        />
+        <Box data-mock-part="password">
+          <TextBox
+            kind="credential"
+            autoComplete="new-password"
+            size="lg"
+            label="Password"
+            name="password"
+            hint={PASSWORD_HINT}
+            autoFocus
+          />
+        </Box>
+        <Box data-mock-part="password-again">
+          <TextBox
+            kind="credential"
+            autoComplete="new-password"
+            size="lg"
+            label="Password again"
+            name="again"
+          />
+        </Box>
         <Button type="submit" data-mock-part="submit">
           {totpOn ? "Continue" : "Finish setup"}
         </Button>
