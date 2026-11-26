@@ -18,7 +18,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const askPayload = `{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"toolu_1","tool_input":{"questions":[{"question":"Which?","header":"Pick","multiSelect":false,"options":[{"label":"A","description":"first"},{"label":"B","description":"second"}]}]}}`
@@ -81,7 +81,7 @@ func TestAskQuestionHook_MarkerExistsOnlyWhileHeld(t *testing.T) {
 			t.Errorf("%s: markers while held = %d, want 1", how, n)
 		}
 		if how == "resolved" {
-			h.Server.Sessions().ResolveAsk("s1", "toolu_1", wire.AskHookResult{Decision: wire.AskHookRelease})
+			h.Server.Sessions().ResolveAsk("s1", "toolu_1", ops.AskHookResult{Decision: ops.AskHookRelease})
 		} else {
 			cancel()
 		}
@@ -102,17 +102,17 @@ func TestAskQuestionHook_PrintsTheServersDecision(t *testing.T) {
 	live := func() (*apiclient.Client, error) { return h.Client, nil }
 	for _, tc := range []struct {
 		name string
-		res  wire.AskHookResult
+		res  ops.AskHookResult
 		want string
 	}{
-		{"allow", wire.AskHookResult{Decision: wire.AskHookAllow, UpdatedInput: json.RawMessage(`{"answers":{"Which?":"A"}}`)},
+		{"allow", ops.AskHookResult{Decision: ops.AskHookAllow, UpdatedInput: json.RawMessage(`{"answers":{"Which?":"A"}}`)},
 			`{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","updatedInput":{"answers":{"Which?":"A"}}}}`},
-		{"deny", wire.AskHookResult{Decision: wire.AskHookDeny, Reason: "use gx tickets ask"},
+		{"deny", ops.AskHookResult{Decision: ops.AskHookDeny, Reason: "use gx tickets ask"},
 			`{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"use gx tickets ask"}}`},
-		{"release", wire.AskHookResult{Decision: wire.AskHookRelease}, ""},
+		{"release", ops.AskHookResult{Decision: ops.AskHookRelease}, ""},
 	} {
 		done := make(chan struct{})
-		var held []wire.AskHookRequest
+		var held []ops.AskHookRequest
 		go func() {
 			defer close(done)
 			deadline := time.Now().Add(8 * time.Second)

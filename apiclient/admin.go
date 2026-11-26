@@ -112,8 +112,8 @@ func (a *Admin) SaveChecks(ctx context.Context, req wire.SaveChecksRequest) (wir
 
 // DefaultHarness is the global Default harness, the agent runner and each
 // project's override.
-func (a *Admin) DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error) {
-	var st wire.DefaultHarnessStatus
+func (a *Admin) DefaultHarness(ctx context.Context) (ops.DefaultHarnessStatus, error) {
+	var st ops.DefaultHarnessStatus
 	err := a.t.get(ctx, "/v1/settings/agents", &st)
 	return st, err
 }
@@ -135,8 +135,8 @@ func (a *Admin) SetSettings(ctx context.Context, req ops.SettingsWriteRequest) (
 
 // SetDefaultHarness writes the Default harness. A refusal is a result (Refused
 // set), not an error.
-func (a *Admin) SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
-	var res wire.SetDefaultHarnessResult
+func (a *Admin) SetDefaultHarness(ctx context.Context, req ops.SetDefaultHarnessRequest) (ops.SetDefaultHarnessResult, error) {
+	var res ops.SetDefaultHarnessResult
 	err := a.t.post(ctx, "/v1/settings/agents", req, &res)
 	return res, err
 }

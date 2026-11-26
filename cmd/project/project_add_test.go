@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -22,13 +23,13 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	notRepo := t.TempDir()
 
-	add := func(req wire.AddProjectRequest) (string, error) {
+	add := func(req ops.AddProjectRequest) (string, error) {
 		var out bytes.Buffer
 		err := runProjectAdd(ctx, h.Client, Deps{}, &out, false, req)
 		return out.String(), err
 	}
 
-	out, err := add(wire.AddProjectRequest{Path: repo})
+	out, err := add(ops.AddProjectRequest{Path: repo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,19 +49,19 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 	}
 
 	// Re-adding the same path (even under another name) names the existing project.
-	out, err = add(wire.AddProjectRequest{Path: repo, Name: "other"})
+	out, err = add(ops.AddProjectRequest{Path: repo, Name: "other"})
 	if err != nil || !strings.Contains(out, "already registered as project "+name) {
 		t.Errorf("re-add = %q, %v", out, err)
 	}
 
 	for _, tc := range []struct {
 		desc, reason string
-		req          wire.AddProjectRequest
+		req          ops.AddProjectRequest
 	}{
-		{"scratch reserved", wire.ReasonReservedName, wire.AddProjectRequest{Path: notRepo, Name: "scratch", VCS: "none"}},
-		{"duplicate name", wire.ReasonNameTaken, wire.AddProjectRequest{Path: notRepo, Name: name, VCS: "none"}},
-		{"non-repo", wire.ReasonNotRepo, wire.AddProjectRequest{Path: notRepo}},
-		{"bad name", wire.ReasonBadName, wire.AddProjectRequest{Path: notRepo, Name: "a/b", VCS: "none"}},
+		{"scratch reserved", ops.ReasonReservedName, ops.AddProjectRequest{Path: notRepo, Name: "scratch", VCS: "none"}},
+		{"duplicate name", ops.ReasonNameTaken, ops.AddProjectRequest{Path: notRepo, Name: name, VCS: "none"}},
+		{"non-repo", ops.ReasonNotRepo, ops.AddProjectRequest{Path: notRepo}},
+		{"bad name", ops.ReasonBadName, ops.AddProjectRequest{Path: notRepo, Name: "a/b", VCS: "none"}},
 	} {
 		if _, err := add(tc.req); err == nil || !strings.Contains(err.Error(), tc.reason) {
 			t.Errorf("%s: err = %v, want reason %s", tc.desc, err, tc.reason)
@@ -68,7 +69,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 	}
 
 	// A non-repo registers with --vcs none.
-	if _, err := add(wire.AddProjectRequest{Path: notRepo, Name: "loose", VCS: "none"}); err != nil {
+	if _, err := add(ops.AddProjectRequest{Path: notRepo, Name: "loose", VCS: "none"}); err != nil {
 		t.Errorf("vcs none: %v", err)
 	}
 }
@@ -77,7 +78,7 @@ func TestProjectAdd_DefaultNameIsDirHoldingBare(t *testing.T) {
 	h := servertest.Start(t)
 	bare := testutil.TempDotBareRepoWithWorktrees(t)
 	var out bytes.Buffer
-	if err := runProjectAdd(context.Background(), h.Client, Deps{}, &out, false, wire.AddProjectRequest{Path: bare}); err != nil {
+	if err := runProjectAdd(context.Background(), h.Client, Deps{}, &out, false, ops.AddProjectRequest{Path: bare}); err != nil {
 		t.Fatal(err)
 	}
 	want := filepath.Base(bare)

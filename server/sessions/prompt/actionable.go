@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/sessions/chat/roundparse"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
@@ -204,7 +205,7 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 // round's first question.
 func designQuestion(round int, text string) sessions.DesignQuestion {
 	q := sessions.DesignQuestion{Round: round}
-	if cards := chat.RoundCards(text); len(cards) > 0 {
+	if cards := roundparse.RoundCards(text); len(cards) > 0 {
 		q.Text = firstLine(cards[0].Body)
 		if q.Text == "" {
 			q.Text = cards[0].Title

@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // SetHarness sets the default harness through the client.
-func SetHarness(t *testing.T, h *servertest.Harness, req wire.SetDefaultHarnessRequest) wire.SetDefaultHarnessResult {
+func SetHarness(t *testing.T, h *servertest.Harness, req ops.SetDefaultHarnessRequest) ops.SetDefaultHarnessResult {
 	t.Helper()
 	res, err := h.Client.Admin.SetDefaultHarness(context.Background(), req)
 	if err != nil {

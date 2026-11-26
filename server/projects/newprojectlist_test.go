@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // appliedLines reads a project's list; ok is false when it has none.
@@ -31,7 +31,7 @@ func appliedLines(t *testing.T, projectDir string) (lines []string, ok bool) {
 func TestProjectAdd_NewProjectGetsTheFullAppliedList(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
-	res, err := h.Client.Reads.AddProject(context.Background(), wire.AddProjectRequest{Path: t.TempDir(), Name: "fresh", VCS: config.VCSNone})
+	res, err := h.Client.Reads.AddProject(context.Background(), ops.AddProjectRequest{Path: t.TempDir(), Name: "fresh", VCS: config.VCSNone})
 	if err != nil || res.Refused {
 		t.Fatalf("add = %+v, %v", res, err)
 	}

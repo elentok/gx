@@ -257,8 +257,8 @@ func (s *Sessions) MarkActionable(ctx context.Context, req wire.MarkActionableRe
 
 // AskHold registers a Claude AskUserQuestion call and blocks until the server
 // decides what the hook does with it.
-func (s *Sessions) AskHold(ctx context.Context, req wire.AskHookRequest) (wire.AskHookResult, error) {
-	var res wire.AskHookResult
+func (s *Sessions) AskHold(ctx context.Context, req ops.AskHookRequest) (ops.AskHookResult, error) {
+	var res ops.AskHookResult
 	err := s.t.post(ctx, "/v1/sessions/ask-hold", req, &res)
 	return res, err
 }

@@ -1,4 +1,4 @@
-package sessions_test
+package infoflows_test
 
 import (
 	"os"

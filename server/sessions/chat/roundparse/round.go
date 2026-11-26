@@ -1,4 +1,5 @@
-package chat
+// Package roundparse reads a Grilling round out of an agent message.
+package roundparse
 
 import (
 	"fmt"
@@ -8,10 +9,8 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/tickets/ticketlog"
-	"github.com/elentok/gx/transcript"
 )
 
 // roundBlockNote explains a free-text card whose gx-question block was missing
@@ -113,24 +112,4 @@ func afterRoundNumber(header string) string {
 		rest = strings.TrimPrefix(header[loc[1]:], "**")
 	}
 	return strings.TrimLeft(rest, "-:– ")
-}
-
-// chatRound is the round the agent's last turn ended with, or nil.
-func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
-	for _, text := range transcript.TrailingAgentTexts(msgs) {
-		if grillround.HasMarker(text) {
-			return RoundCards(text)
-		}
-	}
-	return nil
-}
-
-// ChatNext is the run-end line of the agent's last turn, or nil.
-func ChatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ref FlowRef, final bool) *wire.SessionNext {
-	for _, text := range transcript.TrailingAgentTexts(msgs) {
-		if a, ok := RunEndNext(text, ref, string(kind), final); ok {
-			return &wire.SessionNext{Action: a}
-		}
-	}
-	return nil
 }

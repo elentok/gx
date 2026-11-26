@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
@@ -35,7 +36,7 @@ func (p *Registry) Remove(req wire.ProjectRequest) (wire.ProjectResult, error) {
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	if req.Name == ScratchProject {
-		return refuseProject(wire.ReasonReservedName, "\""+ScratchProject+"\" is built in and cannot be removed")
+		return refuseProject(ops.ReasonReservedName, "\""+ScratchProject+"\" is built in and cannot be removed")
 	}
 	dir, err := p.Dir(req.Name)
 	if err != nil {
@@ -69,7 +70,7 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 		// The outbox became a real clone, so its tickets can commit.
 		pf.VCS = nil
 	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
-		return refuseProject(wire.ReasonNotRepo, req.Path+" is not a git repo")
+		return refuseProject(ops.ReasonNotRepo, req.Path+" is not a git repo")
 	}
 	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {

@@ -1,4 +1,5 @@
-package sessions
+// Package agentlogs prunes the agent logs of every project.
+package agentlogs
 
 import (
 	"context"
@@ -22,17 +23,17 @@ type logPruner interface {
 	Prune(maxAge time.Duration, now time.Time, paused func(label string) bool) ([]string, error)
 }
 
-// reattacher adopts the agent a previous server launched.
-type Reattacher interface {
-	Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error)
-}
-
 // AgentLogs prunes the agent logs of every project.
 type AgentLogs struct {
 	ticketStore string
 	log         *slog.Logger
 	settings    *settings.Holder
 	harness     *harnesschoice.Harness
+}
+
+// New returns the pruner of the projects under ticketStore.
+func New(ticketStore string, log *slog.Logger, settings *settings.Holder, harness *harnesschoice.Harness) *AgentLogs {
+	return &AgentLogs{ticketStore: ticketStore, log: log, settings: settings, harness: harness}
 }
 
 func (al *AgentLogs) logRetention() time.Duration {

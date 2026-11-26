@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
@@ -113,10 +114,10 @@ func TestTicketAskCard_QueueAgentListsOnlyTheAsk(t *testing.T) {
 
 func TestClaudeDialogCard(t *testing.T) {
 	t.Parallel()
-	req := wire.AskHookRequest{Session: "s1", ToolUseID: "toolu_9", Questions: []wire.AskHookQuestion{
-		{Header: "Scope", Question: "Which scope?", Options: []wire.AskHookOption{{Label: "A", Description: "first"}, {Label: "B", Description: "second"}}},
-		{Header: "Extras", Question: "Which extras?", MultiSelect: true, Options: []wire.AskHookOption{{Label: "X", Description: "x desc"}}},
-		{Header: "Ship", Question: "Ship it?", Options: []wire.AskHookOption{{Label: "Yes"}}},
+	req := ops.AskHookRequest{Session: "s1", ToolUseID: "toolu_9", Questions: []ops.AskHookQuestion{
+		{Header: "Scope", Question: "Which scope?", Options: []ops.AskHookOption{{Label: "A", Description: "first"}, {Label: "B", Description: "second"}}},
+		{Header: "Extras", Question: "Which extras?", MultiSelect: true, Options: []ops.AskHookOption{{Label: "X", Description: "x desc"}}},
+		{Header: "Ship", Question: "Ship it?", Options: []ops.AskHookOption{{Label: "Yes"}}},
 	}}
 	got := chat.ClaudeDialogCard(req)
 	if len(got) != 1 || got[0].Source != wire.CardSourceClaudeDialog || got[0].ID != "toolu_9" || len(got[0].Questions) != 3 {

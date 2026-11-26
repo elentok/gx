@@ -5,8 +5,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
@@ -15,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/agentlogs"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/convrecord"
 	"github.com/elentok/gx/server/settings"
@@ -35,6 +38,11 @@ type SessionsConfig struct {
 	Player                  sound.Player
 	SessionBannerDelay      time.Duration
 	SessionExitCleanupDelay time.Duration
+}
+
+// Reattacher adopts the agent a previous server launched.
+type Reattacher interface {
+	Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error)
 }
 
 // Host is what the Manager and the Resumer need from the rest of the root.
@@ -69,7 +77,7 @@ type Manager struct {
 	host    Host
 	Watches *sessionWatches
 	// Logs prunes the agent logs; Maps answers for the map epic of an address.
-	Logs *AgentLogs
+	Logs *agentlogs.AgentLogs
 	Maps *MapEpics
 	// OnSessionGone is told the id of a session that just exited or was
 	// removed. Nil is a no-op.
@@ -147,7 +155,7 @@ func NewManager(d ManagerDeps) *Manager {
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,
-		Logs:    &AgentLogs{ticketStore: d.Cfg.TicketStore, log: d.Log, settings: d.Settings, harness: d.Harness},
+		Logs:    agentlogs.New(d.Cfg.TicketStore, d.Log, d.Settings, d.Harness),
 		Maps:    maps,
 		Conv:    &convrecord.Recorder{Dir: d.Cfg.ConversationsDir, Log: d.Log, Host: convHost{d.Projects, maps}},
 		designs: d.Designs, rollouts: d.Rollouts, workspaces: d.Workspaces,

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -90,7 +91,7 @@ func New(d Deps) *cobra.Command {
 				return err
 			}
 			return runProjectAdd(c.Context(), cl, d, c.OutOrStdout(), addJSON,
-				wire.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
+				ops.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
 		},
 	}
 	add.Flags().StringVar(&name, "name", "", "project name (default: the repo directory's name)")
@@ -169,19 +170,19 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 // addProjectJSON is the `project add --json` object: the add result, plus the
 // unset check kinds and the command that sets them up when config is missing.
 type addProjectJSON struct {
-	wire.AddProjectResult
+	ops.AddProjectResult
 	ChecksMissing  []string `json:"checks_missing,omitempty"`
 	OnboardCommand string   `json:"onboard_command,omitempty"`
 }
 
-func runProjectAdd(ctx context.Context, cl *apiclient.Client, d Deps, w io.Writer, jsonOut bool, req wire.AddProjectRequest) error {
+func runProjectAdd(ctx context.Context, cl *apiclient.Client, d Deps, w io.Writer, jsonOut bool, req ops.AddProjectRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := cl.Reads.AddProject(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.AddProjectResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = ops.AddProjectResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

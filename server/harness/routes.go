@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Routes lists the Default harness endpoints. The getter is called per request,
@@ -20,7 +21,7 @@ func Routes(h func() *Harness) []wire.Route {
 			wire.WriteJSON(w, st)
 		}},
 		{Pattern: "POST /v1/settings/agents", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
-			var req wire.SetDefaultHarnessRequest
+			var req ops.SetDefaultHarnessRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return

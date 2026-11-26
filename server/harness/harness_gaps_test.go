@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -68,7 +69,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		run  func(t *testing.T, f refusalFixture) wire.SessionResult
 	}{
 		{"project override", "the project default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			rigs.SetHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			rigs.SetHarness(t, f.h, ops.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},

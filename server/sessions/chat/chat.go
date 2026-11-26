@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
@@ -67,7 +68,7 @@ type Source interface {
 	// question.
 	TicketAsk(address string) (q ticketlog.Question, state string, ok bool)
 	// HeldAsks lists the AskUserQuestion calls a Claude hook holds for a session.
-	HeldAsks(session string) []wire.AskHookRequest
+	HeldAsks(session string) []ops.AskHookRequest
 	// AskReleased says whether the session handed a dialog showing question
 	// back to the terminal.
 	AskReleased(session, question string) bool

@@ -1,4 +1,4 @@
-package sessions_test
+package watchflows_test
 
 import (
 	"context"

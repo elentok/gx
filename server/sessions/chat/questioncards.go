@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
@@ -130,7 +131,7 @@ func headed(header, question string) string {
 // ClaudeDialogCard is a held AskUserQuestion call as a Question card. Its id is
 // the tool_use_id; an option's id is its 1-based position, and every question
 // ends in an "Other" row the person types into.
-func ClaudeDialogCard(req wire.AskHookRequest) []wire.QuestionCard {
+func ClaudeDialogCard(req ops.AskHookRequest) []wire.QuestionCard {
 	qs := make([]wire.QuestionCardQuestion, len(req.Questions))
 	for i, it := range req.Questions {
 		cq := wire.QuestionCardQuestion{Kind: "options", Label: strconv.Itoa(i + 1), Title: headed(it.Header, it.Question)}

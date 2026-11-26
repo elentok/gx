@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // ServerAPI is the slice of apiclient.Client the tab uses in server mode: the
@@ -22,8 +23,8 @@ type ServerAPI interface {
 type AdminAPI interface {
 	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
-	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
-	SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error)
+	DefaultHarness(ctx context.Context) (ops.DefaultHarnessStatus, error)
+	SetDefaultHarness(ctx context.Context, req ops.SetDefaultHarnessRequest) (ops.SetDefaultHarnessResult, error)
 }
 
 // QueueAPI is the slice of *apiclient.Queue the tickets and queue tabs use.

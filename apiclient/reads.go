@@ -81,8 +81,8 @@ func (r *Reads) DeleteCleanupBranch(ctx context.Context, req ops.CleanupWriteReq
 
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
-func (r *Reads) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {
-	var res wire.AddProjectResult
+func (r *Reads) AddProject(ctx context.Context, req ops.AddProjectRequest) (ops.AddProjectResult, error) {
+	var res ops.AddProjectResult
 	err := r.t.post(ctx, "/v1/projects/add", req, &res)
 	return res, err
 }

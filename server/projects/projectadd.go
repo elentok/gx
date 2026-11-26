@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
@@ -24,20 +24,20 @@ var projectNameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
 // projectAddMu serializes adds, so two racing adds cannot claim one name.
 var projectAddMu sync.Mutex
 
-func refuseAdd(reason, msg string) (wire.AddProjectResult, error) {
-	return wire.AddProjectResult{Refused: true, Reason: reason, Message: msg}, nil
+func refuseAdd(reason, msg string) (ops.AddProjectResult, error) {
+	return ops.AddProjectResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
-func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error) {
+func (p *Registry) Add(req ops.AddProjectRequest) (ops.AddProjectResult, error) {
 	if req.VCS != "" && req.VCS != config.VCSNone {
-		return refuseAdd(wire.ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
+		return refuseAdd(ops.ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
 	}
 	repo := CanonicalDir(req.Path)
 	defaultName := filepath.Base(repo)
 	if req.VCS == "" {
 		info, err := git.FindRepo(req.Path)
 		if err != nil {
-			return refuseAdd(wire.ReasonNotRepo, req.Path+" is not a git repo (use --vcs none for a project without one)")
+			return refuseAdd(ops.ReasonNotRepo, req.Path+" is not a git repo (use --vcs none for a project without one)")
 		}
 		repo = CanonicalDir(info.Root)
 		dir := repo
@@ -51,22 +51,22 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 		name = defaultName
 	}
 	if name == ScratchProject {
-		return refuseAdd(wire.ReasonReservedName, "\""+ScratchProject+"\" is reserved")
+		return refuseAdd(ops.ReasonReservedName, "\""+ScratchProject+"\" is reserved")
 	}
 	if !projectNameRe.MatchString(name) {
-		return refuseAdd(wire.ReasonBadName, "project name "+name+" must be a slug of letters, digits, '.', '_' or '-'")
+		return refuseAdd(ops.ReasonBadName, "project name "+name+" must be a slug of letters, digits, '.', '_' or '-'")
 	}
 
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
-		return wire.AddProjectResult{}, err
+		return ops.AddProjectResult{}, err
 	}
 	for _, dir := range dirs {
 		pf, err := config.ReadProjectFile(dir)
 		if err == nil && pf.Repo != nil && CanonicalDir(*pf.Repo) == repo {
-			return wire.AddProjectResult{Name: tickets.ProjectName(dir), Repo: repo, Existing: true}, nil
+			return ops.AddProjectResult{Name: tickets.ProjectName(dir), Repo: repo, Existing: true}, nil
 		}
 	}
 	for _, dir := range dirs {
@@ -75,7 +75,7 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 			if pf, err := config.ReadProjectFile(dir); err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone {
 				msg += "; to turn that ticket-only project into this clone, run gx project set-path " + name + " <clone>"
 			}
-			return refuseAdd(wire.ReasonNameTaken, msg)
+			return refuseAdd(ops.ReasonNameTaken, msg)
 		}
 	}
 	pf := config.ProjectFile{Name: &name, Repo: &repo}
@@ -84,12 +84,12 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 	}
 	projectDir := filepath.Join(p.cfg().TicketStore, name)
 	if err := ticketmigrate.WriteProjectFile(projectDir, pf); err != nil {
-		return wire.AddProjectResult{}, err
+		return ops.AddProjectResult{}, err
 	}
 	if err := migrations.WriteFullApplied(projectDir); err != nil {
-		return wire.AddProjectResult{}, err
+		return ops.AddProjectResult{}, err
 	}
-	return wire.AddProjectResult{Name: name, Repo: repo}, nil
+	return ops.AddProjectResult{Name: name, Repo: repo}, nil
 }
 
 // CanonicalDir resolves symlinks so one directory has one identity; a path

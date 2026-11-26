@@ -1,4 +1,4 @@
-package sessions_test
+package infoflows_test
 
 import (
 	"encoding/json"
@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -60,15 +61,15 @@ func (s infoSource) ReadMeta(string) (chat.Meta, error) { return chat.Meta{}, er
 func (s infoSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return nil, errors.New("unused")
 }
-func (s infoSource) HeldAsks(string) []wire.AskHookRequest { return nil }
-func (s infoSource) AskReleased(string, string) bool       { return false }
-func (s infoSource) StepFinal(chat.FlowRef) bool           { return false }
-func (s infoSource) NoteFailure(string)                    {}
-func (s infoSource) NoteCards(string)                      {}
-func (s infoSource) Stopped() <-chan struct{}              { return nil }
-func (s infoSource) HasChatReader(string) bool             { return false }
-func (s infoSource) CodexHome() (string, error)            { return s.codexHome, nil }
-func (s infoSource) Publish(string, string)                {}
+func (s infoSource) HeldAsks(string) []ops.AskHookRequest { return nil }
+func (s infoSource) AskReleased(string, string) bool      { return false }
+func (s infoSource) StepFinal(chat.FlowRef) bool          { return false }
+func (s infoSource) NoteFailure(string)                   {}
+func (s infoSource) NoteCards(string)                     {}
+func (s infoSource) Stopped() <-chan struct{}             { return nil }
+func (s infoSource) HasChatReader(string) bool            { return false }
+func (s infoSource) CodexHome() (string, error)           { return s.codexHome, nil }
+func (s infoSource) Publish(string, string)               {}
 func (s infoSource) TicketAsk(string) (ticketlog.Question, string, bool) {
 	return ticketlog.Question{}, "", false
 }

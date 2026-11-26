@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/prompt/dialogkeys"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // dismissReason is what Claude reads when the person dismisses a held question.
@@ -22,7 +23,7 @@ const dismissReason = "The user doesn't want to proceed with this question. Do n
 // by keys.
 func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) wire.SessionResult {
 	stale := sessions.Refusal(wire.ReasonStale, "the question moved on; review it first")
-	var held *wire.AskHookRequest
+	var held *ops.AskHookRequest
 	for _, h := range p.sessions.HeldAsks(req.ID) {
 		if h.ToolUseID == req.CardID {
 			held = &h
@@ -36,7 +37,7 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 			Settle: SettleScreen,
 		})
 	}
-	var res wire.AskHookResult
+	var res ops.AskHookResult
 	switch {
 	case req.Release:
 		if !p.sessions.ReleaseAsk(req.ID, req.CardID) {
@@ -44,13 +45,13 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 		}
 		return wire.SessionResult{}
 	case !slices.ContainsFunc(req.Answers, dialogkeys.Answered):
-		res = wire.AskHookResult{Decision: wire.AskHookDeny, Reason: dismissReason}
+		res = ops.AskHookResult{Decision: ops.AskHookDeny, Reason: dismissReason}
 	default:
 		input, refusal := claudeUpdatedInput(*held, req.Answers)
 		if refusal != "" {
 			return sessions.Refusal(wire.ReasonSessionBadRequest, refusal)
 		}
-		res = wire.AskHookResult{Decision: wire.AskHookAllow, UpdatedInput: input}
+		res = ops.AskHookResult{Decision: ops.AskHookAllow, UpdatedInput: input}
 	}
 	if !p.sessions.ResolveAsk(req.ID, req.CardID, res) {
 		return stale
@@ -62,7 +63,7 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 // original questions, answers keyed by question text (multi-select labels
 // joined with ", "), and the per-question notes as annotations. A refusal
 // message says which question is not answered right.
-func claudeUpdatedInput(held wire.AskHookRequest, answers []wire.SessionAnswer) (json.RawMessage, string) {
+func claudeUpdatedInput(held ops.AskHookRequest, answers []wire.SessionAnswer) (json.RawMessage, string) {
 	type option struct {
 		Label       string `json:"label"`
 		Description string `json:"description"`

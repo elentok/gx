@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func TestSentEntry_OnlyDesignAndPlainChatSave(t *testing.T) {
@@ -27,10 +28,10 @@ func TestSentEntry_OnlyDesignAndPlainChatSave(t *testing.T) {
 }
 
 func TestClaudeUpdatedInput_ClickOrder(t *testing.T) {
-	held := wire.AskHookRequest{Questions: []wire.AskHookQuestion{{
+	held := ops.AskHookRequest{Questions: []ops.AskHookQuestion{{
 		Question:    "Which?",
 		MultiSelect: true,
-		Options:     []wire.AskHookOption{{Label: "A"}, {Label: "B"}},
+		Options:     []ops.AskHookOption{{Label: "A"}, {Label: "B"}},
 	}}}
 	tests := []struct {
 		name    string

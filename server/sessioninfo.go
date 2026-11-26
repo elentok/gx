@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -49,7 +50,7 @@ func (c chatSource) TicketAsk(address string) (ticketlog.Question, string, bool)
 	return ticketlog.QuestionOfEvent(*open), queue.AnswerState(*open, t.PausedClass()), true
 }
 
-func (c chatSource) HeldAsks(session string) []wire.AskHookRequest {
+func (c chatSource) HeldAsks(session string) []ops.AskHookRequest {
 	return c.s.sessions.HeldAsks(session)
 }
 func (c chatSource) AskReleased(session, question string) bool {

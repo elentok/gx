@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -58,9 +58,9 @@ func newServerDefaultHarnessSetCmd(d Deps) *cobra.Command {
 		Short: "Set the Default harness, globally or for one project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			req := wire.SetDefaultHarnessRequest{Scope: wire.DefaultHarnessGlobal, Harness: args[0]}
+			req := ops.SetDefaultHarnessRequest{Scope: ops.DefaultHarnessGlobal, Harness: args[0]}
 			if project != "" {
-				req.Scope, req.Project = wire.DefaultHarnessProject, project
+				req.Scope, req.Project = ops.DefaultHarnessProject, project
 			}
 			if args[0] == followGlobal {
 				if project == "" {
@@ -80,7 +80,7 @@ func newServerDefaultHarnessSetCmd(d Deps) *cobra.Command {
 	return c
 }
 
-func runServerDefaultHarnessSet(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.SetDefaultHarnessRequest, jsonOut bool) error {
+func runServerDefaultHarnessSet(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.SetDefaultHarnessRequest, jsonOut bool) error {
 	res, err := cl.Admin.SetDefaultHarness(ctx, req)
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)

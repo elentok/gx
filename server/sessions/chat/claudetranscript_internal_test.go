@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
@@ -55,15 +56,15 @@ func (f *fakeSource) setConversation(id string) {
 func (f *fakeSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return f.refusal, nil
 }
-func (f *fakeSource) HeldAsks(string) []wire.AskHookRequest { return nil }
-func (f *fakeSource) AskReleased(string, string) bool       { return false }
-func (f *fakeSource) StepFinal(FlowRef) bool                { return f.final }
-func (f *fakeSource) NoteFailure(id string)                 { f.noted <- id }
-func (f *fakeSource) NoteCards(string)                      {}
-func (f *fakeSource) Stopped() <-chan struct{}              { return f.stopped }
-func (f *fakeSource) HasChatReader(h string) bool           { return f.readers[h] }
-func (f *fakeSource) CodexHome() (string, error)            { return f.codexHome, nil }
-func (f *fakeSource) Publish(event, id string)              { f.published <- [2]string{event, id} }
+func (f *fakeSource) HeldAsks(string) []ops.AskHookRequest { return nil }
+func (f *fakeSource) AskReleased(string, string) bool      { return false }
+func (f *fakeSource) StepFinal(FlowRef) bool               { return f.final }
+func (f *fakeSource) NoteFailure(id string)                { f.noted <- id }
+func (f *fakeSource) NoteCards(string)                     {}
+func (f *fakeSource) Stopped() <-chan struct{}             { return f.stopped }
+func (f *fakeSource) HasChatReader(h string) bool          { return f.readers[h] }
+func (f *fakeSource) CodexHome() (string, error)           { return f.codexHome, nil }
+func (f *fakeSource) Publish(event, id string)             { f.published <- [2]string{event, id} }
 func (f *fakeSource) TicketAsk(string) (ticketlog.Question, string, bool) {
 	return ticketlog.Question{}, "", false
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -85,7 +86,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 		wantFrom string
 	}{
 		{"project override", func(t *testing.T, h *servertest.Harness, _, _ string) {
-			rigs.SetHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			rigs.SetHarness(t, h, ops.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 		}, "the project default"},
 		{"reload", func(t *testing.T, h *servertest.Harness, path, store string) {
 			rigs.SwitchDefaultHarness(t, h, path, store, "codex")

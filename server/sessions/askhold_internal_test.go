@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
-func holdAsync(mg *Manager, session, id, question string) chan wire.AskHookResult {
-	out := make(chan wire.AskHookResult, 1)
-	req := wire.AskHookRequest{Session: session, ToolUseID: id, Questions: []wire.AskHookQuestion{{Question: question}}}
+func holdAsync(mg *Manager, session, id, question string) chan ops.AskHookResult {
+	out := make(chan ops.AskHookResult, 1)
+	req := ops.AskHookRequest{Session: session, ToolUseID: id, Questions: []ops.AskHookQuestion{{Question: question}}}
 	go func() { out <- mg.HoldAsk(context.Background(), req) }()
 	return out
 }
@@ -69,12 +69,12 @@ func TestAskHold_ReAskAfterReleaseNeverRegistersAHold(t *testing.T) {
 		go mg.ReleaseAsk("s1", "t1")
 		<-res
 		// The hook re-asks the moment its release returns.
-		again := make(chan wire.AskHookResult, 1)
+		again := make(chan ops.AskHookResult, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		go func() { again <- mg.HoldAsk(ctx, wire.AskHookRequest{Session: "s1", ToolUseID: "t1"}) }()
+		go func() { again <- mg.HoldAsk(ctx, ops.AskHookRequest{Session: "s1", ToolUseID: "t1"}) }()
 		select {
 		case r := <-again:
-			if r.Decision != wire.AskHookRelease {
+			if r.Decision != ops.AskHookRelease {
 				t.Fatalf("iteration %d: re-ask decision = %q", i, r.Decision)
 			}
 		case <-time.After(2 * time.Second):
@@ -90,7 +90,7 @@ func TestAskHold_ReAskAfterReleaseNeverRegistersAHold(t *testing.T) {
 func TestAskHold_ResolveAndReleaseDropTheHeldAskAtOnce(t *testing.T) {
 	for name, finish := range map[string]func(mg *Manager) bool{
 		"resolve": func(mg *Manager) bool {
-			return mg.ResolveAsk("s1", "t1", wire.AskHookResult{Decision: wire.AskHookDeny})
+			return mg.ResolveAsk("s1", "t1", ops.AskHookResult{Decision: ops.AskHookDeny})
 		},
 		"release": func(mg *Manager) bool { return mg.ReleaseAsk("s1", "t1") },
 	} {

@@ -30,7 +30,7 @@ const (
 	ReasonSessionNotDeliveryCard = "not-delivery-card"
 	// ReasonSessionNoCard refuses Dismiss of a session that shows no card.
 	ReasonSessionNoCard = "no-card"
-	// ReasonSessionBadName is ReasonBadName, so the public contract has one value.
+	// ReasonSessionBadName is ops.ReasonBadName, so the public contract has one value.
 	ReasonSessionBadName = "bad-name"
 )
 

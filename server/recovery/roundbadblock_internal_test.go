@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/grillround"
-	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/sessions/chat/roundparse"
 )
 
 func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
@@ -24,7 +24,7 @@ func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := chat.ParseRoundSegment(1, c.seg)
+			p := roundparse.ParseRoundSegment(1, c.seg)
 			if (p.Err != nil) != c.wantBad {
 				t.Fatalf("bad block = %v, want %v", p.Err, c.wantBad)
 			}

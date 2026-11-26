@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // ProjectDefaultHarness is one project's override; Harness is empty when the
 // project follows the global default.

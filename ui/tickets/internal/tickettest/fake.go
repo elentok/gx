@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // FakeServerAPI is a recording fake of the tab's server client. The sub-client
@@ -37,19 +38,19 @@ type FakeServerAPI struct {
 	QueueItems []wire.QueueItem
 	// Harness is what DefaultHarness returns; HarnessSets records the
 	// SetDefaultHarness requests and HarnessRes is what it returns.
-	Harness     wire.DefaultHarnessStatus
-	HarnessSets *[]wire.SetDefaultHarnessRequest
-	HarnessRes  wire.SetDefaultHarnessResult
+	Harness     ops.DefaultHarnessStatus
+	HarnessSets *[]ops.SetDefaultHarnessRequest
+	HarnessRes  ops.SetDefaultHarnessResult
 }
 
 // FakeAdmin is the Admin sub-client over the same FakeServerAPI state.
 type FakeAdmin struct{ FakeServerAPI }
 
-func (f FakeAdmin) DefaultHarness(context.Context) (wire.DefaultHarnessStatus, error) {
+func (f FakeAdmin) DefaultHarness(context.Context) (ops.DefaultHarnessStatus, error) {
 	return f.Harness, nil
 }
 
-func (f FakeAdmin) SetDefaultHarness(_ context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
+func (f FakeAdmin) SetDefaultHarness(_ context.Context, req ops.SetDefaultHarnessRequest) (ops.SetDefaultHarnessResult, error) {
 	if f.HarnessSets != nil {
 		*f.HarnessSets = append(*f.HarnessSets, req)
 	}

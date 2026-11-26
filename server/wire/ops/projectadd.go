@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // AddProjectRequest registers the project at Path. Name defaults to the repo
 // directory's name; VCS is "" (git) or config.VCSNone.

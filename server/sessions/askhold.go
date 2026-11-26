@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // askKey identifies a held question: one AskUserQuestion call of one session.
@@ -26,25 +27,25 @@ type askHolds struct {
 }
 
 type heldAsk struct {
-	req    wire.AskHookRequest
-	result chan wire.AskHookResult // buffered: resolving never blocks
+	req    ops.AskHookRequest
+	result chan ops.AskHookResult // buffered: resolving never blocks
 }
 
 // HoldAsk registers the question and waits for ResolveAsk. When ctx ends first
 // (the hook went away) it returns a release, which leaves Claude's own dialog.
-func (a *askHolds) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.AskHookResult {
+func (a *askHolds) HoldAsk(ctx context.Context, req ops.AskHookRequest) ops.AskHookResult {
 	key := askKey{req.Session, req.ToolUseID}
-	h := &heldAsk{req: req, result: make(chan wire.AskHookResult, 1)}
+	h := &heldAsk{req: req, result: make(chan ops.AskHookResult, 1)}
 	a.mu.Lock()
 	if _, ok := a.released[key]; ok {
 		a.mu.Unlock()
-		return wire.AskHookResult{Decision: wire.AskHookRelease}
+		return ops.AskHookResult{Decision: ops.AskHookRelease}
 	}
 	if a.held == nil {
 		a.held = map[askKey]*heldAsk{}
 	}
 	if old, ok := a.held[key]; ok {
-		old.result <- wire.AskHookResult{Decision: wire.AskHookRelease}
+		old.result <- ops.AskHookResult{Decision: ops.AskHookRelease}
 	}
 	a.held[key] = h
 	a.mu.Unlock()
@@ -59,21 +60,21 @@ func (a *askHolds) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.As
 	case res := <-h.result:
 		return res
 	case <-ctx.Done():
-		return wire.AskHookResult{Decision: wire.AskHookRelease}
+		return ops.AskHookResult{Decision: ops.AskHookRelease}
 	}
 }
 
 // HeldAsks lists a session's held questions.
-func (a *askHolds) HeldAsks(session string) []wire.AskHookRequest {
+func (a *askHolds) HeldAsks(session string) []ops.AskHookRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	var out []wire.AskHookRequest
+	var out []ops.AskHookRequest
 	for k, h := range a.held {
 		if k.session == session {
 			out = append(out, h.req)
 		}
 	}
-	slices.SortFunc(out, func(x, y wire.AskHookRequest) int { return strings.Compare(x.ToolUseID, y.ToolUseID) })
+	slices.SortFunc(out, func(x, y ops.AskHookRequest) int { return strings.Compare(x.ToolUseID, y.ToolUseID) })
 	return out
 }
 
@@ -90,7 +91,7 @@ func (a *askHolds) ForgetReleasedAsks(session string) {
 }
 
 // ResolveAsk gives a held question its result and reports whether one was held.
-func (a *askHolds) ResolveAsk(session, toolUseID string, res wire.AskHookResult) bool {
+func (a *askHolds) ResolveAsk(session, toolUseID string, res ops.AskHookResult) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	h, ok := a.held[askKey{session, toolUseID}]
@@ -117,7 +118,7 @@ func (a *askHolds) ReleaseAsk(session, toolUseID string) bool {
 		return false
 	}
 	select {
-	case h.result <- wire.AskHookResult{Decision: wire.AskHookRelease}:
+	case h.result <- ops.AskHookResult{Decision: ops.AskHookRelease}:
 	default:
 		return false
 	}
@@ -149,7 +150,7 @@ func (a *askHolds) AskReleased(session, question string) bool {
 // AskHoldWrite is POST /v1/sessions/ask-hold: the hook's call, which blocks
 // until the question has a result.
 func (a *askHolds) AskHoldWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.AskHookRequest
+	var req ops.AskHookRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Session == "" || req.ToolUseID == "" {
 		http.Error(w, "ask-hold needs a session and a tool_use_id", http.StatusBadRequest)
 		return

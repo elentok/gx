@@ -2644,7 +2644,7 @@ export const ReasonSessionNotDeliveryCard = "not-delivery-card";
  */
 export const ReasonSessionNoCard = "no-card";
 /**
- * ReasonSessionBadName is ReasonBadName, so the public contract has one value.
+ * ReasonSessionBadName is ops.ReasonBadName, so the public contract has one value.
  */
 export const ReasonSessionBadName = "bad-name";
 /**

@@ -184,7 +184,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/serverflows/` holds black-box tests of `server` (dev mode, heartbeat, runner options, unavailable, parallel); `server/servertest/` holds its test helpers (`server/servertest/rigs/` holds the leaf scenario rigs built on them, and the design, grilling, advancing, triage session and prompt session fixtures); `server/wire/` holds the
-  wire types, consts and pure methods (no behaviour, no import of `server`); `server/wire/ops/` holds the wire types that hold only data (schedules, cleanup, settings page, restart, web info, design drafts), generated to `webui/src/generated/ops.ts` and re-exported by `server.ts`; `server/schedules/` holds the per-machine Schedule state in the state dir (machine id, switch, baseline with forward-only `Advance`, skip log of the newest 10, cleanup; the scheduler comes later); `server/broker/` holds
+  wire types, consts and pure methods (no behaviour, no import of `server`); `server/wire/ops/` holds the wire types that hold only data (schedules, cleanup, settings page, restart, web info, design drafts), generated to `webui/src/generated/ops.ts` and re-exported by `server.ts`, plus the ask-hook, Default harness and project add types, which the web does not use (not generated); `server/schedules/` holds the per-machine Schedule state in the state dir (machine id, switch, baseline with forward-only `Advance`, skip log of the newest 10, cleanup; the scheduler comes later); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
   `server/web/` holds the web listener: bind, the login-gated mux, static and dev proxy, the
@@ -210,9 +210,12 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   detail);
   `server/sessions/chat/` holds the session chat: the `Chat` (reads, failure banner, command lists,
   permission dialogs, screens), its `Poll`, `Routes()`, the transcript path and file caches
-  (`TranscriptPaths`, `FileCache`, `AuthFailures`), the parsed-chat `Cache`, the Grilling round and
-  run-end parsers, `DesignContinueAction` and `AcceptsKeys`. It reaches the sessions through the
+  (`TranscriptPaths`, `FileCache`, `AuthFailures`), the parsed-chat `Cache`, the
+  run-end parser, `ContinueAction` and `AcceptsKeys`. It reaches the sessions through the
   `Source` interface (the root implements it as `chatSource`); its tests use a fake `Source`;
+  `server/sessions/chat/roundparse/` holds the Grilling round parser (`RoundCards`,
+  `ParseRoundSegment`; it must not import `chat`);
+  `server/sessions/agentlogs/` holds the daily pruning of every project's agent logs (`AgentLogs`);
   `server/sessions/` holds the interactive sessions: the `Manager` (create, stop, remove, focus,
   banner, watches, state) and the `Resumer` (resume, restore, handoff, link, step, fix agent), with
   `Routes()`. It imports `chat` (never the reverse); the root implements its `Host`, `Prompter`
@@ -281,6 +284,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   (test-only package: it has no non-test code);
   `server/sessions/convflows/` holds the conversation sweep, conversations and grilling-conversation
   tests and the handoff test (test-only package: it has no non-test code);
+  `server/sessions/infoflows/` holds the session info tests (context, model, usage, run-end line)
+  and `server/sessions/watchflows/` the subagent watch tests (both test-only);
   `server/sessions/convrecord/` holds a session's conversation record: its token and cost totals
   and Grilling round counts;
   `server/sessions/fixagent/` holds the `/gx-investigate` fix agent for a paused ticket or a failed

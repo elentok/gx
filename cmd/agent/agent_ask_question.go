@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // newAgentAskQuestionCmd is the Claude PreToolUse hook for AskUserQuestion. It
@@ -79,7 +79,7 @@ func runAskQuestion(ctx context.Context, dial func() (*apiclient.Client, error),
 
 // askHookRequestOf reads the hook payload. One it cannot read, or one without a
 // session, a tool_use_id and a question, gives no request.
-func askHookRequestOf(session string, raw []byte) (wire.AskHookRequest, bool) {
+func askHookRequestOf(session string, raw []byte) (ops.AskHookRequest, bool) {
 	var in struct {
 		ToolName  string `json:"tool_name"`
 		ToolUseID string `json:"tool_use_id"`
@@ -96,13 +96,13 @@ func askHookRequestOf(session string, raw []byte) (wire.AskHookRequest, bool) {
 		} `json:"tool_input"`
 	}
 	if session == "" || json.Unmarshal(raw, &in) != nil || in.ToolUseID == "" || len(in.ToolInput.Questions) == 0 {
-		return wire.AskHookRequest{}, false
+		return ops.AskHookRequest{}, false
 	}
-	req := wire.AskHookRequest{Session: session, ToolUseID: in.ToolUseID}
+	req := ops.AskHookRequest{Session: session, ToolUseID: in.ToolUseID}
 	for _, q := range in.ToolInput.Questions {
-		wq := wire.AskHookQuestion{Question: q.Question, Header: q.Header, MultiSelect: q.MultiSelect}
+		wq := ops.AskHookQuestion{Question: q.Question, Header: q.Header, MultiSelect: q.MultiSelect}
 		for _, o := range q.Options {
-			wq.Options = append(wq.Options, wire.AskHookOption{Label: o.Label, Description: o.Description})
+			wq.Options = append(wq.Options, ops.AskHookOption{Label: o.Label, Description: o.Description})
 		}
 		req.Questions = append(req.Questions, wq)
 	}
@@ -111,15 +111,15 @@ func askHookRequestOf(session string, raw []byte) (wire.AskHookRequest, bool) {
 
 // claudeAskOutput is the PreToolUse output for a decision; ok is false for a
 // release or an unknown decision, which print nothing.
-func claudeAskOutput(res wire.AskHookResult) (map[string]any, bool) {
+func claudeAskOutput(res ops.AskHookResult) (map[string]any, bool) {
 	out := map[string]any{"hookEventName": "PreToolUse"}
 	switch res.Decision {
-	case wire.AskHookAllow:
+	case ops.AskHookAllow:
 		out["permissionDecision"] = "allow"
 		if len(res.UpdatedInput) > 0 {
 			out["updatedInput"] = res.UpdatedInput
 		}
-	case wire.AskHookDeny:
+	case ops.AskHookDeny:
 		out["permissionDecision"] = "deny"
 		out["permissionDecisionReason"] = res.Reason
 	default:
