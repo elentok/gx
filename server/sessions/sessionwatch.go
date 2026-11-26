@@ -478,6 +478,49 @@ func (s *subagentWatches) endClient(client string) {
 	}
 }
 
+// cardWatches are the session watches of the clients whose page shows a working
+// card.
+type cardWatches struct {
+	mu sync.Mutex
+	by map[string]cardWatch // client
+}
+
+type cardWatch struct {
+	session string
+	w       *chat.SubagentWatch
+}
+
+// syncCardWatch starts or stops the client's session watch to match its latest
+// focus report. It reads the report under the lock, so two quick reports cannot
+// leave a stale watch.
+func syncCardWatch(mg *Manager, client string) {
+	s := &mg.cardWatches
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, watching := mg.focus.watchedSession(client)
+	old, has := s.by[client]
+	if has && watching && old.session == session {
+		return
+	}
+	if has {
+		old.w.Close()
+		delete(s.by, client)
+	}
+	if !watching {
+		return
+	}
+	dir, _, res, err := mg.SessionDir(session)
+	if res.Refused || err != nil {
+		return
+	}
+	if s.by == nil {
+		s.by = map[string]cardWatch{}
+	}
+	s.by[client] = cardWatch{session, chat.WatchSession(mg.chat, session, dir, func() {
+		mg.events.PublishEvent(wire.Event{Type: wire.EventSessionSubagentChanged, Address: session, Client: client})
+	})}
+}
+
 // subagentWatchWriteWeb opens or ends the watch of one subagent page. It is a
 // function, not a Manager method, to keep the Manager under its method limit.
 func subagentWatchWriteWeb(mg *Manager, w http.ResponseWriter, r *http.Request) {

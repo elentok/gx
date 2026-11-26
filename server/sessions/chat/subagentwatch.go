@@ -4,11 +4,14 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/transcript"
 )
 
-// SubagentWatch ticks while one subagent page is open. It stats the file on the
-// chat poll interval and calls publish when its size or mtime moves; it never
-// parses the file.
+// SubagentWatch ticks while a page shows subagent work: one subagent page, or a
+// session's working card. It stats the files on the chat poll interval and calls
+// publish when a size or mtime moves; it never parses a subagent file.
 type SubagentWatch struct {
 	stop chan struct{}
 	done chan struct{}
@@ -92,6 +95,90 @@ func watchSubagent(c *Chat, w *SubagentWatch, id, dir, callID string, t subagent
 			return
 		}
 	}
+}
+
+// WatchSession watches the files of the running subagents of session id. With
+// one running it calls publish before it returns, after it recorded the files;
+// then once per tick that finds a file grown or new. It goes on while nothing
+// runs, so a later subagent is picked up.
+func WatchSession(c *Chat, id, dir string, publish func()) *SubagentWatch {
+	w := &SubagentWatch{stop: make(chan struct{}), done: make(chan struct{})}
+	prev, running, _ := runningSubagentFiles(c, id, dir)
+	if running {
+		publish()
+	}
+	go func() {
+		defer close(w.done)
+		ticker := time.NewTicker(c.cfg.ChatPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-w.stop:
+				return
+			case <-c.src.Stopped():
+				return
+			case <-ticker.C:
+			}
+			// A failed read keeps the old stamps: dropping them would make every
+			// file look new on the next tick.
+			cur, _, ok := runningSubagentFiles(c, id, dir)
+			if !ok {
+				continue
+			}
+			for path, stamp := range cur {
+				if old, seen := prev[path]; !seen || old != stamp {
+					publish()
+					break
+				}
+			}
+			prev = cur
+		}
+	}()
+	return w
+}
+
+// runningSubagentFiles stamps the files found for the session's running
+// subagents; running also counts one whose file is not there yet. ok is false
+// when the parent transcript cannot be read.
+//
+// It judges a call by the parent transcript alone: resolvedCall.live also reads
+// the sidecar's finished key, and filling the records would parse the files.
+func runningSubagentFiles(c *Chat, id, dir string) (files map[string]fileStamp, running, ok bool) {
+	meta, err := c.src.ReadMeta(dir)
+	if err != nil {
+		return nil, false, false
+	}
+	path, kind, found := c.Transcript(id, meta)
+	if !found {
+		return nil, false, false
+	}
+	parent, err := c.ReadSnapshot(path, kind, meta.Flow, dir)
+	if err != nil {
+		return nil, false, false
+	}
+	files = map[string]fileStamp{}
+	for _, rec := range parent.Records {
+		if rec.Kind != transcript.TaskKindSubagent || resolveTask(rec, meta, c.clock()).finished {
+			continue
+		}
+		running = true
+		var ref subagentRef
+		var has bool
+		switch kind {
+		case harness.Codex:
+			c.transcripts.ForgetMiss(rec.ID)
+			ref, has = c.codexSubagent(rec, meta)
+		case harness.Claude:
+			ref, has = c.claudeSubagent(rec, path)
+		}
+		if !has {
+			continue
+		}
+		if stamp := stampOf(ref.Path); stamp != nil {
+			files[ref.Path] = *stamp
+		}
+	}
+	return files, running, true
 }
 
 // resolveSubagent resolves the call the way a chat read with subagent= does. A

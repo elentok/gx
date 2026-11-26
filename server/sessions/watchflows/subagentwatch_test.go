@@ -98,9 +98,16 @@ const (
 // writeSubagent writes the Claude sidecar and file of call a1.
 func (f *subWatch) writeSubagent(t *testing.T) string {
 	t.Helper()
-	path := f.dir + "/agent-ag1.jsonl"
+	return f.writeSubagentOf(t, "a1", "ag1")
+}
+
+// writeSubagentOf writes the sidecar and file of the subagent agent of call.
+func (f *subWatch) writeSubagentOf(t *testing.T, call, agent string) string {
+	t.Helper()
+	path := f.dir + "/agent-" + agent + ".jsonl"
 	servertest.WriteTranscript(t, path, subFileLine)
-	if err := os.WriteFile(f.dir+"/agent-ag1.meta.json", []byte(`{"toolUseId":"a1","agentType":"Explore"}`), 0o644); err != nil {
+	sidecar := fmt.Sprintf(`{"toolUseId":%q,"agentType":"Explore"}`, call)
+	if err := os.WriteFile(f.dir+"/agent-"+agent+".meta.json", []byte(sidecar), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return path

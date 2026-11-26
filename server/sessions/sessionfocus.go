@@ -188,6 +188,7 @@ func (mg *Manager) reportFocus(req wire.FocusReport) (wire.SessionResult, error)
 	case reportStale:
 		return wire.SessionResult{}, nil
 	}
+	syncCardWatch(mg, req.Client)
 	if !req.Focused || req.Session == "" {
 		return wire.SessionResult{}, nil
 	}

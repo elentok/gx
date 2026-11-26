@@ -68,7 +68,9 @@ type Manager struct {
 	focus *FocusReports
 	// subagentWatches are the subagent pages open in the web.
 	subagentWatches subagentWatches
-	afk             *queue.AFK
+	// cardWatches are the working cards shown in the web.
+	cardWatches cardWatches
+	afk         *queue.AFK
 	// alerts sends the AFK chat alert of a banner.
 	alerts *notify.ServerChat
 	// queue is the Queue whose live agents the reads show.
@@ -161,7 +163,10 @@ func NewManager(d ManagerDeps) *Manager {
 		designs: d.Designs, rollouts: d.Rollouts, workspaces: d.Workspaces,
 	}
 	if d.Focus != nil {
-		d.Focus.OnGone = mg.subagentWatches.endClient
+		d.Focus.OnGone = func(client string) {
+			mg.subagentWatches.endClient(client)
+			syncCardWatch(mg, client)
+		}
 	}
 	return mg
 }
