@@ -4,11 +4,12 @@ import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../gener
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
+import { TextBox } from "../ui/text-box/TextBox"
 import { withKeys } from "../uniqueKeys"
 import { refusalText, useWrite } from "../useWrite"
 import { modelKeyHarness, useModelNames } from "./aliasNote"
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
-import { ChangedDot, Highlight, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
+import { ChangedDot, Highlight, SaveStatus, Segmented, TagChip } from "./parts"
 
 function valueText(e: SettingsEntry): string {
   if (e.type === "secret") return e.set ? "Set" : "Not set"
@@ -43,7 +44,8 @@ const HINTS: Record<string, string> = {
   size: "e.g. 50G",
 }
 
-const rowInput = { ...inputProps, maxW: "220px" } as const
+// The width of a text box that shares its row with the buttons.
+const rowBox = { minW: "0", maxW: "220px" } as const
 
 // The browser sends text for a number; a draft that is not one goes as typed so the server refuses it with its reason.
 const draftValue = (type: string, draft: string): unknown => {
@@ -73,20 +75,22 @@ export function TextControl({
           ))}
         </datalist>
       )}
-      <chakra.input
-        type="text"
+      <TextBox
+        kind="line"
+        verbatim
+        name="setting-value"
+        label={entryLabel(entry)}
+        hideLabel
         list={names.length > 0 ? listId : undefined}
-        aria-label={entryLabel(entry)}
-        aria-invalid={invalid || undefined}
+        invalid={invalid}
         value={draft}
         inputMode={entry.type === "number" ? "decimal" : undefined}
-        borderColor={invalid ? "tone.deadlocked.fg" : "border"}
         onChange={(e) => setDraft(e.currentTarget.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && dirty && !pending) save(draftValue(entry.type, draft))
           if (e.key === "Escape") setDraft(undefined)
         }}
-        {...rowInput}
+        {...rowBox}
       />
       {HINTS[entry.type] && (
         <Text fontSize="xs" color="text.dim">
@@ -202,15 +206,17 @@ function ListControl({ entry, pending, save }: ControlProps) {
         ))}
       </Box>
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
-        <chakra.input
-          type="text"
-          aria-label={`Add to ${entryLabel(entry)}`}
-          aria-invalid={problem ? true : undefined}
+        <TextBox
+          kind="line"
+          verbatim
+          name="setting-list-item"
+          label={`Add to ${entryLabel(entry)}`}
+          hideLabel
+          invalid={Boolean(problem)}
           value={text}
-          borderColor={problem ? "tone.deadlocked.fg" : "border"}
           onChange={(e) => setText(e.currentTarget.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          {...rowInput}
+          {...rowBox}
         />
         <Button size="sm" disabled={pending || text.trim() === ""} onClick={add}>
           Add
@@ -238,14 +244,15 @@ function SecretControl({ entry, pending, save, remove }: ControlProps) {
       <Chip tone={entry.set ? "done" : "muted"}>{entry.set ? "Set" : "Not set"}</Chip>
       {replacing ? (
         <>
-          <chakra.input
-            type="password"
-            autoComplete="off"
-            aria-label={`New ${entryLabel(entry)}`}
+          <TextBox
+            kind="line"
+            secret
+            name="setting-secret"
+            label={`New ${entryLabel(entry)}`}
+            hideLabel
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            borderColor="border"
-            {...rowInput}
+            {...rowBox}
           />
           <Button
             size="sm"

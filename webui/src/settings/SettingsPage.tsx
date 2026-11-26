@@ -36,6 +36,7 @@ import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { StateHeader } from "../page/StateHeader"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useFetched, type FetchedState } from "../useFetched"
 import { useFetchedReady, useReady } from "../useReady"
 import { useWrite } from "../useWrite"
@@ -342,31 +343,21 @@ export function WebLoginView({
         </Text>
       )}
       <Box mt="6">
-        <chakra.label data-mock-part="name" display="block">
-          <Text fontSize="sm" color="text.muted" mb="2">
-            Name
-          </Text>
-          <chakra.input
+        <Box data-mock-part="name">
+          <TextBox
             key={login.name}
-            type="text"
+            kind="line"
+            name="login-title"
+            label="Title"
+            placeholder="Title"
+            hint="Saved when you leave the field."
             defaultValue={login.name}
-            w="100%"
-            h="40px"
-            px="3"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="8px"
-            bg="surface.raised"
-            color="text"
             onBlur={(e) => {
-              const name = e.currentTarget.value.trim()
-              if (name && name !== login.name) onRename(name)
+              const title = e.currentTarget.value.trim()
+              if (title && title !== login.name) onRename(title)
             }}
           />
-          <Text fontSize="xs" color="text.dim" mt="1">
-            Saved when you leave the field.
-          </Text>
-        </chakra.label>
+        </Box>
       </Box>
       <Group>
         <chakra.button

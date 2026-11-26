@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { SETTINGS_HREF } from "../hrefs"
 import { StateHeader } from "../page/StateHeader"
 import { Spinner } from "../ui/spinner/Spinner"
+import { TextBox } from "../ui/text-box/TextBox"
 
 /** A settings page still loading: the page's own header over the spinner. */
 export function LoadingState({ title }: { title: string }) {
@@ -175,22 +176,17 @@ export const SearchBox = ({
   value: string
   onChange: (q: string) => void
 }) => (
-  <chakra.input
+  <TextBox
+    kind="search"
+    name="settings-search"
     data-mock-part="search"
-    type="text"
-    aria-label="Search settings"
+    label="Search settings"
+    hideLabel
     placeholder="Search all settings"
     value={value}
-    onChange={(e) => onChange(e.target.value)}
+    onChange={(e) => onChange(e.currentTarget.value)}
     mt="2"
     w="100%"
-    h="40px"
-    px="3.5"
-    borderWidth="1px"
-    borderColor="border"
-    borderRadius="10px"
-    bg="surface.raised"
-    color="text"
   />
 )
 

@@ -189,13 +189,13 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   // A hand-typed list that names no catalog kind is refused in the search results and config.json stays.
   const beforeBogus = JSON.stringify(await fixture.globalConfig())
   await page
-    .getByRole("textbox", { name: "Search settings" })
+    .getByRole("searchbox", { name: "Search settings" })
     .fill("notification-channels.slack.kinds")
   await page.getByLabel("Add to Kinds").fill("bogus")
   await page.getByRole("button", { name: "Add", exact: true }).click()
   await expect(page.getByRole("alert").filter({ hasText: "Not saved:" })).toBeVisible()
   expect(JSON.stringify(await fixture.globalConfig())).toBe(beforeBogus)
-  await page.getByRole("textbox", { name: "Search settings" }).fill("")
+  await page.getByRole("searchbox", { name: "Search settings" }).fill("")
 
   // The Push switch row sits in the Push section; off dims the strip box, the chips and the section, and keeps them editable.
   const pushEnabled = async () =>

@@ -155,6 +155,66 @@ func TestPlacementGuardNamesTheKey(t *testing.T) {
 	}
 }
 
+// textBoxTypes are the types the settings page draws as a text box.
+var textBoxTypes = map[ValueType]bool{
+	TypeString: true, TypeNumber: true, TypeDuration: true, TypeSize: true,
+	TypeStringList: true, TypeNumberList: true, TypeSecret: true,
+}
+
+// nameRuleProblems names every editable text setting whose row label holds
+// "name": the web UI's TextBox refuses it, as iPhone would offer AutoFill
+// Contact. Without a label the page shows the key's last segment.
+func nameRuleProblems(r *Registry) []string {
+	var out []string
+	for _, e := range r.All() {
+		if e.ReadOnly || !textBoxTypes[e.Type] {
+			continue
+		}
+		shown := []string{e.Label}
+		if e.Label == "" {
+			shown = []string{lastSegment(e.Key), lastSegment(e.ProjectPath())}
+		}
+		for _, s := range shown {
+			if strings.Contains(strings.ToLower(s), "name") {
+				out = append(out, "key "+e.Key.String()+`: the setting's label "`+s+`" must not contain "name"`)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func lastSegment(k KeyPath) string { return k[len(k)-1] }
+
+func TestNameRuleGuard(t *testing.T) {
+	if problems := nameRuleProblems(Default()); len(problems) > 0 {
+		t.Fatalf("name rule problems:\n%s", strings.Join(problems, "\n"))
+	}
+}
+
+func TestNameRuleGuardNamesTheKey(t *testing.T) {
+	for name, bad := range map[string]Entry{
+		"label":       {Key: Key("some", "key"), Type: TypeString, Label: "Host Name"},
+		"key segment": {Key: Key("some", "filename"), Type: TypeSecret},
+		"project key": {Key: Key("some", "key"), ProjectKey: Key("user-name"), Type: TypeStringList},
+		"number list": {Key: Key("names"), Type: TypeNumberList},
+	} {
+		got := strings.Join(nameRuleProblems(New(bad)), "\n")
+		if !strings.Contains(got, "key "+bad.Key.String()) {
+			t.Errorf("%s: problems do not name the key: %q", name, got)
+		}
+	}
+	allowed := New(
+		Entry{Key: Key("name"), Type: TypeString, ReadOnly: true},
+		Entry{Key: Key("rename"), Type: TypeBool},
+		Entry{Key: Key("some", "name"), Type: TypeString, Label: "Title"},
+		Entry{Key: Key("names", "key"), Type: TypeString},
+	)
+	if problems := nameRuleProblems(allowed); len(problems) > 0 {
+		t.Errorf("allowed entries reported: %q", problems)
+	}
+}
+
 func TestTreeOrderAndModelsTables(t *testing.T) {
 	var cats []Category
 	for _, c := range Tree() {

@@ -642,11 +642,12 @@ describe("WebLoginPage", () => {
       </ConnectionContext.Provider>,
     )
 
-  it("renames on leaving the name field and refreshes the list", async () => {
+  it("renames on leaving the Title field and refreshes the list", async () => {
     const rename = vi.fn(async () => ({}))
     const fetchList = vi.fn(async () => entries)
-    const { findByDisplayValue } = renderAt("b", { rename, fetchList })
-    const input = await findByDisplayValue("Firefox on Linux")
+    const { findByRole } = renderAt("b", { rename, fetchList })
+    const input = await findByRole("textbox", { name: "Title" })
+    expect((input as HTMLInputElement).value).toBe("Firefox on Linux")
     fireEvent.change(input, { target: { value: "Work laptop" } })
     fireEvent.blur(input)
     await waitFor(() => expect(rename).toHaveBeenCalledWith("b", "Work laptop"))

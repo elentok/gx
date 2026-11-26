@@ -166,7 +166,7 @@ describe("lagging alias note", () => {
 
   it("makes no models request outside the Models section", async () => {
     const { findByText } = renderSection(entries, "Budget")
-    await findByText("Soft")
+    await findByText("Soft", { selector: "p" })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
@@ -283,7 +283,8 @@ describe("SettingsShellView", () => {
 
   it("shows the section's rows read-only: label, description, key path and value", () => {
     const { getByText, getByLabelText, queryByText } = renderShell("Execution queue")
-    expect(getByText("Max agents")).toBeTruthy()
+    // The row heading; the box's hidden label carries the same text.
+    expect(getByText("Max agents", { selector: "p" })).toBeTruthy()
     expect(getByText("Live agents across every project.")).toBeTruthy()
     expect(getByText("execution-queue.max-agents")).toBeTruthy()
     expect((getByLabelText("Max agents") as HTMLInputElement).value).toBe("6")
@@ -491,12 +492,12 @@ describe("SettingsShellView in a project", () => {
   })
 
   it("shows the Repository group as read-only text with no control", () => {
-    const { container, getByTestId } = renderProject("Project")
+    const { getByLabelText, getByTestId } = renderProject("Project")
     const identity = getByTestId("group-Repository")
     expect(identity.textContent).toContain("/Users/david/dev/gx")
     expect(identity.querySelectorAll("input, button, select")).toHaveLength(0)
     expect(within(identity).getAllByText(/read-only/)).toHaveLength(3)
-    expect(container.querySelector("[aria-label=Trunk]")).toBeTruthy()
+    expect(getByLabelText("Trunk")).toBeTruthy()
   })
 
   it("sends project-scope changes for trunk, landing and auto-ff-merge", async () => {
