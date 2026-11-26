@@ -16,7 +16,8 @@ import type { MenuKey } from "../../commands/useCompletion"
 import { useLatest } from "../../hooks"
 import type { Selection } from "./LargeEditor"
 import { useViEscape } from "../../vimode"
-import { fieldLook, PROMPT_BOX_ATTR } from "./look"
+import { PROMPT_BOX_ATTR } from "./look"
+import { textBoxLook } from "../text-box/look"
 
 export type ViMode = "INSERT" | "NORMAL" | "VISUAL"
 
@@ -69,10 +70,18 @@ function modeOf(mode: string): ViMode {
   return mode === "insert" || mode === "replace" ? "INSERT" : "NORMAL"
 }
 
+/** The part of a text box's look the editor takes; its border width and radius are its own. */
+const editorLook = {
+  fontSize: textBoxLook.fontSize,
+  color: textBoxLook.color,
+  bg: textBoxLook.bg,
+  borderColor: textBoxLook.borderColor,
+}
+
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: fieldLook.fontSize,
+    fontSize: editorLook.fontSize,
     color: "inherit",
     backgroundColor: "transparent",
   },
@@ -465,7 +474,7 @@ export default function CodeEditor({
         overflow="hidden"
         data-focus-ring="none"
         opacity={inline.disabled ? 0.5 : undefined}
-        {...fieldLook}
+        {...editorLook}
         bg="transparent"
       />
     )
@@ -477,7 +486,7 @@ export default function CodeEditor({
       overflow="hidden"
       borderWidth={bare ? "0" : "1px"}
       borderRadius="10px"
-      {...fieldLook}
+      {...editorLook}
       {...(bare && { bg: "transparent" })}
     />
   )

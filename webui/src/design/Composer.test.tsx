@@ -193,7 +193,10 @@ test("the footer line sits above the buttons with Note closed and inside the box
   const line = () => screen.getByTestId("footer-line")
   expect(line().nextElementSibling).toBe(buttons)
   const box = await openNote()
-  expect(box.parentElement!.contains(line())).toBe(true)
+  // TextBox wraps the textarea twice; the next parent is the prompt box's frame.
+  const frame = box.parentElement!.parentElement!.parentElement!
+  expect(frame.contains(line())).toBe(true)
+  expect(frame.contains(buttons)).toBe(false)
 })
 
 test("a plain message posts its text with the last message id", async () => {

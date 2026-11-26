@@ -1,7 +1,6 @@
-import { Box, chakra, Text, Textarea, VisuallyHidden } from "@chakra-ui/react"
+import { Box, chakra, Text } from "@chakra-ui/react"
 import {
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,9 +12,10 @@ import type { CodeEditorHandle, ViMode } from "./CodeEditor"
 import { useBigPrompt } from "./bigPromptStore"
 import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor"
 import { useInlineEditor, useSwapCarry } from "./useInlineEditor"
-import { fieldLook, PROMPT_BOX_ATTR } from "./look"
+import { PROMPT_BOX_ATTR } from "./look"
 import { isMac } from "../../platform"
 import { ModeText } from "./ModeText"
+import { TextBox } from "../text-box/TextBox"
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
 export function submitOnCmdEnter(e: KeyboardEvent<HTMLTextAreaElement>, submit: () => void) {
@@ -165,7 +165,6 @@ function Field({
   const [selection, setSelection] = useState<Selection | null>(null)
 
   const { wantEditor, Editor, showEditor } = useInlineEditor()
-  const textareaId = useId()
   // Kept across blur and focus. The editor resets it itself when the parent empties the text.
   const [mode, setMode] = useState<ViMode>("INSERT")
   const onMode = menu?.onMode
@@ -219,6 +218,39 @@ function Field({
     if (onSubmit) submitOnCmdEnter(e, onSubmit)
   }
   const raised = bg ?? "surface.raised"
+  const expandButton = (
+    <chakra.button
+      type="button"
+      w="36px"
+      h="36px"
+      borderRadius="8px"
+      bg={raised}
+      color="text.muted"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      cursor="pointer"
+      _disabled={{ opacity: 0.5, cursor: "not-allowed" }}
+      disabled={disabled}
+      aria-label="Open the note in a large editor"
+      title="Open the note in a large editor"
+      onClick={open}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" />
+      </svg>
+    </chakra.button>
+  )
   // The box draws the border, background and focus ring; the textarea inside has none, and the note and footer sit under it in the flow.
   // Both outlines sit inside the box, so nothing spills into (or is clipped by) the sheet or footer around it.
   const ringShadow = "inset 0 0 0 2px {colors.tone.running.fg}"
@@ -231,13 +263,17 @@ function Field({
       borderRadius={radius}
       boxShadow="inset 0 0 0 1px {colors.hairline}"
       css={{
-        "&:has(> textarea:focus-visible), &:has(.cm-editor.cm-focused)": {
+        [`&:has(textarea[${PROMPT_BOX_ATTR}]:focus-visible), &:has(.cm-editor.cm-focused)`]: {
           boxShadow: `${ringShadow} !important`,
         },
       }}
     >
       {showEditor && Editor ? (
         <Box ref={wrap}>
+          {/* Where TextBox's end slot puts it over the textarea. */}
+          <Box position="absolute" top="1.5" insetEnd="1.5" zIndex="1">
+            {expandButton}
+          </Box>
           <Editor
             inline={{ rows: effectiveRows, name, disabled, holdMode: !!selection }}
             onSubmit={onSubmit}
@@ -262,86 +298,35 @@ function Field({
           />
         </Box>
       ) : (
-        <>
-          {/* Safari AutoFill reads a <label>; without one it guesses from the text around the box and can
-              offer a contact. aria-hidden: aria-label stays the accessible name. */}
-          <VisuallyHidden asChild>
-            <label htmlFor={textareaId} aria-hidden="true">
-              {label}
-            </label>
-          </VisuallyHidden>
-          <Textarea
-            id={textareaId}
-            ref={area}
-            {...fieldLook}
-            data-focus-ring="none"
-            {...{ [PROMPT_BOX_ATTR]: "" }}
-            size={size}
-            bg="transparent"
-            borderWidth="0"
-            borderRadius="0"
-            autoFocus={autoFocus && !swapped.current}
-            rows={effectiveRows}
-            lineHeight="1.5"
-            display="block"
-            pt="2.5"
-            pb="2.5"
-            ps="3"
-            pe="46px"
-            resize="none"
-            aria-label={label}
-            name={name}
-            autoComplete="off"
-            placeholder={placeholder}
-            disabled={disabled}
-            value={value}
-            onChange={(e) => {
-              menu?.onCursor(e.target.selectionStart)
-              onChange(e.target.value)
-            }}
-            onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
-            onKeyDown={onKeyDown}
-          />
-        </>
+        <TextBox
+          kind="prose"
+          look="bare"
+          size={size}
+          label={label}
+          hideLabel
+          ref={area}
+          name={name}
+          {...{ [PROMPT_BOX_ATTR]: "" }}
+          autoFocus={autoFocus && !swapped.current}
+          rows={effectiveRows}
+          resize="none"
+          endElement={expandButton}
+          placeholder={placeholder}
+          disabled={disabled}
+          value={value}
+          onChange={(e) => {
+            const area = e.target as HTMLTextAreaElement
+            menu?.onCursor(area.selectionStart)
+            onChange(area.value)
+          }}
+          onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
+          onKeyDown={onKeyDown}
+        />
       )}
       <PromptFooter vi={wantEditor} mode={mode} disabled={disabled} note={note}>
         {footer}
       </PromptFooter>
       {!selection && menu?.node}
-      <chakra.button
-        type="button"
-        position="absolute"
-        top="1.5"
-        right="1.5"
-        w="36px"
-        h="36px"
-        borderRadius="8px"
-        bg={raised}
-        color="text.muted"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        cursor="pointer"
-        _disabled={{ opacity: 0.5, cursor: "not-allowed" }}
-        disabled={disabled}
-        aria-label="Open the note in a large editor"
-        title="Open the note in a large editor"
-        onClick={open}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" />
-        </svg>
-      </chakra.button>
       {selection && (
         <LargeEditor
           title={title}

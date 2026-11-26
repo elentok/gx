@@ -173,7 +173,7 @@ const titleStyle = {
 
 const textareaPadding = {
   boxed: { px: "3", py: "2", lineHeight: "1.5" },
-  bare: { px: "3", py: "2.5", lineHeight: "1.5" },
+  bare: { px: "3", py: "2.5", lineHeight: "1.5", scrollPaddingBottom: "2", borderRadius: "0" },
   page: { px: "4", py: "3", lineHeight: "1.6" },
 } as const
 
@@ -252,6 +252,7 @@ export function TextBox(props: TextBoxProps) {
           ...textareaPadding[page ? "page" : look],
           // Fills a parent that grows; `rows` still sets the starting height.
           flex: "1 1 auto",
+          _disabled: { opacity: 0.5, cursor: "not-allowed" },
           ...areaLayout,
         }
       : title

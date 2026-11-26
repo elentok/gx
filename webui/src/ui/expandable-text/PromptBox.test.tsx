@@ -64,6 +64,52 @@ test("the textarea turns AutoFill off and has a name", () => {
   }
 })
 
+test("the textarea is named by a linked label and keeps the prompt box marks", () => {
+  renderThemed(<Harness />)
+  const area = field()
+  expect(area.hasAttribute("aria-label")).toBe(false)
+  expect(area.labels?.[0].textContent).toBe("Note")
+  expect(area.labels?.[0].hasAttribute("aria-hidden")).toBe(false)
+  expect(area.hasAttribute("data-prompt-box")).toBe(true)
+  expect(area.getAttribute("name")).toBe("test-note")
+})
+
+test("a label with the word name is refused", () => {
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  expect(() =>
+    renderThemed(<PromptBox label="Name" name="n" title={TITLE} value="" onChange={() => {}} />),
+  ).toThrow("text-box-name")
+})
+
+test.each(["sm", "md"] as const)("a %s box keeps its spacing", (size) => {
+  renderThemed(
+    <PromptBox label="Note" name="n" title={TITLE} size={size} value="" onChange={() => {}} />,
+  )
+  // jsdom cannot compute the theme's spacing tokens, so read the rules written for the textarea.
+  const rules = [...document.querySelectorAll("style")]
+    .flatMap((s) => (s.textContent ?? "").split("\n"))
+    .filter((line) => [...field().classList].some((c) => line.includes(`.${c}{`)))
+    .join("\n")
+  for (const rule of [
+    /padding-inline:var\(--chakra-spacing-3\)/,
+    /padding-block:var\(--chakra-spacing-2\\?\.5\)/,
+    /padding-inline-end:46px/,
+    /line-height:1\.5/,
+    /resize:none/,
+  ])
+    expect(rules).toMatch(rule)
+})
+
+test("the expand button also opens the large editor from the inline vi editor", async () => {
+  setViMode(true)
+  renderThemed(<Harness />)
+  await waitFor(() => expect(document.querySelector("[data-vi-inline] .cm-editor")).toBeTruthy())
+  expect(document.querySelector("textarea")).toBeNull()
+  expect(screen.getAllByLabelText("Open the note in a large editor")).toHaveLength(1)
+  fireEvent.click(expand())
+  await findLargeEditor(TITLE)
+})
+
 test("the textarea gets value, rows, label, placeholder and disabled", () => {
   renderThemed(
     <PromptBox
