@@ -36,17 +36,28 @@ test("lists the workspaces in order", () => {
   ])
 })
 
-test("the Default row has neither rename nor delete", () => {
+const titleBox = (workspace: string) =>
+  within(screen.getByRole("group", { name: workspace })).getByRole<HTMLInputElement>("textbox", {
+    name: "Title",
+  })
+
+test("each non-default row has a Title box in a group named after its workspace", () => {
   setup()
-  expect(screen.queryByLabelText("Rename Default")).toBeNull()
+  expect(titleBox("Work").value).toBe("Work")
+  expect(titleBox("Home").value).toBe("Home")
+})
+
+test("the Default row has neither a box nor delete", () => {
+  setup()
+  const [first] = within(screen.getByRole("list")).getAllByRole("listitem")
+  expect(within(first!).queryByRole("textbox")).toBeNull()
   expect(screen.queryByRole("button", { name: "Delete Default" })).toBeNull()
-  expect(screen.getByLabelText("Rename Work")).toBeTruthy()
   expect(screen.getByRole("button", { name: "Delete Work" })).toBeTruthy()
 })
 
 test("Enter saves a rename", async () => {
   const { writers } = setup()
-  const input = screen.getByLabelText("Rename Work")
+  const input = titleBox("Work")
   input.focus()
   fireEvent.change(input, { target: { value: "Office" } })
   fireEvent.keyDown(input, { key: "Enter" })
@@ -56,7 +67,7 @@ test("Enter saves a rename", async () => {
 
 test("blur saves a rename", async () => {
   const { writers } = setup()
-  const input = screen.getByLabelText("Rename Work")
+  const input = titleBox("Work")
   input.focus()
   fireEvent.change(input, { target: { value: "Office" } })
   input.blur()
@@ -65,12 +76,30 @@ test("blur saves a rename", async () => {
 
 test("Escape cancels a rename and does not close the dialog", () => {
   const { writers, onClose } = setup()
-  const input = screen.getByLabelText<HTMLInputElement>("Rename Work")
+  const input = titleBox("Work")
   fireEvent.change(input, { target: { value: "Office" } })
   fireEvent.keyDown(input, { key: "Escape" })
   expect(input.value).toBe("Work")
   expect(onClose).not.toHaveBeenCalled()
   expect(writers.rename).not.toHaveBeenCalled()
+})
+
+test("an emptied box restores the old title and saves nothing", () => {
+  const { writers } = setup()
+  const input = titleBox("Work")
+  input.focus()
+  fireEvent.change(input, { target: { value: "  " } })
+  fireEvent.blur(input)
+  expect(input.value).toBe("Work")
+  expect(writers.rename).not.toHaveBeenCalled()
+})
+
+test("Escape on an untouched box closes the dialog", () => {
+  const { onClose } = setup()
+  const input = titleBox("Work")
+  input.focus()
+  fireEvent.keyDown(input, { key: "Escape" })
+  expect(onClose).toHaveBeenCalled()
 })
 
 test("a refused rename shows the reason inline", async () => {
@@ -80,7 +109,7 @@ test("a refused rename shows the reason inline", async () => {
       message: "A workspace named Home already exists.",
     }),
   })
-  const input = screen.getByLabelText("Rename Work")
+  const input = titleBox("Work")
   input.focus()
   fireEvent.change(input, { target: { value: "Home" } })
   input.blur()

@@ -310,8 +310,8 @@ const sidebarCase = (label: string, device: Device, step: (root: HTMLElement) =>
 })
 
 // Types into a field the way a user does, so React sees the change.
-const typeInto = (root: HTMLElement, label: string, value: string) => {
-  const input = root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)
+const typeInto = (root: HTMLElement, group: string, value: string) => {
+  const input = root.querySelector<HTMLInputElement>(`[role="group"][aria-label="${group}"] input`)
   if (!input) return false
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value)
   input.dispatchEvent(new Event("input", { bubbles: true }))
@@ -397,7 +397,7 @@ export const shellEntries: GalleryEntry[] = [
     name: "ManageWorkspaces",
     cases: [
       manageCase("default", noop),
-      manageCase("rename in progress", (root) => typeInto(root, "Rename Work", "Client work")),
+      manageCase("rename in progress", (root) => typeInto(root, "Work", "Client work")),
       manageCase("delete confirmation", (root) => clickButton(root, byLabel("Delete Work"))),
     ],
   },

@@ -213,11 +213,11 @@ test("Workspaces touch", async ({ page, start }) => {
     await expect(dialog).toHaveCount(0)
   }
   await newItem("New workspace…")
-  await expect(dialog.getByRole("textbox", nav("Workspace name"))).toBeFocused()
+  await expect(dialog.getByRole("textbox", nav("Title"))).toBeFocused()
   await closeDialog()
   await switcher.click()
   await page.getByRole("menuitem", { name: "New workspace…" }).click()
-  await expect(dialog.getByRole("textbox", nav("Workspace name"))).toBeFocused()
+  await expect(dialog.getByRole("textbox", nav("Title"))).toBeFocused()
   await closeDialog()
   await newItem("New chat")
   await expect(dialog.getByRole("textbox", nav("Title"))).toBeVisible()

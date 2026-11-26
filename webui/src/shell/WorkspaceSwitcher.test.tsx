@@ -87,6 +87,12 @@ function setup(create: CreateWorkspace = async () => ({}), onManage = () => {}) 
 }
 
 const body = () => within(screen.getByTestId("sidebar-body"))
+const newDialog = () => within(screen.getByRole("dialog", { name: "New workspace" }))
+const titleBox = () => newDialog().getByRole("textbox", { name: "Title" })
+const findTitleBox = async () =>
+  within(await screen.findByRole("dialog", { name: "New workspace" })).getByRole("textbox", {
+    name: "Title",
+  })
 const openMenu = async () => {
   fireEvent.click(await screen.findByRole("button", { name: /^Workspace:/ }))
   return screen.findByRole("menu")
@@ -120,23 +126,25 @@ test("New workspace… posts the trimmed name, makes it active and closes the di
   const create = vi.fn(async (): Promise<WorkspaceResult> => ({}))
   setup(create)
   fireEvent.click(within(await openMenu()).getByRole("menuitem", { name: "New workspace…" }))
-  fireEvent.change(await screen.findByLabelText("Workspace name"), { target: { value: " Fresh " } })
+  fireEvent.change(await findTitleBox(), { target: { value: " Fresh " } })
   fireEvent.click(screen.getByRole("button", { name: "Create" }))
   await waitFor(() => expect(create).toHaveBeenCalledWith("Fresh"))
-  await waitFor(() => expect(screen.queryByLabelText("Workspace name")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "New workspace" })).toBeNull())
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Fresh")
 })
 
 test.each([
   ["desktop", true],
   ["phone", false],
-] as const)("the New workspace dialog on a %s: Name focused is %s", (device, focused) => {
+] as const)("the New workspace dialog on a %s: Title focused is %s", (device, focused) => {
   renderThemed(
     <DeviceContext.Provider value={device}>
       <NewWorkspaceDialog onCreated={() => {}} onClose={() => {}} />
     </DeviceContext.Provider>,
   )
-  expect(document.activeElement === screen.getByLabelText("Workspace name")).toBe(focused)
+  expect(newDialog().getAllByRole("textbox")).toHaveLength(1)
+  expect(titleBox().getAttribute("placeholder")).toBe("Title")
+  expect(document.activeElement === titleBox()).toBe(focused)
 })
 
 test("a clash refusal shows inline and keeps the dialog open", async () => {
@@ -148,12 +156,12 @@ test("a clash refusal shows inline and keeps the dialog open", async () => {
   )
   setup(create)
   fireEvent.click(within(await openMenu()).getByRole("menuitem", { name: "New workspace…" }))
-  fireEvent.change(await screen.findByLabelText("Workspace name"), { target: { value: "Side" } })
+  fireEvent.change(await findTitleBox(), { target: { value: "Side" } })
   fireEvent.click(screen.getByRole("button", { name: "Create" }))
   expect((await screen.findByRole("alert")).textContent).toBe(
     "A workspace named Side already exists.",
   )
-  expect(screen.getByLabelText("Workspace name")).toBeTruthy()
+  expect(titleBox()).toBeTruthy()
   expect(localStorage.getItem(ACTIVE_KEY)).not.toBe("Side")
 })
 
@@ -161,7 +169,7 @@ test("the footer + New item opens the same dialog", async () => {
   setup()
   fireEvent.click(await screen.findByRole("button", { name: "+ New" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "New workspace…" }))
-  expect(await screen.findByLabelText("Workspace name")).toBeTruthy()
+  expect(await findTitleBox()).toBeTruthy()
 })
 
 test("Manage workspaces calls its callback", async () => {

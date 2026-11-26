@@ -375,7 +375,7 @@ test("Workspaces", async ({ page, start }) => {
 
   // Manage workspaces: order, rename, reorder, delete naming its members; Default has no controls.
   const manage = page.getByRole("dialog", nav("Manage workspaces"))
-  const names = manage.getByRole("textbox")
+  const names = manage.getByRole("textbox", nav("Title"))
   const openManage = async () => {
     await switcher.click()
     await page.getByRole("menuitem", nav("Manage workspaces")).click()

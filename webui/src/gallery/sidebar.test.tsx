@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from "@testing-library/react"
+import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { afterEach, expect, test } from "vitest"
 import { renderThemed } from "../ui/render"
@@ -79,7 +79,11 @@ test("the Manage workspaces cases show the list, a rename in progress and the de
   cleanup()
   render("ManageWorkspaces", "rename in progress")
   await waitFor(() =>
-    expect((screen.getByLabelText("Rename Work") as HTMLInputElement).value).toBe("Client work"),
+    expect(
+      within(screen.getByRole("group", { name: "Work" })).getByRole<HTMLInputElement>("textbox", {
+        name: "Title",
+      }).value,
+    ).toBe("Client work"),
   )
   cleanup()
   render("ManageWorkspaces", "delete confirmation")

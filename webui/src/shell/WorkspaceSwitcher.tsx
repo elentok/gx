@@ -5,6 +5,7 @@ import { Button } from "../ui/button/Button"
 import { GxMenu } from "../ui/menu/Menu"
 import { Modal } from "../ui/modal/Modal"
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
+import { TextBox } from "../ui/text-box/TextBox"
 import { refusalText, useWrite } from "../useWrite"
 import { postWorkspace } from "../workspaces/postWorkspace"
 
@@ -45,20 +46,15 @@ export function NewWorkspaceDialog({
       <form onSubmit={submit}>
         <Box display="flex" flexDirection="column" gap="3">
           <Text fontWeight="600">New workspace</Text>
-          <chakra.input
-            aria-label="Workspace name"
+          <TextBox
+            kind="line"
+            label="Title"
+            hideLabel
+            name="new-workspace-title"
+            placeholder="Title"
             ref={focusFirst}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Name"
-            h="36px"
-            px="3"
-            fontSize="16px"
-            bg="surface"
-            color="text"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="8px"
           />
           {problem && (
             <Text role="alert" color="tone.waiting.fg" fontSize="sm">

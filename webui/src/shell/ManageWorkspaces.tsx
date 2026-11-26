@@ -8,6 +8,7 @@ import type {
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
+import { TextBox } from "../ui/text-box/TextBox"
 import { refusalText, useWrite } from "../useWrite"
 import { postWorkspace } from "../workspaces/postWorkspace"
 
@@ -113,7 +114,12 @@ function Row({
   }
   return (
     <Box as="li" display="flex" flexDirection="column" gap="1">
-      <Box display="flex" alignItems="center" gap="1">
+      <Box
+        {...(!workspace.default && { role: "group", "aria-label": name })}
+        display="flex"
+        alignItems="center"
+        gap="1"
+      >
         {workspace.default ? (
           <Text flex="1" px="3" color="text" fontSize="16px">
             {name}
@@ -122,8 +128,12 @@ function Row({
             </Text>
           </Text>
         ) : (
-          <chakra.input
-            aria-label={`Rename ${name}`}
+          <TextBox
+            kind="line"
+            size="sm"
+            label="Title"
+            hideLabel
+            name="workspace-title"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={save}
@@ -136,14 +146,6 @@ function Row({
               }
             }}
             flex="1"
-            h="32px"
-            px="3"
-            fontSize="16px"
-            bg="surface"
-            color="text"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="8px"
           />
         )}
         <Text color="text.dim" fontSize="sm" minW="16" textAlign="right">
