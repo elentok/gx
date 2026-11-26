@@ -1,4 +1,6 @@
-package main
+// Package storeseed writes the state and store records a scenario seeds
+// before the server starts.
+package storeseed
 
 import (
 	"encoding/json"
@@ -14,10 +16,10 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
-// seedLeftoverRuns claims each LeftoverRun's ticket and writes its worktree and
+// SeedLeftoverRuns claims each LeftoverRun's ticket and writes its worktree and
 // runs.json entry, so the server's start-up recovery finds a run whose runner it
-// cannot build. It runs after prepareStore wrote the store and the repo.
-func seedLeftoverRuns(f *fixture, sc scenario) error {
+// cannot build. It runs after the fixture wrote the store and the repo.
+func SeedLeftoverRuns(stateDir, storeDir, root string, git spec.Git, sc spec.Scenario) error {
 	var queue []map[string]string
 	for _, lr := range sc.LeftoverRuns {
 		tg, err := leftoverTarget(lr.Address)
@@ -30,14 +32,14 @@ func seedLeftoverRuns(f *fixture, sc scenario) error {
 				if err := os.WriteFile(filepath.Join(wt, "agent.txt"), []byte("work"), 0o644); err != nil {
 					return err
 				}
-				if err := f.git(wt, "add", "-A"); err != nil {
+				if err := git(wt, "add", "-A"); err != nil {
 					return err
 				}
-				return f.git(wt, "commit", "-q", "-m", "agent work")
+				return git(wt, "commit", "-q", "-m", "agent work")
 			}
 		}
 		runner := lr.Runner
-		_, _, err = servertest.StageLeftover(f.stateD, f.store, filepath.Join(f.root, "repo"), tg, work, func(servertest.Run) map[string]any {
+		_, _, err = servertest.StageLeftover(stateDir, storeDir, filepath.Join(root, "repo"), tg, work, func(servertest.Run) map[string]any {
 			return map[string]any{"runner": runner}
 		})
 		if err != nil {
@@ -52,12 +54,12 @@ func seedLeftoverRuns(f *fixture, sc scenario) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(f.stateD, projects.QueueFileName), data, 0o600)
+	return os.WriteFile(filepath.Join(stateDir, projects.QueueFileName), data, 0o600)
 }
 
-// appendRawRunLog appends lines to the run log at path without runlog.AppendEvent,
+// AppendRawRunLog appends lines to the run log at path without runlog.AppendEvent,
 // which refuses the removed types and kinds these lines exist to carry.
-func appendRawRunLog(path string, lines []spec.RunLogLine) error {
+func AppendRawRunLog(path string, lines []spec.RunLogLine) error {
 	if len(lines) == 0 {
 		return nil
 	}

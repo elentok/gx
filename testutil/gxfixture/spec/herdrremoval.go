@@ -14,7 +14,7 @@ const (
 func herdrLeftover(epicName, addr string, commit bool) scenario {
 	sc := recoveryEpic(epicName, servertest.TicketOpts{}, false)
 	sc.LeftoverRuns = []LeftoverRun{{Address: addr, Runner: "herdr", Commit: commit}}
-	// queue add refuses an epic with no open ticket, so seedLeftoverRuns queues it on disk.
+	// queue add refuses an epic with no open ticket, so storeseed.SeedLeftoverRuns queues it on disk.
 	sc.Queue = nil
 	return sc
 }

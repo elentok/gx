@@ -16,7 +16,8 @@ Read this before probing `testutil/gxfixture`. Every path below was checked with
 - `catalog/scenarios.go` and `testutil/gxfixture/scenarios.go` (package `main`) only hold type aliases
   (`scenario = spec.Scenario`, ...) so the code stays short. Do not put data in `main`'s `scenarios.go`.
 - Code that acts on a knob (seeding, starting children) is in `main`: `startup.go`, `seed.go`,
-  `seedrest.go`, `seedschedules.go`, `serve.go`, `sessions.go`.
+  `serve.go`, `sessions.go`. Seeding that needs only the state dir, store, root and git is in
+  `storeseed` (`leftover.go`, `seedrest.go`, `seedschedules.go`).
 - The packages are near their `sizeguard` limits. Prefer `spec` or a new file over growing a big one.
 
 ## 2. Env for the fixture's children

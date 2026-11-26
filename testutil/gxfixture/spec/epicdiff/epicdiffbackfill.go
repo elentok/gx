@@ -1,10 +1,11 @@
-package spec
+package epicdiff
 
 import (
 	"fmt"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/merge"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // The merged epics of the backfill shape: none has a stamped range, and the
@@ -54,8 +55,8 @@ var EpicDiffBackfillEmpty = [][2]string{{project, EpicDiffNoCommits}, {EpicDiffB
 // EpicDiffBackfillSubject is the headline of commit n of an epic of the backfill shape.
 func EpicDiffBackfillSubject(epic string, n int) string { return fmt.Sprintf("%s: commit %d", epic, n) }
 
-func epicDiffBackfillScenario() Scenario {
-	sc := Scenario{
+func epicDiffBackfillScenario() scenario {
+	sc := scenario{
 		EpicMeta: map[string]string{},
 		// The default left the project's applied list empty, so the server runs every
 		// step at start-up, the range backfill among them.
@@ -67,7 +68,7 @@ func epicDiffBackfillScenario() Scenario {
 		},
 	}
 	add := func(proj, name string, picked bool) {
-		sc.Epics = append(sc.Epics, Epic{Project: proj, Name: name})
+		sc.Epics = append(sc.Epics, epic{Project: proj, Name: name})
 		sc.EpicMeta[proj+":"+name] = epicDiffMergedMeta("")
 		if picked {
 			sc.PickedEpics = append(sc.PickedEpics, proj+":"+name)
@@ -80,10 +81,10 @@ func epicDiffBackfillScenario() Scenario {
 	add(project, EpicDiffNoCommits, false)
 	add(EpicDiffBackfillSecond, EpicDiffSecondExact, true)
 	add(EpicDiffBackfillSecond, EpicDiffSecondNoCommits, false)
-	sc.Epics = append(sc.Epics, Epic{Project: project, Name: EpicDiffExactMap})
+	sc.Epics = append(sc.Epics, epic{Project: project, Name: EpicDiffExactMap})
 	sc.EpicMeta[project+":"+EpicDiffExactMap] = epicDiffMergedMeta("kind: map\n")
 
-	sc.GitSetup = func(git Git, repo string) error {
+	sc.GitSetup = func(git spec.Git, repo string) error {
 		s := &epicDiffGit{git: git, repo: repo}
 		w := backfillWork{s: s, project: project}
 		w.merged(EpicDiffExactA, 2)
@@ -116,8 +117,8 @@ func epicDiffBackfillScenario() Scenario {
 		s.run("checkout", "-q", "main")
 		return s.err
 	}
-	sc.OwnGitSetup = map[string]func(git Git, repo string) error{
-		EpicDiffBackfillSecond: func(git Git, repo string) error {
+	sc.OwnGitSetup = map[string]func(git spec.Git, repo string) error{
+		EpicDiffBackfillSecond: func(git spec.Git, repo string) error {
 			s := &epicDiffGit{git: git, repo: repo}
 			(backfillWork{s: s, project: EpicDiffBackfillSecond}).merged(EpicDiffSecondExact, 1)
 			return s.err

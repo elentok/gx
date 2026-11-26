@@ -78,7 +78,7 @@ time two minutes ahead (the only shape whose time can fire) and the bare-server 
 and `server pid` in the output's `migrate_dir` (`GXF_MIGRATE_DIR`), so a flow can stop the server across the set time and
 start it again; the fixture and its temp dir stay alive meanwhile. The machine id is fixed (`fixture1`) so the
 seeded One-offs carry the server's Dedupe key. Data: `testutil/gxfixture/spec/schedules.go`; the files and state are written by
-`testutil/gxfixture/seedschedules.go`.
+`testutil/gxfixture/storeseed/seedschedules.go`.
 The `rest` scenario starts a server with the Rest feature configured and a Rest period or warning in force
 (`start("rest", { shape })`; default `bedtime`). Every time is relative to the server start. The master toggle is on in all
 shapes. `bedtime`: Bedtime on, range from one hour ago to one hour ahead (local `HH:MM`), so a Bedtime period is in force.
@@ -87,7 +87,7 @@ shapes. `bedtime`: Bedtime on, range from one hour ago to one hour ahead (local 
 something far away.", and its `break-start` record. `break-warning`: Break on, work count 53 (two below Work time), last
 active minute now, no Rest period. `bedtime-warning`: Bedtime on, start 10 minutes ahead, no Rest period. Data:
 `testutil/gxfixture/spec/rest.go`; the state file `rest.json` and the records under `rest-records/` in the state dir are
-written by `testutil/gxfixture/seedrest.go` through the server's own runner (only the Break text is patched afterwards).
+written by `testutil/gxfixture/storeseed/seedrest.go` through the server's own runner (only the Break text is patched afterwards).
 The `worktree-diff` scenario seeds one target for each way a Worktree diff opens (output `worktree_diff`; seeding in
 `testutil/gxfixture/spec/worktreediff.go` and `worktreediffedges.go`). Chats: `chat` (worktree off `main` with a rename, a
 commit and every kind of uncommitted file) and `clone` (a separate clone). Queue agents: `ticket` (claimed, its iteration
@@ -119,7 +119,7 @@ with no range and a real trunk reflog: exact matches (`bf-exact-a-impl`, `bf-exa
 range of epics with a run log and no pick (`bf-nocommit-impl`, `bf-second-nocommit-impl`) get one; `bf-pull-x-impl` and
 `bf-pull-y-impl` (one entry), `bf-spread-impl` (spread over two entries), `bf-twice-impl` (merged twice), the map `bf-exact-a`,
 `bf-nolog-impl` (no run log) and `bf-offtrunk-impl` (commits not on trunk) get none.
-The names are constants in `testutil/gxfixture/spec/epicdiff.go`, `epicdiffpr.go` and `epicdiffbackfill.go`; the commits are made by `GitSetup` there.
+The names are constants in `testutil/gxfixture/spec/epicdiff/epicdiff.go`, `epicdiffpr.go` and `epicdiffbackfill.go`; the commits are made by `GitSetup` there.
 The `epic-waiting` scenario seeds Waiting epics and their blockers in the project `demo` (`start("epic-waiting", { shape })`; default
 `two-blockers`; data in `testutil/gxfixture/spec/epicwaiting.go`). Every shape has `notification-alignment-impl` (not queued: Ready to
 queue) and `notification-alignment-queued-impl` (queued: Implementing), each with tickets 01 and 02 done, 03 open (no `blocked_by`) and

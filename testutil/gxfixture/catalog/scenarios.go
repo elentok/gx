@@ -695,7 +695,7 @@ var Scenarios = map[string]scenario{
 	"schedules": {SchedulesShaped: true},
 	"rest":      {RestShaped: true},
 	// epic-diff: real git history and stored epics for the Diff page, in the shape --shape
-	// names (default merged). run swaps in spec.EpicDiffScenario(shape).
+	// names (default merged). run swaps in epicdiff.EpicDiffScenario(shape).
 	"epic-diff": {EpicDiffShaped: true},
 	// epic-waiting: Waiting epics and their blockers, in the shape --shape names (default
 	// two-blockers). run swaps in epicwaiting.Scenario(shape).

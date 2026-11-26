@@ -14,7 +14,7 @@ var RestShapes = []string{"bedtime", "break", "break-warning", "bedtime-warning"
 
 // The Break text of the stored mock. The engine picks its text at random and
 // cuts a configured message at the first sentence end, so the seeder passes
-// these two to the runner (see seedRest).
+// these two to the runner (see storeseed.SeedRest).
 const (
 	RestBreakMessage    = "Fifty-five minutes in a row? The agents will survive without you."
 	RestBreakSubMessage = "Stand up, drink some water, look at something far away."

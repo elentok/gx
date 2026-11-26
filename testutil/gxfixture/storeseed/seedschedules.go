@@ -1,4 +1,4 @@
-package main
+package storeseed
 
 import (
 	"os"
@@ -10,22 +10,22 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
-// seedSchedules writes the scenario's Schedule files with the schedules store and
+// SeedSchedules writes the scenario's Schedule files with the schedules store and
 // their switch, baseline and skip log with the server's state API, so the server
 // reads what its own writes would have made. The machine id is fixed first so the
 // seeded One-offs' Dedupe keys match the server's.
-func seedSchedules(f *fixture, sc scenario) error {
+func SeedSchedules(stateDir, storeDir string, sc spec.Scenario) error {
 	if len(sc.Schedules) == 0 {
 		return nil
 	}
-	state, err := serverschedules.OpenWithID(f.stateD, spec.SchedulesMachineID)
+	state, err := serverschedules.OpenWithID(stateDir, spec.SchedulesMachineID)
 	if err != nil {
 		return err
 	}
-	store := schedules.NewStore(f.store)
+	store := schedules.NewStore(storeDir)
 	for _, s := range sc.Schedules {
 		// A folder without project.json is a project the server does not know.
-		if err := os.MkdirAll(filepath.Join(f.store, s.Project), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(storeDir, s.Project), 0o755); err != nil {
 			return err
 		}
 		made, err := store.Create(s.Project, schedules.Schedule{Name: s.Name, Prompt: s.Prompt, Days: s.Days, Times: s.Times, LateLimitHours: s.LateLimitHours})

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/epicwaiting"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/spec/epicdiff"
 )
 
 // limitShapes are the --shape values of a limits scenario. Each builds the
@@ -77,7 +78,7 @@ func checkShape(sc scenario, shape string) (string, error) {
 	case sc.RestShaped:
 		def, names = spec.RestShapes[0], spec.RestShapes
 	case sc.EpicDiffShaped:
-		def, names = spec.EpicDiffShapes[0], spec.EpicDiffShapes
+		def, names = epicdiff.EpicDiffShapes[0], epicdiff.EpicDiffShapes
 	case sc.EpicWaitingShaped:
 		def, names = epicwaiting.Shapes[0], epicwaiting.Shapes
 	case sc.BgProgressShaped:

@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake/codex"
 	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/storeseed"
 )
 
 // removeAll retries while a stopped process finishes writing into dir. Go
@@ -324,13 +325,13 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 	if err := seedTriage(f.store, sc); err != nil {
 		return fmt.Errorf("seed triage: %w", err)
 	}
-	if err := seedSchedules(f, sc); err != nil {
+	if err := storeseed.SeedSchedules(f.stateD, f.store, sc); err != nil {
 		return fmt.Errorf("seed schedules: %w", err)
 	}
-	if err := seedRest(f, sc); err != nil {
+	if err := storeseed.SeedRest(f.stateD, sc); err != nil {
 		return fmt.Errorf("seed rest: %w", err)
 	}
-	if err := seedLeftoverRuns(f, sc); err != nil {
+	if err := storeseed.SeedLeftoverRuns(f.stateD, f.store, f.root, f.git, sc); err != nil {
 		return fmt.Errorf("seed leftover runs: %w", err)
 	}
 	if sc.PromptGrace != "" {

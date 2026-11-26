@@ -1,4 +1,4 @@
-package main
+package storeseed
 
 import (
 	"time"
@@ -9,17 +9,17 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
-// seedRest writes the scenario's Rest state and records by driving the
+// SeedRest writes the scenario's Rest state and records by driving the
 // server's own runner over the seed's heartbeat times on a stepped clock, so
 // the server reads what its own writes would have made. The runner is never
 // started, so no timer is armed.
-func seedRest(f *fixture, sc scenario) error {
+func SeedRest(stateDir string, sc spec.Scenario) error {
 	if sc.Rest == nil {
 		return nil
 	}
 	var now time.Time
 	cfg := func() config.MentalHealthConfig { return sc.Rest.Config }
-	r, err := rest.Open(f.stateD, broker.New(0), cfg, func() time.Time { return now },
+	r, err := rest.Open(stateDir, broker.New(0), cfg, func() time.Time { return now },
 		rest.WithBreakText(spec.RestBreakMessage, spec.RestBreakSubMessage))
 	if err != nil {
 		return err

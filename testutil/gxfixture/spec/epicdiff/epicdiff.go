@@ -1,4 +1,5 @@
-package spec
+// Package epicdiff builds the epic-diff scenario's shapes.
+package epicdiff
 
 import (
 	"fmt"
@@ -9,6 +10,16 @@ import (
 	gitpkg "github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/gxfixture/limitseed"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
+)
+
+const project = limitseed.Project
+
+type (
+	epic     = spec.Epic
+	ticket   = spec.Ticket
+	scenario = spec.Scenario
 )
 
 // EpicDiffShapes are the --shape names of the epic-diff scenario; the first is the default.
@@ -58,24 +69,24 @@ func epicDiffMergedMeta(extra string) string {
 // EpicDiffScenario is the epic-diff scenario in the given shape. The stored
 // epics hold SHAs of the repo's own history, so GitSetup writes them into the
 // meta once it has made the commits (seed reads the meta after GitSetup).
-func EpicDiffScenario(shape string) (Scenario, bool) {
-	sc := Scenario{EpicMeta: map[string]string{}}
-	done := func(id, slug string) Ticket {
-		return Ticket{ID: id, Slug: slug, Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt}}
+func EpicDiffScenario(shape string) (spec.Scenario, bool) {
+	sc := scenario{EpicMeta: map[string]string{}}
+	done := func(id, slug string) ticket {
+		return ticket{ID: id, Slug: slug, Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt}}
 	}
 	mergedMeta := epicDiffMergedMeta
 	mapMeta := mergedMeta("kind: map\n")
 	switch shape {
 	case "merged":
-		sc.Epics = []Epic{
+		sc.Epics = []epic{
 			{Project: project, Name: EpicDiffMap},
-			{Project: project, Name: EpicDiffEpic, Tickets: []Ticket{
+			{Project: project, Name: EpicDiffEpic, Tickets: []ticket{
 				done("01", "every-commit-stamped"), done("02", "legacy-trailer"), done("03", "last-commit-stamped"),
 				{ID: "04", Slug: "commitless-check", Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt, Commitless: true}},
 			}},
 		}
-		sc.Archived = []ArchivedEpic{{Project: project, Name: EpicDiffArchived, Tickets: []Ticket{done("01", "old-work")}}}
-		sc.GitSetup = func(git Git, repo string) error {
+		sc.Archived = []spec.ArchivedEpic{{Project: project, Name: EpicDiffArchived, Tickets: []ticket{done("01", "old-work")}}}
+		sc.GitSetup = func(git spec.Git, repo string) error {
 			s := &epicDiffGit{git: git, repo: repo}
 			oldBase, oldTip := s.archivedRange()
 			base, tip := s.mergedRange()
@@ -88,11 +99,11 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 			return nil
 		}
 	case "unstamped", "empty", "missing-sha":
-		sc.Epics = []Epic{
+		sc.Epics = []epic{
 			{Project: project, Name: EpicDiffMap},
-			{Project: project, Name: EpicDiffEpic, Tickets: []Ticket{done("01", "only-ticket")}},
+			{Project: project, Name: EpicDiffEpic, Tickets: []ticket{done("01", "only-ticket")}},
 		}
-		sc.GitSetup = func(git Git, repo string) error {
+		sc.GitSetup = func(git spec.Git, repo string) error {
 			trunk, err := gitpkg.RevParse(repo, "main")
 			if err != nil {
 				return err
@@ -109,10 +120,10 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 			return nil
 		}
 	case "running":
-		open := func(name string) Epic {
-			return Epic{Project: project, Name: name, Tickets: []Ticket{{ID: "01", Slug: "work", Opts: servertest.TicketOpts{}}}}
+		open := func(name string) epic {
+			return epic{Project: project, Name: name, Tickets: []ticket{{ID: "01", Slug: "work", Opts: servertest.TicketOpts{}}}}
 		}
-		sc.Epics = []Epic{open(EpicDiffAhead), open(EpicDiffStacked), {Project: project, Name: EpicDiffShipped}, open(EpicDiffOnTrunk), open(EpicDiffExplicit), open(EpicDiffQuiet)}
+		sc.Epics = []epic{open(EpicDiffAhead), open(EpicDiffStacked), {Project: project, Name: EpicDiffShipped}, open(EpicDiffOnTrunk), open(EpicDiffExplicit), open(EpicDiffQuiet)}
 		// A derived stacked base needs the on-done landing policy; under the default one
 		// a dependent always bases on trunk.
 		sc.ProjectExtra = map[string]string{project: `,"landing":"on-done"`}
@@ -120,7 +131,7 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 		sc.EpicMeta[project+":"+EpicDiffShipped] = mergedMeta("")
 		sc.EpicMeta[project+":"+EpicDiffOnTrunk] = "status: open\nblocked_by: [" + EpicDiffShipped + "]\n"
 		sc.EpicMeta[project+":"+EpicDiffExplicit] = "status: open\nbase: " + EpicDiffReleaseBranch + "\n"
-		sc.GitSetup = func(git Git, repo string) error {
+		sc.GitSetup = func(git spec.Git, repo string) error {
 			s := &epicDiffGit{git: git, repo: repo}
 			s.runningBranches()
 			return s.err
@@ -130,7 +141,7 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 	case "backfill":
 		return epicDiffBackfillScenario(), true
 	default:
-		return Scenario{}, false
+		return scenario{}, false
 	}
 	return sc, true
 }
@@ -138,7 +149,7 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 // epicDiffGit makes the scenario's commits; the first failure sticks and
 // turns every later call into a no-op.
 type epicDiffGit struct {
-	git  Git
+	git  spec.Git
 	repo string
 	err  error
 }

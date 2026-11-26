@@ -1,4 +1,4 @@
-package spec
+package epicdiff
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/ghfake"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // The epics of the pr shape. The first four are merged on origin only: the
@@ -49,12 +50,12 @@ func EpicDiffSquashSubject() string {
 // EpicDiffPRStep is the headline of commit n of a PR epic's branch.
 func EpicDiffPRStep(epic string, n int) string { return fmt.Sprintf("%s: step %d", epic, n) }
 
-func epicDiffPRScenario() Scenario {
-	sc := Scenario{EpicMeta: map[string]string{}}
-	done := func(id string) Ticket {
-		return Ticket{ID: id, Slug: "step-" + id, Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt}}
+func epicDiffPRScenario() scenario {
+	sc := scenario{EpicMeta: map[string]string{}}
+	done := func(id string) ticket {
+		return ticket{ID: id, Slug: "step-" + id, Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt}}
 	}
-	tickets := func(n int) (out []Ticket) {
+	tickets := func(n int) (out []ticket) {
 		for i := 1; i <= n; i++ {
 			out = append(out, done(fmt.Sprintf("%02d", i)))
 		}
@@ -64,19 +65,19 @@ func epicDiffPRScenario() Scenario {
 	for i, name := range epicDiffPREpics {
 		n := epicDiffPRFirst + i
 		url := fmt.Sprintf("https://github.com/%s/pull/%d", ghfake.Repo, n)
-		sc.Epics = append(sc.Epics, Epic{Project: project, Name: name, Tickets: tickets(2)})
+		sc.Epics = append(sc.Epics, epic{Project: project, Name: name, Tickets: tickets(2)})
 		sc.EpicMeta[project+":"+name] = fmt.Sprintf("status: open\ncompleted_at: 2026-02-10T10:00:00Z\npr_number: %d\npr_url: %s\n", n, url)
 		prs[i] = ghfake.PR{Number: n, URL: url, Head: name, Base: "main", State: "OPEN", Mergeable: "MERGEABLE"}
 	}
 	sc.Epics[1].Tickets = tickets(EpicDiffSquashTickets)
 	sc.Epics = append(sc.Epics,
-		Epic{Project: project, Name: EpicDiffStackedKept, Tickets: tickets(1)},
-		Epic{Project: project, Name: EpicDiffStackedGone, Tickets: tickets(1)},
+		epic{Project: project, Name: EpicDiffStackedKept, Tickets: tickets(1)},
+		epic{Project: project, Name: EpicDiffStackedGone, Tickets: tickets(1)},
 	)
 	sc.ProjectExtra = map[string]string{project: `,"delivery":"pr"`}
-	sc.FakeGH = &FakeGH{State: ghfake.State{PRs: prs}}
+	sc.FakeGH = &spec.FakeGH{State: ghfake.State{PRs: prs}}
 
-	sc.GitSetup = func(git Git, repo string) error {
+	sc.GitSetup = func(git spec.Git, repo string) error {
 		s := &epicDiffGit{git: git, repo: repo}
 		trailer := func(epic string, id string) string { return "demo:" + merge.TicketTrailerValue(epic, id) }
 		branch := func(name, from string, commits int) {
@@ -100,7 +101,7 @@ func epicDiffPRScenario() Scenario {
 		}
 		sc.EpicMeta[project+":"+EpicDiffStackedKept] = stackedMeta("range_base: " + keptBase + "\nrange_tip: " + keptTip + "\n")
 		sc.EpicMeta[project+":"+EpicDiffStackedGone] = stackedMeta("range_base: " + EpicDiffGoneBase + "\nrange_tip: " + EpicDiffMissingTip + "\n")
-		sc.FakeGH.OriginSetup = func(git Git, repo string) error {
+		sc.FakeGH.OriginSetup = func(git spec.Git, repo string) error {
 			return landOnOrigin(&epicDiffGit{git: git, repo: repo}, prs, trailer)
 		}
 		return s.err

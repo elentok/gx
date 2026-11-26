@@ -341,10 +341,13 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   command's output tail); SIGTERM stops it. Per-ticket worker behaviour
   (finish/ask/fail) lives in `.agentfake-worker.json`, see `catalog/scenarios.go`. The scenario data model
   (`Scenario`, `Epic`, `Ticket`, `SessionSpec`) and the scenario definitions that need nothing from
-  the fixture program live in the sub-package `testutil/gxfixture/spec`. The registry
+  the fixture program live in the sub-package `testutil/gxfixture/spec` (the `epic-diff`
+  scenario is in `spec/epicdiff`). `storeseed` seeds records before the server starts,
+  `holderdiag` describes a session that did not start. The registry
   (`catalog.Scenarios`, `catalog.Names()`) lives in `testutil/gxfixture/catalog` (`scenarios.go`,
   `cachegate.go`, `launchstate.go`, `imagesscenarios.go`, `hostfiles.go`: data only; the
-  `host-files` scenario's repo files, second origin and chat lines are `hostfiles.go` in `main`); `scenarios.go` in `main` keeps
+  `host-files` scenario's repo files and second origin are in `hostfileseed`, its layout and chat
+  lines are `hostfiles.go` in `main`); `scenarios.go` in `main` keeps
   the spec aliases. New scenario definitions that take no `fixture` go there too
   (the package is near the `sizeguard` limits). `Output`, the JSON it prints, lives in `spec` too.
   Its scenario tests run in the test-only packages `designflows`, `limitsflows` and `webflows`
