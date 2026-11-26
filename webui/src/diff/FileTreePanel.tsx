@@ -1,6 +1,7 @@
 import { Box, chakra } from "@chakra-ui/react"
 import { forwardRef, useMemo } from "react"
 import type { DiffFile } from "../generated/server"
+import { TextBox } from "../ui/text-box/TextBox"
 import { buildTree, filterFiles } from "./fileTree"
 
 export const FileFilter = forwardRef<
@@ -8,28 +9,18 @@ export const FileFilter = forwardRef<
   { value: string; onChange: (v: string) => void }
 >(function FileFilter({ value, onChange }, ref) {
   return (
-    <chakra.input
+    <TextBox
+      kind="search"
       ref={ref}
+      name="file-filter"
       data-testid="file-filter"
-      aria-label="Filter files"
+      label="Filter files"
+      hideLabel
       placeholder="Filter files"
+      mono
+      mb="2"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      spellCheck={false}
-      autoCapitalize="off"
-      autoCorrect="off"
-      w="100%"
-      h="40px"
-      px="3"
-      mb="2"
-      fontSize="sm"
-      fontFamily="mono"
-      bg="surface.raised"
-      color="text"
-      border="1px solid"
-      borderColor="border"
-      borderRadius="8px"
-      _focusVisible={{ outline: "none", borderColor: "text.dim" }}
     />
   )
 })

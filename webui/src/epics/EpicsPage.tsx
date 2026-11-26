@@ -1,4 +1,4 @@
-import { Box, chakra, Input, Text } from "@chakra-ui/react"
+import { Box, chakra, Text } from "@chakra-ui/react"
 import { ARCHIVE_HREF } from "../hrefs"
 import { HeaderLink } from "../page/HeaderLink"
 import { useEffect, useRef, useState } from "react"
@@ -23,6 +23,7 @@ import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
@@ -265,17 +266,20 @@ export function EpicsPage({
           </Text>
         )}
         <Box display="flex" alignItems="center" gap="4" mt="4">
-          <Input
-            type="search"
-            aria-label="Filter epics"
+          <TextBox
+            kind="search"
+            name="epics-filter"
+            label="Filter epics"
+            hideLabel
             placeholder="Filter epics"
-            h="40px"
-            fontSize="16px"
             maxW="320px"
             flex="1"
             minW="0"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQuery("")
+            }}
           />
           {projects.length > 1 && (
             <ProjectFilter

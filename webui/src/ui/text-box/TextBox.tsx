@@ -292,7 +292,15 @@ export function TextBox(props: TextBoxProps) {
   )
 
   return (
-    <Box display="flex" flexDirection="column" gap="1.5" minH={wrapMinH} {...layout}>
+    // Positioned, so a hidden label stays inside a scrolling parent instead of stretching the page.
+    <Box
+      position="relative"
+      display="flex"
+      flexDirection="column"
+      gap="1.5"
+      minH={wrapMinH}
+      {...layout}
+    >
       {hideLabel ? <VisuallyHidden>{text}</VisuallyHidden> : text}
       <Box
         position="relative"

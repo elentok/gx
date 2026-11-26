@@ -1,7 +1,8 @@
-import { Box, chakra, Input, Text } from "@chakra-ui/react"
+import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import { ReasonBlockedByCycle, type EpicBlockerResult } from "../generated/server"
 import { slugOf } from "../slug"
+import { TextBox } from "../ui/text-box/TextBox"
 import { refusalText, useWrite } from "../useWrite"
 import { candidates, cycleSentence } from "./blockers"
 import { postBlockerAdd, postBlockerRemove } from "./blockerWrite"
@@ -28,7 +29,6 @@ export function BlockerPicker({
   const { run, refusal, error } = useWrite<EpicBlockerResult>({ toastRefusal: false })
   const q = query.trim().toLowerCase()
   const rows = candidates(list, address).filter((c) => c.name.toLowerCase().includes(q))
-  const project = address.slice(0, address.indexOf(":"))
   const cycle = refusal?.reason === ReasonBlockedByCycle && refusal.blocker && refusal.chain?.length
   const failure = cycle ? cycleSentence(refusal) : refusal ? refusalText(refusal) : error
   return (
@@ -41,13 +41,18 @@ export function BlockerPicker({
       p="2"
       maxW="380px"
     >
-      <Input
-        type="search"
-        aria-label="Search epics"
-        placeholder={`Search epics in ${project}…`}
+      <TextBox
+        kind="search"
+        name="blocker-search"
+        label="Search epics"
+        hideLabel
+        placeholder="Search epics"
         mb="2"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setQuery("")
+        }}
       />
       {rows.map((c) => {
         const on = ticked.has(c.address)

@@ -1630,7 +1630,19 @@ test("the picker lists the project's loop epics with their states and marks the 
     "☐ c-implImplementing",
   ])
   expect(within(picker).getByText("blog-impl: this epic")).toBeTruthy()
-  expect(within(picker).getByRole("searchbox", { name: "Search epics" })).toBeTruthy()
+  expect(
+    within(picker).getByRole("searchbox", { name: "Search epics" }).getAttribute("placeholder"),
+  ).toBe("Search epics")
+})
+
+test("Escape clears the picker search and brings every candidate back", async () => {
+  const picker = await openPicker()
+  const box = within(picker).getByRole("searchbox") as HTMLInputElement
+  fireEvent.change(box, { target: { value: "B-IM" } })
+  expect(within(picker).getAllByRole("button")).toHaveLength(1)
+  fireEvent.keyDown(box, { key: "Escape" })
+  expect(box.value).toBe("")
+  expect(within(picker).getAllByRole("button")).toHaveLength(4)
 })
 
 test("the picker search filters by name, ignoring case", async () => {

@@ -11,6 +11,7 @@ import { FileFilter, FileTree } from "./FileTreePanel"
 import { filterFiles, treeOrder } from "./fileTree"
 import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { TextBox } from "../ui/text-box/TextBox"
 import type { Keyed } from "../useKeyedFetch"
 import { useDevice } from "../useWide"
 import { useReadyWhen } from "../useReady"
@@ -44,6 +45,7 @@ const NO_RANGE_TEXT = "gx has no exact range for this epic. Type two refs to com
 
 function RefInput({
   label,
+  name,
   value,
   invalid,
   phone,
@@ -52,33 +54,26 @@ function RefInput({
 }: {
   phone: boolean
   label: string
+  name: string
   value: string
   invalid: boolean
   onChange: (v: string) => void
   onKeyDown: (e: KeyboardEvent) => void
 }) {
   return (
-    <chakra.input
-      aria-label={label}
-      aria-invalid={invalid || undefined}
+    <TextBox
+      kind="line"
+      verbatim
+      mono
+      name={name}
+      label={label}
+      hideLabel
+      invalid={invalid}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
-      spellCheck={false}
-      autoCapitalize="off"
-      autoCorrect="off"
       flex={phone ? "1 1 0" : "1 1 140px"}
       minW="0"
-      h="40px"
-      px={phone ? "2" : "3"}
-      fontFamily="mono"
-      fontSize="sm"
-      bg="surface.raised"
-      color="text"
-      border="1px solid"
-      borderColor={invalid ? "tone.deadlocked.fg" : "border"}
-      borderRadius="8px"
-      _focusVisible={{ outline: "none", borderColor: invalid ? "tone.deadlocked.fg" : "text.dim" }}
     />
   )
 }
@@ -627,6 +622,7 @@ export function DiffPage({
                   <RefInput
                     phone={device === "phone"}
                     label="Base ref"
+                    name="base-ref"
                     value={draft.first}
                     invalid={invalid === "first"}
                     onChange={(v) => setDraft((d) => ({ ...d, first: v }))}
@@ -638,6 +634,7 @@ export function DiffPage({
                   <RefInput
                     phone={device === "phone"}
                     label="Tip ref"
+                    name="tip-ref"
                     value={draft.second}
                     invalid={invalid === "second"}
                     onChange={(v) => setDraft((d) => ({ ...d, second: v }))}

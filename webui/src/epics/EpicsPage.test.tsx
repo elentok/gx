@@ -222,6 +222,16 @@ test("the filter opens a matching collapsed section, hides the others, and reach
   expect(screen.queryByRole("link", { name: "done-b" })).toBeNull()
 })
 
+test("Escape clears the filter and shows every epic again", async () => {
+  await loaded(mixed())
+  const box = (await filterBox()) as HTMLInputElement
+  fireEvent.change(box, { target: { value: "done-b" } })
+  expect(regionNames()).toEqual(["epics-finished"])
+  fireEvent.keyDown(box, { key: "Escape" })
+  expect(box.value).toBe("")
+  expect(regionNames()).toHaveLength(6)
+})
+
 const twoProjects = () =>
   listOf([
     row("g1", { project: "gx" }),
