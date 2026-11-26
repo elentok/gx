@@ -1291,6 +1291,10 @@ _Avoid_: input, field, text field
 setup).
 _Avoid_: variant, type
 
+**Broken rule report** — what the web UI sends when, in production, it finds one of its own rules
+broken. It is filed as a **Follow-up**, one per rule and broken value.
+_Avoid_: client error (a crash in the browser, which is only logged)
+
 **Prompt box** — the text field where the person writes to an agent or answers a question: the chat
 composer, the design composer and note, the answer boxes, the deny note, the start-over reason and
 the schedule prompt. It is a textarea, or, with vi mode on and a pointer that is not coarse, an
