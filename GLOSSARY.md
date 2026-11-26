@@ -1283,8 +1283,13 @@ name comes from the macOS menu bar.
 _Avoid_: status area, indicators bar
 
 **Text box** — any native input or textarea in the web UI that the person types text into. A
-**Prompt box** is one kind. The vi editor is not a text box.
+**Prompt box** is a text box with extras. The vi editor is not a text box.
 _Avoid_: input, field, text field
+
+**Text box kind** — what a **Text box** is for, which sets its AutoFill behaviour: prose
+(multi-line free text), line (a title, slug, name or setting), search, or credential (login and
+setup).
+_Avoid_: variant, type
 
 **Prompt box** — the text field where the person writes to an agent or answers a question: the chat
 composer, the design composer and note, the answer boxes, the deny note, the start-over reason and
