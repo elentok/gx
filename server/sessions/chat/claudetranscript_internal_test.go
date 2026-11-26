@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
@@ -150,13 +151,45 @@ func TestPoll_PublishesOnTranscriptGrowth(t *testing.T) {
 	defer p.Close()
 	p.SetActive(true)
 	<-src.noted
-	<-src.noted // the first tick has finished, so the baseline size is taken
+	<-src.noted // the first tick has finished
 	if err := os.WriteFile(path, []byte("{}\n{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	got := <-src.published
 	if got != [2]string{wire.EventSessionChatChanged, "s1"} {
 		t.Fatalf("published %v, want a chat-changed event for s1", got)
+	}
+}
+
+// The page loads the chat when the turn starts, so a write between that load and
+// the first tick must still publish, also the one that creates the transcript.
+func TestPoll_PublishesAWriteBeforeTheFirstTick(t *testing.T) {
+	t.Parallel()
+	for name, before := range map[string][]string{"growth": {"{}"}, "new file": nil} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newClaudeFixture(t)
+			if before != nil {
+				writeLines(t, f.path, before...)
+			}
+			c := claudeChat(f.src, f.config)
+			// Long enough that the write below lands before the first tick.
+			c.cfg.ChatPollInterval = 200 * time.Millisecond
+			p := c.NewPoll("dir", "s1")
+			defer p.Close()
+			p.SetActive(true)
+			writeLines(t, f.path, "{}", "{}")
+			<-f.src.noted
+			<-f.src.noted // the first tick has finished
+			select {
+			case got := <-f.src.published:
+				if got != [2]string{wire.EventSessionChatChanged, "s1"} {
+					t.Fatalf("published %v, want a chat-changed event for s1", got)
+				}
+			default:
+				t.Fatal("the first tick published nothing for the write before it")
+			}
+		})
 	}
 }
 

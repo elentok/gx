@@ -31,7 +31,10 @@ func (p *Poll) SetActive(active bool) {
 	switch {
 	case active && p.stop == nil:
 		p.stop, p.done = make(chan struct{}), make(chan struct{})
-		go p.run(p.stop, p.done)
+		// The baseline is taken here, not at the first tick: the page loads the
+		// chat when the turn starts, and growth after that load is news.
+		path := p.transcript()
+		go p.run(p.stop, p.done, path, sizeOf(path))
 	case !active && p.stop != nil:
 		p.halt()
 	}
@@ -52,12 +55,19 @@ func (p *Poll) halt() {
 	p.stop, p.done = nil, nil
 }
 
-func (p *Poll) run(stop <-chan struct{}, done chan<- struct{}) {
+// sizeOf is the file's size, or -1 when it cannot be read.
+func sizeOf(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return -1
+	}
+	return info.Size()
+}
+
+func (p *Poll) run(stop <-chan struct{}, done chan<- struct{}, path string, size int64) {
 	defer close(done)
 	ticker := time.NewTicker(p.c.cfg.ChatPollInterval)
 	defer ticker.Stop()
-	var path string
-	size := int64(-1)
 	for {
 		select {
 		case <-stop:
@@ -71,29 +81,16 @@ func (p *Poll) run(stop <-chan struct{}, done chan<- struct{}) {
 		p.c.src.NoteCards(p.id)
 		// /clear starts a new conversation with a new transcript, so the path is
 		// resolved every tick. A moved path is a change the page must refetch for:
-		// its last-message id belongs to the old file.
+		// its last-message id belongs to the old file. A transcript that appears
+		// is news too.
 		cur := p.transcript()
-		if cur != path {
-			moved := path != ""
-			path, size = cur, -1
-			if moved {
-				p.c.src.Publish(wire.EventSessionChatChanged, p.id)
-			}
-		}
-		if path == "" {
+		cursize := sizeOf(cur)
+		// An unreadable file at the same path keeps the last size.
+		if cur == path && (cursize < 0 || cursize == size) {
 			continue
 		}
-		info, err := os.Stat(path)
-		if err != nil {
-			continue
-		}
-		prev := size
-		size = info.Size()
-		// The first reading is the baseline: growth that predates the poll
-		// is already in the chat the page loads.
-		if prev >= 0 && size != prev {
-			p.c.src.Publish(wire.EventSessionChatChanged, p.id)
-		}
+		path, size = cur, cursize
+		p.c.src.Publish(wire.EventSessionChatChanged, p.id)
 	}
 }
 

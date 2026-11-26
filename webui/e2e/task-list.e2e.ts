@@ -61,6 +61,26 @@ test("208. Task list", async ({ page, start }) => {
     await expect(working).not.toContainText("running shell:")
   }
 
+  // An open row survives a chat reload.
+  const kept = rowOf(page, "python3").getByRole("button").first()
+  await kept.click()
+  await expect(kept).toHaveAttribute("aria-expanded", "true")
+  appendFileSync(
+    fixture.transcripts.claude,
+    `${JSON.stringify({
+      type: "assistant",
+      uuid: "bg-reload",
+      timestamp: new Date().toISOString(),
+      message: {
+        id: "msg_reload",
+        role: "assistant",
+        content: [{ type: "text", text: "Still watching the log." }],
+      },
+    })}\n`,
+  )
+  await expect(page.getByText("Still watching the log.")).toBeVisible()
+  await expect(kept).toHaveAttribute("aria-expanded", "true")
+
   // The elapsed time of a running row moves with no request meanwhile.
   for (const label of ["Survey the sessions code", "Watch the app log", "python3"]) {
     const cell = elapsed(page, label)

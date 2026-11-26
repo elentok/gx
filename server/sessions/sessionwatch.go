@@ -162,6 +162,9 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			}
 			seenBusy = busy && (seenBusy || sawIdle)
 			sawIdle = !busy
+			// Before the update publishes the new status, so the poll's baseline
+			// is no later than the page's read of the chat.
+			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			update(func(m *Meta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -233,7 +236,6 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			if st.State == wire.SessionBlocked {
 				mg.NoteQuestionCards(id)
 			}
-			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := chat.TurnMark{}, false
 			if idleEdge {
