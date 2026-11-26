@@ -12,13 +12,13 @@ the description.
   `"run_in_background":"true"` and 4672 with the boolean `true`.
 - `taskUse` declares `RunInBackground bool` (`transcript/taskrecords.go:313`).
   `json.Unmarshal` of a string into a bool fails.
-- `taskToolUses` (`transcript/taskrecords.go:~290`) unmarshals the whole message in one
+- `taskToolUses` (`transcript/taskrecords.go:318-327`) unmarshals the whole message in one
   call and returns `nil` on any error (`if json.Unmarshal(message, &m) != nil { return nil }`).
   One bad `input` drops **every** Agent, Task, Bash and Monitor tool_use of that assistant
   line. The "assistant" case (`taskrecords.go:132-150`) then builds no record and never
   sets `byUse[id]`.
 - The launch result (`toolUseResult.status == "async_launched"`) still arrives. The
-  tool_result branch finds no `byUse` entry (`taskrecords.go:~172`, `r == nil` then
+  tool_result branch finds no `byUse` entry (`taskrecords.go:179-181`, `r == nil` then
   `continue`), so `byTask` stays empty for that id.
 - The fallback at `taskrecords.go:217-226` (`res.launch()` with `byTask[id] == nil`) then
   creates the row: `&TaskRecord{Kind, TaskID, StartedAt}` with `ID = id`. It has no `Label`
