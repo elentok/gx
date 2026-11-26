@@ -51,6 +51,7 @@ const untoned = [
   "Menu",
   "Question",
   "FullScreenLoader",
+  "TextBox",
 ]
 
 it("shows the Menu on each device type, closed and open", () => {

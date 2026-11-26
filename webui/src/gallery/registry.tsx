@@ -9,6 +9,7 @@ import { confirmEntries } from "./confirmEntries"
 import { designFooterEntries } from "./designFooterEntries"
 import { questionEntries } from "./questionEntries"
 import { shellEntries } from "./shellEntries"
+import { textBoxEntries } from "./textBoxEntries"
 import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
 import { WebPerformance, type PerfTab } from "../stats/WebPerformance"
 import type { StatsWebPerformance } from "../generated/server"
@@ -1803,4 +1804,5 @@ export const galleryEntries: GalleryEntry[] = [
   ...shellEntries,
   ...confirmEntries,
   ...designFooterEntries,
+  ...textBoxEntries,
 ]
