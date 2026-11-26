@@ -189,7 +189,7 @@ writes it). `codex-child`: a rollout whose `session_meta` has `agent_role` "revi
 and `subagent_history_start_ordinal`, then the parent's history ending in the marker developer message, then the child's own
 lines (encrypted `agent_message`, `turn_context` model, tool calls, `token_count`, a last assistant message).
 `codex-null-role`: the same with `agent_role: null`. `codex-compressed`: only `rollout-...-<thread>.jsonl.zst` under
-`sessions/`, no `.jsonl`. `codex-nested`: the child's own lines hold a `spawn_agent` call (no link is expected).
+`sessions/`, no `.jsonl`. `codex-nested`: the child's own lines hold a `spawn_agent` call (no link is expected). `codex-running-call`: the child's inherited history holds an open call (`git log --oneline`) and its own lines end in another (`go vet ./...`), the row's and the Working row's current call.
 Data: `bgtx/codex_subagents.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).

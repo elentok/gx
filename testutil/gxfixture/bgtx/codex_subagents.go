@@ -2,6 +2,7 @@ package bgtx
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,6 +17,10 @@ const (
 	CodexSubMarker    = "You are now a newly spawned child agent. The preceding conversation is inherited parent context."
 	CodexSubLast      = "The change looks fine."
 	CodexSubGrandcall = "cxgc1"
+	// The running-call shape's open calls: one in the inherited history, one in
+	// the child's own lines.
+	CodexSubInheritedCmd = "git log --oneline"
+	CodexSubRunningCmd   = "go vet ./..."
 
 	// CodexSubVersion is the parent rollout's cli_version, the one the bg-progress
 	// codex shape shows its subagent row with.
@@ -35,6 +40,7 @@ const (
 	codexNullRole                          // a rollout with agent_role null
 	codexCompressed                        // only a .jsonl.zst
 	codexNestedChild                       // a rollout whose own lines spawn a grandchild
+	codexRunningCall                       // a rollout with an open call, inherited and own
 )
 
 // CodexSubagentShapes are the Codex shapes of the subagents scenario, by --shape.
@@ -44,9 +50,11 @@ var CodexSubagentShapes = map[string]Subagent{
 	"codex-null-role":  codexShape("codex-null-role", codexNullRole),
 	"codex-compressed": codexShape("codex-compressed", codexCompressed),
 	"codex-nested":     codexShape("codex-nested", codexNestedChild),
+
+	"codex-running-call": codexShape("codex-running-call", codexRunningCall),
 }
 
-var codexThreads = map[string]string{"codex-starting": "e1", "codex-child": "e2", "codex-null-role": "e3", "codex-compressed": "e4", "codex-nested": "e5"}
+var codexThreads = map[string]string{"codex-starting": "e1", "codex-child": "e2", "codex-null-role": "e3", "codex-compressed": "e4", "codex-nested": "e5", "codex-running-call": "e6"}
 
 // CodexSubThread is the child thread id of a Codex shape.
 func CodexSubThread(shape string) string {
@@ -93,7 +101,15 @@ func (b *Lines) codexChildLines(ago time.Duration, thread string, kind codexChil
 		return jsonLine(map[string]any{"timestamp": at(ago), "type": "response_item", "payload": map[string]any{
 			"type": "message", "role": role, "content": []any{map[string]any{"type": "output_text", "text": text}}}})
 	}
+	openCall := func(call, cmd string) string {
+		return jsonLine(map[string]any{"timestamp": at(ago), "type": "response_item", "payload": map[string]any{
+			"type": "function_call", "name": "exec_command", "call_id": call, "arguments": jsonLine(map[string]any{"cmd": cmd})}})
+	}
 	history := []string{msg("user", "Please review the change."), msg("assistant", "I will ask a subagent."), msg("developer", CodexSubMarker)}
+	if kind == codexRunningCall {
+		// The marker stays the last inherited line.
+		history = slices.Insert(history, 2, openCall("cxp1", CodexSubInheritedCmd))
+	}
 	ordinal := 1 + len(history) // session_meta is line 0
 	var role any = "reviewer"
 	if kind == codexNullRole {
@@ -106,8 +122,7 @@ func (b *Lines) codexChildLines(ago time.Duration, thread string, kind codexChil
 	lines = append(lines,
 		jsonLine(map[string]any{"timestamp": at(ago), "type": "event_msg", "payload": map[string]any{"type": "agent_message", "encrypted_content": "gAAAAABfake"}}),
 		jsonLine(map[string]any{"type": "turn_context", "payload": map[string]any{"model": CodexChildModel, "effort": "medium"}}),
-		jsonLine(map[string]any{"timestamp": at(ago), "type": "response_item", "payload": map[string]any{
-			"type": "function_call", "name": "exec_command", "call_id": "cxk1", "arguments": jsonLine(map[string]any{"cmd": "git diff"})}}),
+		openCall("cxk1", "git diff"),
 		jsonLine(map[string]any{"timestamp": at(ago), "type": "response_item", "payload": map[string]any{
 			"type": "function_call_output", "call_id": "cxk1", "output": "diff --git a/x b/x"}}),
 	)
@@ -124,6 +139,9 @@ func (b *Lines) codexChildLines(ago time.Duration, thread string, kind codexChil
 		}}}),
 		msg("assistant", CodexSubLast),
 	)
+	if kind == codexRunningCall {
+		lines = append(lines, openCall("cxk2", CodexSubRunningCmd))
+	}
 	// The chat read finds the child's own lines by the ordinal each line carries.
 	for i, l := range lines {
 		var m map[string]any

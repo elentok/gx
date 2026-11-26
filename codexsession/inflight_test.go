@@ -153,6 +153,46 @@ func TestReadInFlightTools_ItemCompletedEndsTheCommand(t *testing.T) {
 	}
 }
 
+func TestReadChildInFlightTools_OnlyTheChildsOwnCalls(t *testing.T) {
+	t.Parallel()
+	fn := func(ord int, id, cmd string) string {
+		return fmt.Sprintf(`{"ordinal":%d,"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":%q,"arguments":"{\"cmd\":\"%s\"}"}}`, ord, id, cmd)
+	}
+	cell := func(ord int, id, cmd string) string {
+		return fmt.Sprintf(`{"ordinal":%d,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":%q,"input":"tools.exec_command({cmd:\"%s\"})"}}`, ord, id, cmd)
+	}
+	// A line without an ordinal before the start is inherited too.
+	unnumbered := `{"type":"response_item","payload":{"type":"function_call","name":"update_plan","call_id":"u","arguments":"{}"}}`
+	own := []transcript.InFlightTool{{Kind: "shell", Label: "own"}}
+
+	for _, tc := range []struct {
+		name      string
+		execShape bool
+		lines     []string
+		want      []transcript.InFlightTool
+	}{
+		{"old shape", false, []string{unnumbered, fn(1, "p", "parent"), fn(3, "c", "own")}, own},
+		{"old shape, only inherited calls", false, []string{unnumbered, fn(1, "p", "parent")}, []transcript.InFlightTool{}},
+		{"exec cells", true, []string{unnumbered, cell(1, "p", "parent"), cell(3, "c", "own")}, own},
+		{"exec cells, only inherited calls", true, []string{unnumbered, cell(1, "p", "parent")}, []transcript.InFlightTool{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "rollout.jsonl")
+			if err := os.WriteFile(path, []byte(strings.Join(tc.lines, "\n")+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got, err := ReadChildInFlightTools(path, 3, tc.execShape)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestReadInFlightTools_MissingFile(t *testing.T) {
 	t.Parallel()
 	got, err := ReadInFlightTools(filepath.Join(t.TempDir(), "none.jsonl"), false)

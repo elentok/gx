@@ -11,7 +11,7 @@ import (
 var SubagentsShapes = []string{
 	"claude", "foreground-running", "finished-handback", "file-gone",
 	"stopped-no-handback", "background-returned", "nested", "starting", "finished-no-handback", "string-background", "file-call", "parent-gone", "exited",
-	"codex-starting", "codex-child", "codex-null-role", "codex-compressed", "codex-nested",
+	"codex-starting", "codex-child", "codex-null-role", "codex-compressed", "codex-nested", "codex-running-call",
 }
 
 // SubagentsScenario is the subagents scenario in the given shape: one Working

@@ -16,6 +16,8 @@ type ChildMeta struct {
 	// HistoryStartOrdinal is where the child's own lines start: the lines
 	// before it are a copy of the parent's history.
 	HistoryStartOrdinal int
+	// CLIVersion is the Codex version that wrote the rollout.
+	CLIVersion string
 }
 
 // ReadChildMeta reads the session_meta line of the rollout at path, which is
@@ -33,7 +35,8 @@ func ReadChildMeta(path string) (ChildMeta, error) {
 	var line struct {
 		Type    string `json:"type"`
 		Payload struct {
-			StartOrdinal int `json:"subagent_history_start_ordinal"`
+			CLIVersion   string `json:"cli_version"`
+			StartOrdinal int    `json:"subagent_history_start_ordinal"`
 			Source       struct {
 				Subagent struct {
 					ThreadSpawn struct {
@@ -46,7 +49,7 @@ func ReadChildMeta(path string) (ChildMeta, error) {
 	if json.Unmarshal(raw, &line) != nil || line.Type != "session_meta" {
 		return ChildMeta{}, nil
 	}
-	m := ChildMeta{HistoryStartOrdinal: line.Payload.StartOrdinal}
+	m := ChildMeta{HistoryStartOrdinal: line.Payload.StartOrdinal, CLIVersion: line.Payload.CLIVersion}
 	if role := line.Payload.Source.Subagent.ThreadSpawn.AgentRole; role != nil {
 		m.AgentRole = *role
 	}

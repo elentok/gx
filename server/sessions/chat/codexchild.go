@@ -12,6 +12,14 @@ type codexChild struct {
 	Tokens int
 	// Role is the child's agent_role; empty for a null role.
 	Role string
+	// CurrentCall is the newest open call of the child's own lines; zero when none.
+	CurrentCall transcript.InFlightTool
+}
+
+// codexChildInFlight lists the open calls of a child's own lines, newest first.
+// The exec-cell rules follow the child's Codex version, not the parent's.
+func codexChildInFlight(path string, meta codexsession.ChildMeta) ([]transcript.InFlightTool, error) {
+	return codexsession.ReadChildInFlightTools(path, meta.HistoryStartOrdinal, hasExecShape(meta.CLIVersion))
 }
 
 func readCodexChild(path string) (codexChild, error) {
@@ -32,6 +40,13 @@ func readCodexChild(path string) (codexChild, error) {
 		return codexChild{}, err
 	}
 	out.Tokens = int(usage.Total.Total)
+	open, err := codexChildInFlight(path, meta)
+	if err != nil {
+		return codexChild{}, err
+	}
+	if len(open) > 0 {
+		out.CurrentCall = open[0]
+	}
 	return out, nil
 }
 
@@ -56,8 +71,8 @@ func (c *Chat) codexChildPath(threadID string, meta Meta) (string, bool) {
 	})
 }
 
-// withCodexChildren returns records with each Codex subagent's model and token
-// total filled from its child rollout. Like withSubagentDetails it runs on every
+// withCodexChildren returns records with each Codex subagent's model, token
+// total and current call filled from its child rollout. Like withSubagentDetails it runs on every
 // chat read and not in the snapshot: the child grows while the parent is quiet.
 // A missing child leaves the started event's model and no tokens. It copies what
 // it changes: the records belong to the cached snapshot.
@@ -80,6 +95,9 @@ func (c *Chat) withCodexChildren(records []transcript.TaskRecord, meta Meta) []t
 			r.Tokens, r.SubagentType = d.Tokens, d.Role
 			if d.Model != "" {
 				r.Model = d.Model
+			}
+			if r.End == nil {
+				r.CurrentCall, r.CurrentCallPath = d.CurrentCall.LabelIn(meta.Dir)
 			}
 		},
 	})

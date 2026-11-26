@@ -92,6 +92,18 @@ func TestCodexChild_PageCutsHistoryAndHidesThePrompt(t *testing.T) {
 	}
 }
 
+func TestCodexChild_PageShowsTheChildsOwnCurrentCall(t *testing.T) {
+	t.Parallel()
+	p := newCodexPage(t, time.Minute)
+	lines := codexChildLines(`null`, false)
+	writeLines(t, p.child, append([]string{lines[0], codexCallLine(1, "p", "parent-cmd")},
+		append(lines[1:], codexCallLine(6, "c1", "older-cmd"), codexCallLine(7, "c2", "newer-cmd"))...)...)
+	got := p.read(t, "c1")
+	if got.Current == nil || got.Current.Label != "newer-cmd" || len(got.Others) != 1 || got.Others[0].Label != "older-cmd" {
+		t.Errorf("current = %+v, others = %+v, want only the child's calls, newest first", got.Current, got.Others)
+	}
+}
+
 func TestCodexChild_NullRoleHasNoType(t *testing.T) {
 	t.Parallel()
 	p := newCodexPage(t, time.Minute)

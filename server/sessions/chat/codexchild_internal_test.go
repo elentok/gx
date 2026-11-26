@@ -2,7 +2,9 @@ package chat
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -97,6 +99,61 @@ func TestRead_CodexSubagentRowsTakeDetailsFromTheChildRollout(t *testing.T) {
 	if parses.Load() != 2 {
 		t.Errorf("grown child parsed %d times in total, want 2", parses.Load())
 	}
+}
+
+func TestRead_CodexSubagentRowTakesTheChildsCurrentCall(t *testing.T) {
+	t.Parallel()
+	// A second running subagent keeps the list shown after the first one ends.
+	p := newCodexPage(t, time.Minute, fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":"c2","arguments":"{\"task_name\":\"other\"}"}}`, nowStamp()))
+	parses := &atomic.Int32{}
+	c := claudeChat(p.f.src, t.TempDir())
+	c.reads.codexChild = func(path string) (codexChild, error) {
+		parses.Add(1)
+		return readCodexChild(path)
+	}
+	p.f.srv = serveChat(t, p.f.src, c)
+	row := func() wire.SessionTask {
+		rows := p.f.chat(t, "/v1/sessions/chat").Tasks
+		if len(rows) != 2 || rows[0].Label != "rev" {
+			t.Fatalf("rows = %+v, want rev first of two", rows)
+		}
+		return rows[0]
+	}
+	lines := append(codexChildLines(`null`, false)[:1], codexCallLine(1, "p", "parent-cmd"))
+
+	writeLines(t, p.child, lines...)
+	if got := row().CurrentCall; got != "" {
+		t.Errorf("current call = %q, want none: the open call is inherited", got)
+	}
+
+	lines = append(lines, codexCallLine(3, "c1", "first-cmd"))
+	writeLines(t, p.child, lines...)
+	if got := row().CurrentCall; got != "first-cmd" {
+		t.Errorf("current call = %q, want the child's", got)
+	}
+	row()
+	if parses.Load() != 2 {
+		t.Errorf("parses = %d, want 2: an unchanged child is parsed once", parses.Load())
+	}
+
+	lines = append(lines, codexCallLine(4, "c2", "second-cmd"))
+	writeLines(t, p.child, lines...)
+	if got := row().CurrentCall; got != "second-cmd" {
+		t.Errorf("grown child: current call = %q, want the newest", got)
+	}
+
+	parent, err := os.ReadFile(p.f.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLines(t, p.f.path, strings.TrimSuffix(string(parent), "\n"), completedEvent())
+	if got := row(); !got.Finished || got.CurrentCall != "" {
+		t.Errorf("ended row = %+v, want finished with no current call", got)
+	}
+}
+
+func codexCallLine(ordinal int, call, cmd string) string {
+	return fmt.Sprintf(`{"ordinal":%d,"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":%q,"arguments":"{\"cmd\":\"%s\"}"}}`, ordinal, call, cmd)
 }
 
 func TestCodexSubagent_ResolvesThroughThreadIDOnly(t *testing.T) {

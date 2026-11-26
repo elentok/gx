@@ -113,6 +113,10 @@ func (c *Chat) codexChildLoader(sessionDir string) func(string) (Snapshot, error
 		if err != nil {
 			return Snapshot{}, err
 		}
-		return SnapshotOf(chatreader.Result{Messages: chat.Messages, CodexVersion: chat.Version}, harness.Codex, FlowRef{}, false), nil
+		snap := SnapshotOf(chatreader.Result{Messages: chat.Messages, CodexVersion: chat.Version}, harness.Codex, FlowRef{}, false)
+		if snap.InFlight, err = codexChildInFlight(path, meta); err != nil {
+			return Snapshot{}, err
+		}
+		return snap, nil
 	}
 }

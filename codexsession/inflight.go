@@ -15,3 +15,10 @@ func ReadInFlightTools(path string, execShape bool) ([]transcript.InFlightTool, 
 	r, err := ReadRollout(path, execShape)
 	return r.InFlight, err
 }
+
+// ReadChildInFlightTools is ReadInFlightTools over a Codex child's own lines:
+// from the first line whose ordinal is at least startOrdinal.
+func ReadChildInFlightTools(path string, startOrdinal int, execShape bool) ([]transcript.InFlightTool, error) {
+	r, err := readRollout(path, execShape, &startOrdinal)
+	return r.InFlight, err
+}

@@ -22,6 +22,12 @@ type Rollout struct {
 // ReadRollout scans the rollout once. Records are filled only with execShape (a
 // rollout of Codex 0.144.1 or later). A missing file is an empty rollout.
 func ReadRollout(path string, execShape bool) (Rollout, error) {
+	return readRollout(path, execShape, nil)
+}
+
+// readRollout scans from the startOrdinal rule of ReadChatFromOrdinal; nil scans
+// every line.
+func readRollout(path string, execShape bool, startOrdinal *int) (Rollout, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -32,11 +38,12 @@ func ReadRollout(path string, execShape bool) (Rollout, error) {
 	defer f.Close()
 
 	s := &scanner{
-		execShape: execShape,
-		byCall:    map[string]*cell{},
-		byCellID:  map[string]*cell{},
-		byWait:    map[string]*cell{},
-		bySession: map[string]*cell{},
+		execShape:    execShape,
+		startOrdinal: startOrdinal,
+		byCall:       map[string]*cell{},
+		byCellID:     map[string]*cell{},
+		byWait:       map[string]*cell{},
+		bySession:    map[string]*cell{},
 
 		pollSession: map[string]string{},
 		spawns:      map[string]*subagent{},
@@ -89,6 +96,9 @@ type openCall struct {
 
 type scanner struct {
 	execShape bool
+	// startOrdinal is set until the first line at or after it; earlier lines are
+	// skipped.
+	startOrdinal *int
 
 	// Task state.
 	cells       []*cell
@@ -129,6 +139,12 @@ func (s *scanner) line(raw []byte) {
 	var line chatRolloutLine
 	if json.Unmarshal(raw, &line) != nil {
 		return
+	}
+	if s.startOrdinal != nil {
+		if line.Ordinal == nil || *line.Ordinal < *s.startOrdinal {
+			return
+		}
+		s.startOrdinal = nil
 	}
 	s.inflight(line)
 	if !s.execShape {

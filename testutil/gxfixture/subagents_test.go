@@ -315,6 +315,14 @@ func TestSubagents_CodexShapes(t *testing.T) {
 				t.Fatalf("RolloutPathIn = %q, %v, %v, want none", path, ok, err)
 			}
 		}},
+		{"codex-running-call", func(t *testing.T, r *running, row wire.SessionTask) {
+			if history := rolloutLines(t, r)[:4]; !strings.Contains(strings.Join(history, "\n"), bgtx.CodexSubInheritedCmd) {
+				t.Fatalf("history = %v, want the inherited open call", history)
+			}
+			if row.Finished || row.CurrentCall != bgtx.CodexSubRunningCmd {
+				t.Fatalf("row = %+v, want running %q", row, bgtx.CodexSubRunningCmd)
+			}
+		}},
 		{"codex-nested", func(t *testing.T, r *running, _ wire.SessionTask) {
 			if own := strings.Join(checkChild(t, r, "reviewer"), "\n"); !strings.Contains(own, `"name":"spawn_agent"`) || !strings.Contains(own, bgtx.CodexSubGrandcall) {
 				t.Fatalf("own lines = %s, want a spawn_agent call", own)
