@@ -96,6 +96,21 @@ describe("ChecksEditor", () => {
     ])
   })
 
+  it.each([
+    ["one slow limit", "5s", ["suite limit", "hang limit", "slow limit"]],
+    [
+      "a slow map",
+      { go: "5s" },
+      ["suite limit", "hang limit", "slow go limit", "slow vitest limit", "slow playwright limit"],
+    ],
+  ])("shows each limit's accessible name as its label with %s", (_name, slow, names) => {
+    const v = setup({ test: { full: "f", limits: { slow } } })
+    for (const name of names) {
+      const box = v.getByRole("textbox", { name }) as HTMLInputElement
+      expect(v.getByText(name)).toBe(box.labels![0])
+    }
+  })
+
   it("adds and removes an always command", async () => {
     const v = setup({ test: { full: "f" } })
     type(v, "Add always command for test", "go vet")

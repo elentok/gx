@@ -1,7 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useId, useState } from "react"
+import { useState } from "react"
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server"
 import { Button } from "../ui/button/Button"
+import { TextBox } from "../ui/text-box/TextBox"
 import { withKeys } from "../uniqueKeys"
 import { refusalText, useWrite } from "../useWrite"
 import {
@@ -17,7 +18,7 @@ import {
   type CheckMode,
   type ChecksModel,
 } from "./checks"
-import { ChangedDot, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
+import { ChangedDot, SaveStatus, Segmented, TagChip } from "./parts"
 import type { WriteSetting } from "./SettingsRow"
 
 const MODES: { value: CheckMode; label: string }[] = [
@@ -27,28 +28,25 @@ const MODES: { value: CheckMode; label: string }[] = [
   { value: "pair", label: "changed + full" },
 ]
 
-const TextInput = ({
+const CommandBox = ({
+  name,
   label,
   value,
   onChange,
-  wide = false,
-  id,
 }: {
+  name: string
   label: string
   value: string
   onChange: (v: string) => void
-  wide?: boolean
-  id?: string
 }) => (
-  <chakra.input
-    id={id}
-    type="text"
-    aria-label={label}
+  <TextBox
+    kind="line"
+    verbatim
+    name={name}
+    label={label}
+    hideLabel
     value={value}
-    w={wide ? "100%" : "90px"}
     onChange={(e) => onChange(e.currentTarget.value)}
-    borderColor="border"
-    {...inputProps}
   />
 )
 
@@ -80,24 +78,19 @@ function AlwaysList({
           onRemove={() => onChange(items.filter((_, j) => j !== index))}
         />
       ))}
-      <chakra.input
-        type="text"
-        aria-label={`Add always command for ${kind}`}
+      <TextBox
+        kind="line"
+        verbatim
+        size="sm"
+        name="check-always-command"
+        label={`Add always command for ${kind}`}
+        hideLabel
         placeholder="+ add command"
         value={text}
         onChange={(e) => setText(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && add()}
         onBlur={add}
         w="150px"
-        h="26px"
-        px="2.5"
-        borderWidth="1px"
-        borderColor="border"
-        borderStyle="dashed"
-        borderRadius="full"
-        bg="transparent"
-        color="text"
-        fontSize="12.5px"
       />
     </Box>
   )
@@ -115,6 +108,8 @@ function Limits({
       display="grid"
       gridTemplateColumns={`repeat(${form.slowIsMap ? 2 + SLOW_TOOLS.length : 3}, minmax(0, 1fr))`}
       gap="1.5"
+      // A label word wider than its narrow column breaks instead of covering the next one.
+      overflowWrap="anywhere"
     >
       <LimitField label="suite" value={form.suite} onChange={(suite) => onChange({ suite })} />
       <LimitField label="hang" value={form.hang} onChange={(hang) => onChange({ hang })} />
@@ -142,15 +137,19 @@ const LimitField = ({
   label: string
   value: string
   onChange: (v: string) => void
-}) => {
-  const id = useId()
-  return (
-    <chakra.label htmlFor={id} display="grid" gap="1" fontSize="11px" color="text.muted">
-      {label}
-      <TextInput id={id} wide label={`${label} limit`} value={value} onChange={onChange} />
-    </chakra.label>
-  )
-}
+}) => (
+  <TextBox
+    kind="line"
+    verbatim
+    name="check-limit"
+    label={`${label} limit`}
+    value={value}
+    onChange={(e) => onChange(e.currentTarget.value)}
+    minW="0"
+    // Keeps the boxes level when only some labels wrap.
+    alignSelf="end"
+  />
+)
 
 function KindCard({
   kind,
@@ -201,8 +200,8 @@ function KindCard({
         </Text>
       )}
       {form.mode === "one" && (
-        <TextInput
-          wide
+        <CommandBox
+          name="check-command"
           label={`${kind} command`}
           value={form.command}
           onChange={(command) => onChange({ command })}
@@ -210,14 +209,14 @@ function KindCard({
       )}
       {form.mode === "pair" && (
         <>
-          <TextInput
-            wide
+          <CommandBox
+            name="check-changed-command"
             label={`${kind} changed command`}
             value={form.changed}
             onChange={(changed) => onChange({ changed })}
           />
-          <TextInput
-            wide
+          <CommandBox
+            name="check-full-command"
             label={`${kind} full command`}
             value={form.full}
             onChange={(full) => onChange({ full })}

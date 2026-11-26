@@ -158,17 +158,6 @@ export const rowProps = {
   _hover: { bg: "surface" },
 } as const
 
-/** The look of a settings text field; callers add width and border colour. */
-export const inputProps = {
-  h: "36px",
-  px: "3",
-  minW: "0",
-  borderWidth: "1px",
-  borderRadius: "8px",
-  bg: "surface",
-  color: "text",
-} as const
-
 export const SearchBox = ({
   value,
   onChange,

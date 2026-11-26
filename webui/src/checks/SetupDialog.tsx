@@ -4,6 +4,7 @@ import { refusalText, useWrite } from "../useWrite"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
+import { TextBox } from "../ui/text-box/TextBox"
 import {
   configOf,
   presetRows,
@@ -73,22 +74,18 @@ function KindRow({
       >
         {kindLabel(row.kind)}
       </Text>
-      <chakra.input
-        aria-label={`${kindLabel(row.kind)} command`}
+      <TextBox
+        kind="line"
+        verbatim
+        mono
+        name="setup-check-command"
+        label={`${kindLabel(row.kind)} command`}
+        hideLabel
         list={listId}
         value={row.command}
         disabled={row.mode !== "use"}
         placeholder={found ? undefined : "No command found"}
-        onChange={(e) => onChange({ ...row, command: e.target.value })}
-        w="100%"
-        px="2"
-        py="6px"
-        fontFamily="mono"
-        fontSize="sm"
-        bg="surface"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="sm"
+        onChange={(e) => onChange({ ...row, command: e.currentTarget.value })}
       />
       <datalist id={listId}>
         {suggestions.map((c) => (
