@@ -99,7 +99,10 @@ import (
 // across the Agents, Design and subagent pages with the browser Back button and a reload, a live file growth seen with
 // no reload and layout at 390px need a real server and browser; SubagentPage.test.tsx, AgentsPage.sessionView.test.tsx,
 // TaskList.test.tsx, ChatLog.test.tsx and the Go server tests cover each rule alone but cannot see them together.
-const maxFlows = 170
+//
+// Nav buttons flow (+1): history moves, reload, three layouts, hover in WebKit and a touch tap need a real browser;
+// component tests cover each rule alone.
+const maxFlows = 171
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

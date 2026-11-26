@@ -255,7 +255,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (170). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (171). Before you add a flow, add a step to a flow on the same scenario
 (see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -327,6 +327,10 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 - **58. Dirty trunk on the Epic page (and 60. Merge again).**
 - **59. Stash, merge and restore.**
+
+### `nav.e2e.ts`
+
+- **Nav buttons** (scenario `workspaces`, declares one reload; needs Chromium and WebKit): at 1280px Back and Forward are greyed out on the first Epics page and the sidebar header reads Search, Hide sidebar, Back, Forward from left to right; their state follows two sidebar row clicks, a ticket link, Back, the browser's own back and a reload; `Meta+[` and `Meta+]` arrive with `defaultPrevented` false; a hidden sidebar leaves no Back or Forward button; at 744px and 390px the sliding sidebar shows the four buttons and stays open after Back and after Forward. A new page on `/` and one on an unknown address land on `#/epics` with Back greyed out and `navigation.canGoBack` false; hovering that Back shows "Back (⌘E ,)" or "Back (Ctrl+E ,)" in Chromium and in WebKit; at 390px with touch, a tap on Forward moves, keeps the sidebar open and shows no tooltip.
 
 ## Pause, queue and Codex (`pause`, `codex`)
 

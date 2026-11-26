@@ -97,7 +97,7 @@ jobs:
       - name: Install the browser
         run: |
           cd webui && pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright install --with-deps chromium webkit
 
       - name: Web e2e
         env:

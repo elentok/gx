@@ -16,6 +16,7 @@ const signedIn = (page: Page) =>
 
 async function onEpicsWithNothingBehind(page: Page) {
   await expect(page).toHaveURL(/#\/epics$/)
+  await expect(page.getByRole("button", { name: "Back", exact: true })).toBeDisabled()
   expect(await page.evaluate(() => navigation.canGoBack)).toBe(false)
 }
 

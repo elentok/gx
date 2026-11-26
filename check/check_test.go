@@ -191,7 +191,7 @@ func TestRepoChecksSetup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"pnpm -C webui exec playwright install chromium"}
+	want := []string{"pnpm -C webui exec playwright install chromium webkit"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("setup = %v, want %v", got, want)
 	}
