@@ -614,7 +614,9 @@ const subagentTools = (type: string) =>
     kind: "tools",
     tool_count: 2,
     calls: ["Read: /x/a.go", "Agent: Find auth"],
-    subagent_calls: [{ index: 1, call_id: "toolu_9", type, description: "Find auth" }],
+    subagent_calls: [
+      { index: 1, call_id: "toolu_9", type, description: "Find auth", state: "finished" },
+    ],
   })
 
 test("on the Design chat a tools entry with a marked call shows only its link", async () => {
@@ -639,6 +641,28 @@ test("a marked call with no type drops the type and its separator", async () => 
   renderChat([session()], okChat(chatOf([subagentTools("")])))
   const link = await screen.findByRole("link", { name: "Find auth ↗" })
   expect(link.parentElement?.textContent).toBe("Agent · Find auth ↗")
+})
+
+const markedTools = (...states: (string | undefined)[]) =>
+  msg({
+    kind: "tools",
+    tool_count: states.length,
+    subagent_calls: states.map((state, index) => ({
+      index,
+      call_id: `toolu_${index}`,
+      type: "Explore",
+      description: state ?? "unmarked",
+      state,
+    })),
+  })
+
+test("a step page links a finished call, shows a no-record call as text and hides a running one", async () => {
+  renderChat([session()], okChat(chatOf([markedTools("finished", "no_record", "running")])))
+  const link = await screen.findByRole("link", { name: "finished ↗" })
+  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_0")
+  expect(screen.getByText("Agent · Explore · no_record").querySelector("a")).toBeNull()
+  expect(screen.queryByText(/Agent · Explore · running/)).toBeNull()
+  expect(screen.getAllByRole("link", { name: /↗/ })).toHaveLength(1)
 })
 
 test("a Codex session loads its chat and renders every entry kind", async () => {
@@ -678,6 +702,24 @@ test("an archived Codex chat asks first, and Decode shows the decoded messages",
     expect(await screen.findByText("from the archive")).toBeTruthy()
     expect(archiveCalls()).toEqual(["/v1/sessions/chat/archive?session=s-a"])
     expect(screen.queryByText("Codex archived this conversation")).toBeNull()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a decoded archived Codex conversation shows its subagent calls as plain text", async () => {
+  // The archive read has no task records, so its calls carry no state.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response(JSON.stringify(chatOf([markedTools(undefined)])), { status: 200 }),
+    ),
+  )
+  try {
+    renderChat([session({ harness: "codex" })], okChat(chatOf([], { archived: true })))
+    fireEvent.click(await screen.findByRole("button", { name: "Decode" }))
+    expect((await screen.findByText("Agent · Explore · unmarked")).querySelector("a")).toBeNull()
+    expect(screen.queryByRole("link", { name: /↗/ })).toBeNull()
   } finally {
     vi.unstubAllGlobals()
   }

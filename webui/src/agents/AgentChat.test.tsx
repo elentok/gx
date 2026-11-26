@@ -539,27 +539,52 @@ test("a tools entry shows its count and each call", async () => {
   expect(screen.getByText("Read: /x/a.go")).toBeTruthy()
 })
 
-test("a marked call in a tools entry is a link among the folded lines", async () => {
+test("only a finished call is a link: below the folded group, or once among the open lines", async () => {
+  const mark = (index: number, description: string, state: string) => ({
+    index,
+    call_id: `toolu_${index}`,
+    type: "Explore",
+    description,
+    state,
+  })
   const tools = {
     id: "t2",
     role: "agent",
     kind: "tools",
     text: "",
     at: new Date().toISOString(),
-    tool_count: 2,
-    calls: ["Read: /x/a.go", "Agent: Find auth"],
-    subagent_calls: [{ index: 1, call_id: "toolu_9", type: "Explore", description: "Find auth" }],
+    tool_count: 4,
+    calls: ["Read: /x/a.go", "Agent: Find auth", "Agent: Survey", "Agent: Old one"],
+    subagent_calls: [
+      mark(1, "Find auth", "finished"),
+      mark(2, "Survey", "running"),
+      mark(3, "Old one", "no_record"),
+    ],
   }
   render(session(), chat({ messages: [tools] }))
   const details = (await screen.findByTestId("tool-calls")) as HTMLDetailsElement
-  act(() => {
-    details.open = true
-    details.dispatchEvent(new Event("toggle"))
-  })
-  const link = screen.getByRole("link", { name: "Find auth ↗" })
-  expect(link.getAttribute("href")).toBe(`#/agents/${session().id}/subagents/toolu_9`)
-  expect(link.parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
+  const onlyLink = () => {
+    const links = screen.getAllByRole("link", { name: /↗/ })
+    expect(links).toHaveLength(1)
+    expect(links[0].getAttribute("href")).toBe(`#/agents/${session().id}/subagents/toolu_1`)
+    expect(links[0].parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
+    return links[0]
+  }
+  // Outside the <details>, or the browser hides it while the group is folded.
+  expect(details.contains(onlyLink())).toBe(false)
+  expect(screen.queryByText(/Survey|Old one/)).toBeNull()
+  const toggle = (open: boolean) =>
+    act(() => {
+      details.open = open
+      details.dispatchEvent(new Event("toggle"))
+    })
+  toggle(true)
+  expect(details.contains(onlyLink())).toBe(true)
   expect(screen.getByText("Read: /x/a.go")).toBeTruthy()
+  for (const name of ["Survey", "Old one"])
+    expect(screen.getByText(`Agent · Explore · ${name}`).querySelector("a")).toBeNull()
+  toggle(false)
+  expect(details.contains(onlyLink())).toBe(false)
 })
 
 test("a prompt with images shows a grid above its text", async () => {

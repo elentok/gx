@@ -286,6 +286,7 @@ export function SubagentPage({
               chat={chat}
               sessionId={session.id}
               showTools
+              linkAllCalls
               topAnchor
               head={prompt}
               tail={result}

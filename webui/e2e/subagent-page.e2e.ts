@@ -9,11 +9,13 @@ const MISSING = "Read the old notes"
 const NESTED = "Map the server packages"
 const GRANDCHILD = "Read the wire package"
 
+const namedLink = (page: Page, description: string) =>
+  page.getByRole("link", { name: `${description} ↗`, exact: true })
 /** The chat entry's link; the working card links a running subagent by the same name. */
 const callLink = (page: Page, description: string) =>
-  page
-    .getByRole("link", { name: `${description} ↗`, exact: true })
-    .and(page.locator(":not([data-mock-part='card'] *)"))
+  namedLink(page, description).and(page.locator(":not([data-mock-part='card'] *)"))
+const cardLink = (page: Page, description: string) =>
+  namedLink(page, description).and(page.locator("[data-mock-part='card'] *"))
 const backLink = (page: Page) => page.getByRole("link", { name: "← Back to parent chat" })
 const title = (page: Page, text: string) =>
   expect(page.getByRole("heading", { level: 1, name: text })).toBeVisible()
@@ -41,21 +43,23 @@ test("216. Subagent page", async ({ page, start }) => {
   const session = sub.sessionId
   const runningUrl = new RegExp(`#/agents/${session}/subagents/${sub.calls.running}$`)
 
-  // 1. The call is a link on the Agents page (folded entry opened) and on the Design page (entry hidden).
+  // 1. A running call is linked by the working card only, on the Agents page and on the Design page.
   await go(page, `#/agents/${session}`)
   await openTools(page)
-  await expect(callLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(cardLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(callLink(page, RUNNING)).toHaveCount(0)
   await go(page, DESIGN)
   await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
-  await expect(callLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(cardLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(callLink(page, RUNNING)).toHaveCount(0)
 
   // 2. Open from the Design page, Back, open again, the back link, then a reload.
-  await callLink(page, RUNNING).click()
+  await cardLink(page, RUNNING).click()
   await expect(page).toHaveURL(runningUrl)
   await title(page, RUNNING)
   await page.goBack()
   await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
-  await callLink(page, RUNNING).click()
+  await cardLink(page, RUNNING).click()
   await expect(page).toHaveURL(runningUrl)
   await backLink(page).click()
   await expect(page).toHaveURL(new RegExp(`#/agents/${session}$`))
@@ -108,11 +112,10 @@ test("216. Subagent page", async ({ page, start }) => {
   await noSideScroll(page)
   await page.setViewportSize({ width: 1280, height: 800 })
 
-  // 3. A group that ended: no task row, the tools-entry link stays and opens the page.
+  // 3. A finished call: its log link stays and opens the page.
   const ended = await start("subagents", { shape: "finished-handback" })
   const endedSub = ended.subagents!
   await go(page, `#/agents/${endedSub.sessionId}`)
-  await expect(page.getByRole("list", { name: "Tasks" })).toHaveCount(0)
   await openTools(page)
   await callLink(page, "Check the wire types").click()
   await expect(page).toHaveURL(

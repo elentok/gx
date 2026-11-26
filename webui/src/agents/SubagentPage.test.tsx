@@ -76,6 +76,38 @@ test("a running subagent shows its header, the working row and no result card", 
   expect(screen.queryByText("Result handed back to the parent")).toBeNull()
 })
 
+test("the page links a marked call that has no state", () => {
+  show(
+    chat(
+      {},
+      {
+        messages: [
+          {
+            id: "t1",
+            role: "agent",
+            kind: "tools",
+            text: "",
+            at: "2026-01-01T00:00:00Z",
+            tool_count: 1,
+            calls: ["Agent: Find auth"],
+            subagent_calls: [{ index: 0, call_id: "call-2", description: "Find auth" }],
+          },
+        ],
+      },
+    ),
+  )
+  // A folded group on this page repeats nothing below it.
+  expect(screen.queryByRole("link", { name: "Find auth ↗" })).toBeNull()
+  const details = screen.getByTestId("tool-calls") as HTMLDetailsElement
+  act(() => {
+    details.open = true
+    details.dispatchEvent(new Event("toggle"))
+  })
+  expect(screen.getByRole("link", { name: "Find auth ↗" }).getAttribute("href")).toBe(
+    "#/agents/s-a/subagents/call-2",
+  )
+})
+
 test("a done subagent shows one green result card", () => {
   show(
     chat({

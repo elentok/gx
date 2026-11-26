@@ -2,11 +2,13 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "../ui/button/Button"
 import { fetchArchive } from "./chat"
-import type {
-  SessionChatImage,
-  SessionChatMessage,
-  SessionChatResponse,
-  SessionChatSubagentCall,
+import {
+  SubagentCallFinished,
+  SubagentCallRunning,
+  type SessionChatImage,
+  type SessionChatMessage,
+  type SessionChatResponse,
+  type SessionChatSubagentCall,
 } from "../generated/server"
 import { subagentHref } from "../hrefs"
 import { ImageViewer } from "./ImageViewer"
@@ -131,20 +133,20 @@ function Separator({ children }: { children: string }) {
 function Entry({
   m,
   showTools,
+  linkAllCalls,
   sessionId,
 }: {
   m: SessionChatMessage
   showTools: boolean
+  linkAllCalls: boolean
   sessionId: string
 }) {
   if (m.kind === "compacted") return <Separator>Context compacted</Separator>
   if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>
   if (m.kind === "tools") {
-    return showTools ? (
-      <ToolCalls m={m} sessionId={sessionId} />
-    ) : (
-      <SubagentCallLinks m={m} sessionId={sessionId} />
-    )
+    if (showTools) return <ToolCalls m={m} sessionId={sessionId} linkAllCalls={linkAllCalls} />
+    const shown = (m.subagent_calls ?? []).filter((c) => c.state !== SubagentCallRunning)
+    return <SubagentCallList calls={shown} sessionId={sessionId} linkAllCalls={linkAllCalls} />
   }
   if (m.kind === "prompt") {
     const images = m.images ?? []
@@ -226,15 +228,18 @@ const CALL_LIST_PROPS = {
   gap: "0.5",
 } as const
 
-// "Agent · <type> · " is plain text; the description and the arrow link to the subagent's page.
+// "Agent · <type> · " is plain text; on a linked line the description and the arrow open the subagent's page.
 function SubagentCallLine({
   call,
   sessionId,
+  linked,
 }: {
   call: SessionChatSubagentCall
   sessionId: string
+  linked: boolean
 }) {
   const prefix = call.type ? `Agent · ${call.type} · ` : "Agent · "
+  if (!linked) return <CallLine marked>{`${prefix}${call.description ?? ""}`}</CallLine>
   return (
     <CallLine marked>
       {prefix}
@@ -250,50 +255,88 @@ function SubagentCallLine({
   )
 }
 
-// A tools entry on a page that hides tool calls still shows its subagent calls, as links.
-function SubagentCallLinks({ m, sessionId }: { m: SessionChatMessage; sessionId: string }) {
-  const marks = m.subagent_calls ?? []
-  if (marks.length === 0) return null
+// A running subagent is reached from the working card, so the parent's log links it only once it finishes.
+// The subagent page has no card and its read has no call states, so it links every call.
+function isLinked(call: SessionChatSubagentCall, linkAllCalls: boolean) {
+  return linkAllCalls || call.state === SubagentCallFinished
+}
+
+// Subagent calls shown outside a tool list: on a page that hides tool calls, and under a folded run.
+function SubagentCallList({
+  calls,
+  sessionId,
+  linkAllCalls,
+}: {
+  calls: SessionChatSubagentCall[]
+  sessionId: string
+  linkAllCalls: boolean
+}) {
+  if (calls.length === 0) return null
   return (
     <Box {...CALL_LIST_PROPS} fontSize="xs" color="text.dim">
-      {marks.map((c) => (
-        <SubagentCallLine key={c.call_id} call={c} sessionId={sessionId} />
+      {calls.map((c) => (
+        <SubagentCallLine
+          key={c.call_id}
+          call={c}
+          sessionId={sessionId}
+          linked={isLinked(c, linkAllCalls)}
+        />
       ))}
     </Box>
   )
 }
 
-function ToolCalls({ m, sessionId }: { m: SessionChatMessage; sessionId: string }) {
+function ToolCalls({
+  m,
+  sessionId,
+  linkAllCalls,
+}: {
+  m: SessionChatMessage
+  sessionId: string
+  linkAllCalls: boolean
+}) {
   const [open, setOpen] = useState(false)
   const calls = m.calls ?? []
-  const marks = new Map((m.subagent_calls ?? []).map((c) => [c.index, c]))
+  const subagentCalls = m.subagent_calls ?? []
+  const marks = new Map(subagentCalls.map((c) => [c.index, c]))
   const n = m.tool_count ?? calls.length
+  const below =
+    open || linkAllCalls ? [] : subagentCalls.filter((c) => c.state === SubagentCallFinished)
   return (
-    <Box
-      as="details"
-      fontSize="xs"
-      color="text.dim"
-      data-testid="tool-calls"
-      onToggle={(e) => setOpen((e.currentTarget as unknown as HTMLDetailsElement).open)}
-    >
-      <Box as="summary" cursor="pointer">
-        {n === 1 ? "1 tool call" : `${n} tool calls`}
-        {m.last_tool ? ` · last: ${m.last_tool}` : ""}
-      </Box>
-      {open && (
-        <Box {...CALL_LIST_PROPS} mt="1">
-          {withKeys(calls, (c) => c).map(({ key, item: c }, i) => {
-            const mark = marks.get(i)
-            return mark ? (
-              <SubagentCallLine key={key} call={mark} sessionId={sessionId} />
-            ) : (
-              <CallLine key={key}>
-                <LinkedText>{c}</LinkedText>
-              </CallLine>
-            )
-          })}
+    <Box display="flex" flexDirection="column" gap="1">
+      <Box
+        as="details"
+        fontSize="xs"
+        color="text.dim"
+        data-testid="tool-calls"
+        onToggle={(e) => setOpen((e.currentTarget as unknown as HTMLDetailsElement).open)}
+      >
+        <Box as="summary" cursor="pointer">
+          {n === 1 ? "1 tool call" : `${n} tool calls`}
+          {m.last_tool ? ` · last: ${m.last_tool}` : ""}
         </Box>
-      )}
+        {open && (
+          <Box {...CALL_LIST_PROPS} mt="1">
+            {withKeys(calls, (c) => c).map(({ key, item: c }, i) => {
+              const mark = marks.get(i)
+              return mark ? (
+                <SubagentCallLine
+                  key={key}
+                  call={mark}
+                  sessionId={sessionId}
+                  linked={isLinked(mark, linkAllCalls)}
+                />
+              ) : (
+                <CallLine key={key}>
+                  <LinkedText>{c}</LinkedText>
+                </CallLine>
+              )
+            })}
+          </Box>
+        )}
+      </Box>
+      {/* Outside the <details>: the browser hides everything in a folded one. */}
+      <SubagentCallList calls={below} sessionId={sessionId} linkAllCalls={false} />
     </Box>
   )
 }
@@ -468,11 +511,14 @@ export function ChatMessages({
   bottom,
   sessionId,
   showTools = false,
+  linkAllCalls = false,
   head,
   tail,
   end,
   topAnchor = false,
 }: {
+  /** Links every subagent call whatever its state; the subagent page sets it. */
+  linkAllCalls?: boolean
   /** A short log starts under the header, not at the bottom (the subagent page has no composer). */
   topAnchor?: boolean
   chat: SessionChatResponse
@@ -538,7 +584,13 @@ export function ChatMessages({
           </Box>
         )}
         {shownMessages.map((m, i) => (
-          <Entry key={m.id || hiddenCount + i} m={m} showTools={showTools} sessionId={sessionId} />
+          <Entry
+            key={m.id || hiddenCount + i}
+            m={m}
+            showTools={showTools}
+            linkAllCalls={linkAllCalls}
+            sessionId={sessionId}
+          />
         ))}
         {tail}
         {end}
