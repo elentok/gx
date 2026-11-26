@@ -87,6 +87,25 @@ test("lists the real chord table: the entity group, a separator, then the app gr
   ])
 })
 
+test.each([
+  ["Back", "back"],
+  ["Forward", "forward"],
+])("a click on the %s row runs it, then closes", (name, move) => {
+  const calls: string[] = []
+  const nav = {
+    canBack: true,
+    canForward: true,
+    back: () => calls.push("back"),
+    forward: () => calls.push("forward"),
+  }
+  const table = chordTable({ actions: [], history: noop, nav })
+  renderThemed(
+    <ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={() => calls.push("close")} />,
+  )
+  fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(name) }))
+  expect(calls).toEqual([move, "close"])
+})
+
 test("shows no separator when only one group has rows", () => {
   renderThemed(
     <ChordBox

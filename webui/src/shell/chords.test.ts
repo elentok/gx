@@ -6,11 +6,11 @@ import { registerHistoryOpener } from "../history/historyOpener"
 import {
   agentIdOf,
   chatDraftIdOf,
+  chordKeyOf,
   chordTable,
   displayKey,
   draftIdOf,
   entityChords,
-  letterOf,
   matchesKey,
   parseKey,
 } from "./chords"
@@ -88,10 +88,17 @@ describe("parseKey", () => {
   })
 })
 
-describe("letterOf", () => {
-  it("reads the letter from code", () => {
-    expect(letterOf({ code: "KeyC" })).toBe("c")
-    expect(letterOf({ code: "Digit1" })).toBeNull()
+describe("chordKeyOf", () => {
+  it.each<[string, boolean, string | null]>([
+    ["KeyC", false, "c"],
+    ["KeyC", true, "C"],
+    ["Comma", false, ","],
+    ["Period", false, "."],
+    ["Comma", true, null],
+    ["Period", true, null],
+    ["Digit1", false, null],
+  ])("reads %s with shift %s as %j", (code, shiftKey, key) => {
+    expect(chordKeyOf({ code, shiftKey })).toBe(key)
   })
 })
 
@@ -252,6 +259,44 @@ describe("app chords", () => {
       ["h", "History", false],
     ])
     expect(t.every((c) => c.group !== "entity")).toBe(true)
+  })
+})
+
+describe("chord table , and .", () => {
+  const moves = (canBack: boolean, canForward: boolean) => ({
+    canBack,
+    canForward,
+    back: vi.fn(),
+    forward: vi.fn(),
+  })
+  const rows = (nav: ReturnType<typeof moves>) =>
+    chordTable({ actions: [], history: noop, nav }).slice(-3)
+
+  it("end the app chords after History, as Back then Forward", () => {
+    const t = rows(moves(true, true))
+    expect(t.map((c) => [c.key, c.label({ path: "/" }), c.group])).toEqual([
+      ["h", "History", undefined],
+      [",", "Back", undefined],
+      [".", "Forward", undefined],
+    ])
+  })
+  it.each([
+    [true, false],
+    [false, true],
+  ])("follow canBack %s and canForward %s", (canBack, canForward) => {
+    const [, back, forward] = rows(moves(canBack, canForward))
+    expect([back.available({ path: "/" }), forward.available({ path: "/" })]).toEqual([
+      canBack,
+      canForward,
+    ])
+  })
+  it("run their own move", () => {
+    const nav = moves(true, true)
+    const [, back, forward] = rows(nav)
+    back.run()
+    expect([nav.back.mock.calls.length, nav.forward.mock.calls.length]).toEqual([1, 0])
+    forward.run()
+    expect([nav.back.mock.calls.length, nav.forward.mock.calls.length]).toEqual([1, 1])
   })
 })
 

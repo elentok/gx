@@ -8,6 +8,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { ChordHost } from "./ChordHost"
+import { installFakeNavigation } from "./fakeNavigation.testutil"
 import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { chordTable, type Chord } from "./chords"
 import { registerHistoryOpener } from "../history/historyOpener"
@@ -259,6 +260,7 @@ function setupChats(
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
+  return router
 }
 
 /** Answers each request with the body of the first route whose text is in the URL, else `{}`. */
@@ -524,6 +526,73 @@ test("{leader} r does nothing on a Queue agent page", () => {
   expect(screen.queryByRole("menuitem", { name: /Rename chat/ })).toBeNull()
   press("KeyR")
   expect(screen.getByTestId("renaming").textContent).toBe("none")
+})
+
+describe("Leader then , and .", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const path = () => screen.getByTestId("path").textContent
+  const row = (name: string) => screen.queryByRole("menuitem", { name: new RegExp(name) })
+
+  /**
+   * Three entries, standing on the middle one, so both directions have somewhere to go. The spy
+   * starts after that: a move lands late, so "stays" is asserted on the request for it.
+   */
+  async function onMiddleEntry() {
+    const router = setupChats("/epics")
+    await act(() => router.navigate("/agents"))
+    await act(() => router.navigate("/archive"))
+    await act(() => router.navigate(-1))
+    expect(path()).toBe("/agents")
+    return vi.spyOn(router, "navigate")
+  }
+
+  test.each([
+    ["Comma", ",", "/epics"],
+    ["Comma", "ת", "/epics"],
+    ["Period", ".", "/archive"],
+  ])("code %s with key %s lands on %s", async (code, key, target) => {
+    installFakeNavigation({ canGoBack: true, canGoForward: true })
+    await onMiddleEntry()
+    leaderKey()
+    press(code, { key })
+    await waitFor(() => expect(path()).toBe(target))
+    expect(box()).toBeNull()
+  })
+
+  test.each(
+    ["Comma", "Period"].flatMap((code) =>
+      ["shiftKey", "metaKey", "ctrlKey", "altKey"].map((mod) => [mod, code]),
+    ),
+  )("%s with %s closes the box and stays", async (mod, code) => {
+    installFakeNavigation({ canGoBack: true, canGoForward: true })
+    const navigate = await onMiddleEntry()
+    leaderKey()
+    press(code, { [mod]: true })
+    expect(box()).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test("the open box follows currententrychange and a hidden row's key stays", async () => {
+    const history = installFakeNavigation({ canGoBack: true })
+    const navigate = await onMiddleEntry()
+    leaderKey()
+    expect([row("Back") !== null, row("Forward") !== null]).toEqual([true, false])
+    act(() => history.set({ canGoBack: false, canGoForward: true }))
+    expect([row("Back") !== null, row("Forward") !== null]).toEqual([false, true])
+    press("Comma")
+    expect(box()).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test("without the Navigation API there are no rows and the key only closes the box", async () => {
+    const navigate = await onMiddleEntry()
+    leaderKey()
+    expect([row("Back"), row("Forward")]).toEqual([null, null])
+    press("Comma")
+    expect(box()).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+  })
 })
 
 describe("Leader then h", () => {

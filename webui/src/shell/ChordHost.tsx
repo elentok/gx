@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate } from "react-router"
 import { useOnChange } from "../hooks"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useLatest } from "../hooks"
@@ -6,7 +7,8 @@ import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
 import { openHistory } from "../history/historyOpener"
-import { chordTable, letterOf, matchesKey, type Chord } from "./chords"
+import { chordKeyOf, chordTable, matchesKey, type Chord } from "./chords"
+import { useHistoryState } from "./useHistoryState"
 import { useOpenEntityActions } from "./useOpenEntityActions"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
@@ -33,6 +35,8 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
     setOpen(false)
   }, [])
 
+  const navigate = useNavigate()
+  const { supported, canGoBack, canGoForward } = useHistoryState()
   const table =
     chords ??
     chordTable({
@@ -40,6 +44,14 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       history: () => {
         openHistory()
       },
+      nav: supported
+        ? {
+            canBack: canGoBack,
+            canForward: canGoForward,
+            back: () => void navigate(-1),
+            forward: () => void navigate(1),
+          }
+        : undefined,
     })
   const tableRef = useLatest(table)
 
@@ -60,15 +72,9 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       e.preventDefault()
       e.stopImmediatePropagation()
       // Shift alone makes the capital: Leader c and Leader C are two chords.
-      const plain = letterOf(e)
-      const letter =
-        e.metaKey || e.ctrlKey || e.altKey
-          ? null
-          : e.shiftKey
-            ? (plain?.toUpperCase() ?? null)
-            : plain
-      const hit = letter
-        ? tableRef.current.find((ch) => ch.key === letter && ch.available(c))
+      const chordKey = e.metaKey || e.ctrlKey || e.altKey ? null : chordKeyOf(e)
+      const hit = chordKey
+        ? tableRef.current.find((ch) => ch.key === chordKey && ch.available(c))
         : undefined
       close()
       hit?.run()

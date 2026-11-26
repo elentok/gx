@@ -33,10 +33,16 @@ export function parseKey(setting: string | undefined): ParsedKey | null {
   return { mods, char, code: /\d/.test(char) ? `Digit${char}` : `Key${char.toUpperCase()}` }
 }
 
-/** The letter of a chord key from `code`, since Mac Option rewrites `key` ("Dead"). */
-export function letterOf(e: Pick<KeyboardEvent, "code">): string | null {
-  const m = /^Key([A-Z])$/.exec(e.code)
-  return m ? m[1].toLowerCase() : null
+const PUNCTUATION: Record<string, string> = { Comma: ",", Period: "." }
+
+/**
+ * The chord key of an event from `code`, since a layout or Mac Option rewrites `key`. Shift makes
+ * the capital letter, and nothing of a punctuation key.
+ */
+export function chordKeyOf(e: Pick<KeyboardEvent, "code" | "shiftKey">): string | null {
+  const letter = /^Key([A-Z])$/.exec(e.code)?.[1]
+  if (letter) return e.shiftKey ? letter : letter.toLowerCase()
+  return e.shiftKey ? null : (PUNCTUATION[e.code] ?? null)
 }
 
 /** True when the event is exactly the setting's key and modifiers. Matches on `code`, never `key`. */
@@ -145,15 +151,36 @@ export function entityChords(actions: EntityAction[]): Chord[] {
   )
 }
 
-/** The chord table: the open entity's registry chords, then the app-level ones. `history` opens the History popup, handed in so this module does not depend on it. */
+/** The browser's session history, as far as the Back and Forward chords need it. */
+export type HistoryNav = {
+  canBack: boolean
+  canForward: boolean
+  back: () => void
+  forward: () => void
+}
+
+/**
+ * The chord table: the open entity's registry chords, then the app-level ones. `history` opens the
+ * History popup, handed in so this module does not depend on it. `nav` is absent in a browser that
+ * cannot report its history, and then there are no Back and Forward chords.
+ */
 export function chordTable({
   actions,
   history,
+  nav,
 }: {
   actions: EntityAction[]
   history: () => void
+  nav?: HistoryNav
 }): Chord[] {
-  return [...entityChords(actions), ...appChords(history)]
+  return [...entityChords(actions), ...appChords(history), ...(nav ? navChords(nav) : [])]
+}
+
+function navChords(nav: HistoryNav): Chord[] {
+  return [
+    { key: ",", label: () => "Back", run: nav.back, available: () => nav.canBack },
+    { key: ".", label: () => "Forward", run: nav.forward, available: () => nav.canForward },
+  ]
 }
 
 function appChords(history: () => void): Chord[] {
