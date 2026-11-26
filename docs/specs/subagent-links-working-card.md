@@ -11,7 +11,7 @@ A person follows a running session in the gx web UI and wants to open its subage
 
 ## Solution
 
-One card below the chat, the working card, replaces the Working row and the task list. It has the same look on the chat page and on the Design, Initiative and Triage step pages.
+One card below the chat, the working card, replaces the Working row and the task list. It has the same look on the chat page and on the Design and Triage step pages.
 
 - The header reads "Working: <step> · <title>" with a spinner.
 - Each running subagent has two lines. The first has a dot, the subagent's name as a link and the elapsed time. The second has its current call.
@@ -39,7 +39,7 @@ Working card
 11. As a person, I want tasks that run while the agent is not busy to show without the Working header and without the moving border, so that I am not told the agent is working.
 12. As a person, I want no card when the agent is not busy and has no tasks, so that the chat has the room.
 13. As a person on a phone, I want a long card capped with its own scroll, so that the chat stays readable and the header stays in view.
-14. As a person, I want the card on the chat page and on the Design, Initiative and Triage step pages, so that every page works the same way.
+14. As a person, I want the card on the chat page and on the Design and Triage step pages, so that every page works the same way.
 15. As a person answering questions on a step page, I want the same card in the Questions view, so that I still see the running work.
 16. As a person with a Codex session, I want the same card, including the current call of each running subagent, so that both agents work the same way.
 17. As a person with an old Codex session that has no task list, I want the card header with the current tool, so that I keep what I see today.
@@ -68,7 +68,7 @@ Current call
 
 Back link
 
-31. As a person who opened a subagent from a Design, Initiative or Triage page, I want "Back to parent chat" to return there, so that I keep my place.
+31. As a person who opened a subagent from a Design or Triage page, I want "Back to parent chat" to return there, so that I keep my place.
 32. As a person who opened a subagent from the chat page, I want the back link to return to the chat page.
 33. As a person who opens a pasted subagent URL with no origin, I want the back link to open the chat page, so that it always leads somewhere.
 34. As a person who reloads the page or opens the link in a new tab, I want the back link to keep its target, so that it does not change under me.
@@ -138,7 +138,7 @@ Back link
 - Every subagent link carries the address of the page it is on, as a query parameter of the subagent URL. The parameter name and value form are the implementer's choice.
 - Links on a subagent page to other subagent pages, which are the log links, the breadcrumb levels and the back link to a parent subagent, pass the origin on unchanged.
 - The back link of a nested subagent goes to its parent subagent. The back link of a first-level subagent goes to the origin. The pages for a missing subagent and an unreadable parent follow the origin too.
-- With no origin, or with a value that is not a chat, Design, Initiative or Triage page of this app, the back link opens the session's chat page.
+- With no origin, or with a value that is not a chat, Design or Triage page of this app, the back link opens the session's chat page.
 - The link text stays "Back to parent chat". The breadcrumb's session name and the "chat page" link for an archived parent keep opening the chat page.
 - The page the person returns to opens in its normal state.
 
@@ -167,7 +167,7 @@ Card size and pages (stories 13 to 15)
 
 - Mock states "two-running-one-done-phone", "no-subagents-phone" and "one-subagent-phone".
 - New flow on `bg-progress` shape `many` at 390px: the card is at most 40% of the viewport height, its rows scroll, the header stays in view, the log is visible and the page has no sideways scroll.
-- New flow: the card shows on a Design page, an Initiative page, a Triage page and the chat page, and in a step page's Questions view. New scenario to write: sessions on an Initiative and a Triage page, each with one running and one finished subagent, and one with an open question round.
+- New flow: the card shows on a Design page, a Triage page and the chat page, and in a step page's Questions view. New scenario to write: a session on a Triage page with one running and one finished subagent, and a session with an open question round.
 
 Codex card (stories 16 to 17)
 
@@ -181,7 +181,7 @@ Links in the log (stories 18 to 22)
 - Same flow: end a running subagent through the fixture files. With no reload, its row turns grey or leaves the card and its log link appears.
 - CLI: the chat read names the state of each subagent call.
 
-No task record (story 23)
+No task record (stories 23 to 23)
 
 - New flow on a new scenario, an old Codex session with a subagent call: the call is plain text on the chat page, in the folded and the open group, and as a plain line on a step page. The chat read marks it as having no record.
 
@@ -201,11 +201,11 @@ Live updates (stories 29 to 30)
 
 Back link (stories 31 to 36)
 
-- Flow 216, updated, on `subagents` and on the new scenario with a running subagent on an Initiative and a Triage page, whose sessions each hold one running and one finished subagent: from the card and from a log link on a Design, an Initiative and a Triage page, the back link returns to that page. From the chat page it returns there. A URL with no origin, and one with an outside address as origin, go back to the chat page. A reload keeps the target (declare the reload).
+- Flow 216, updated, on `subagents` and on the new scenario whose Triage session holds one running and one finished subagent: from the card and from a log link on a Design and a Triage page, the back link returns to that page. From the chat page it returns there. A URL with no origin, and one with an outside address as origin, go back to the chat page. A reload keeps the target (declare the reload).
 - Same flow, shape `nested`: from a Design page open the nested subagent and its grandchild. Back goes to the parent subagent, then again, then to the Design page. The breadcrumb levels keep the origin.
 - Same flow, shapes `file-gone` and `parent-gone`: the back link follows the origin.
 
-New flows and scenarios to write are those named above: the `subagents` shapes `card-two-running`, `card-no-tasks`, `card-one-subagent`, `codex-running-call`, `string-background` and `file-call`, the Initiative, Triage and question round sessions, and the old Codex subagent call. These become implementation tickets.
+New flows and scenarios to write are those named above: the `subagents` shapes `card-two-running`, `card-no-tasks`, `card-one-subagent`, `codex-running-call`, `string-background` and `file-call`, the Triage and question round sessions, and the old Codex subagent call. These become implementation tickets.
 
 **Mock states**
 
@@ -227,6 +227,7 @@ New flows and scenarios to write are those named above: the `subagents` shapes `
 
 ## Further Notes
 
+- There is no Initiative step page. The Initiative page only shows information, and Initiative runs happen in the chat page, so the chat page rules cover them.
 - This spec replaces parts of two earlier specs. From "Background progress": the closed summary line and the list below the Working row. From "Subagents": the "Open ↗" link on a task row, the details of a subagent row, the log link of a running subagent and the fixed target of the back link.
 - The glossary term Task group keeps its meaning.
 - The prototype branch `prototype/subagent-links-bottom-block` is a reference for the look only and is never merged.
@@ -242,7 +243,7 @@ New flows and scenarios to write are those named above: the `subagents` shapes `
 6. **What about a decoded archived Codex conversation?** Choice: plain text. Reason: it has no task records, and the subagent page could show nothing.
 7. **What do non-subagent rows look like?** Choice: dot or mark, label, time, no kind word. Reason: this is the card row in the mock.
 8. **What is the height cap exactly?** Choice: 40% of the viewport height, header included. Reason: it is the agreed "about 40%" as one number that a test can check.
-9. **Which origin values count?** Choice: only chat, Design, Initiative and Triage pages of this app, else the chat page. Reason: a URL parameter must not send the person elsewhere.
+9. **Which origin values count?** Choice: only chat, Design and Triage pages of this app, else the chat page. Reason: a URL parameter must not send the person elsewhere.
 10. **Do breadcrumb links keep the origin?** Choice: subagent levels do, the session name still opens the chat page. Reason: back links from an upper level must still end at the origin, and the session name already means the chat.
 11. **Is a step page's picked session restored on return?** Choice: no, the page opens in its normal state. Reason: the browser Back button behaves the same way today.
 12. **How far does the lost-name fix go?** Choice: all three parts from the research: tolerant boolean, per-block decoding and the description fallback. Reason: each removes a way to lose a name.
