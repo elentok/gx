@@ -176,7 +176,7 @@ func (h prWatchHost) FileFlakyFollowUp(project string, from tickets.Address, f t
 	if err != nil {
 		return err
 	}
-	_, err = recovery.WriteFollowUpIn(filepath.Join(dir, "follow-ups"), from, f)
+	_, err = recovery.WriteFollowUpIn(filepath.Join(dir, "follow-ups"), from.String(), f)
 	return err
 }
 

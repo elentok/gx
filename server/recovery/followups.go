@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // DefaultFollowUps is the epic that receives follow-up drafts when
@@ -102,8 +103,6 @@ func dedupeKey(investigateRaw, class string) string {
 	return m[1] + "/" + m[2] + "/" + class
 }
 
-func dedupeLine(key string) string { return "Dedupe key: " + key }
-
 // FollowUpsEpicPath is the follow-ups epic dir that receives follow-ups from
 // fromProject's tickets.
 func (rec *Recovery) FollowUpsEpicPath(fromProject string) (string, error) {
@@ -134,39 +133,54 @@ func investigateFollowUp(from tickets.Address, class, key, result string) ticket
 	}
 }
 
-// WriteFollowUp files the follow-up, or adds an occurrence line to the open
-// draft that already has the same key. from is the ticket the repeat is seen in.
+// WriteFollowUp files the follow-up, or counts a repeat on the open draft that
+// already has the same key. from is the ticket the repeat is seen in.
 func (rec *Recovery) WriteFollowUp(from tickets.Address, f ticketwrite.FollowUp) (string, error) {
 	epicPath, err := rec.FollowUpsEpicPath(from.Project)
 	if err != nil {
 		return "", err
 	}
-	return WriteFollowUpIn(epicPath, from, f)
+	return WriteFollowUpIn(epicPath, from.String(), f)
 }
 
-// WriteFollowUpIn is WriteFollowUp into the epic at epicPath.
-func WriteFollowUpIn(epicPath string, from tickets.Address, f ticketwrite.FollowUp) (string, error) {
-	if err := EnsureDraftEpic(epicPath); err != nil {
+// WriteFollowUpIn is WriteFollowUp into the epic at epicPath, for a repeat seen
+// in source, a description of the place.
+func WriteFollowUpIn(epicPath, source string, f ticketwrite.FollowUp) (string, error) {
+	epic, unlock, err := lockDraftEpic(epicPath)
+	if err != nil {
 		return "", err
 	}
-	line := fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02"))
-	if path, found, err := noteOccurrence(epicPath, f.Key, line); found || err != nil {
+	defer unlock()
+	path, found, err := noteOccurrence(epicPath, f.Key, func(body string) string {
+		return countRepeat(body, source, time.Now().Format("2006-01-02"))
+	})
+	if found || err != nil {
 		return path, err
 	}
-	path, _, err := ticketwrite.WriteNewTicket(epicPath, "", f.Slug, func(id string) (schema.Ticket, string) {
+	path, _, err = ticketwrite.WriteNewTicketLocked(*epic, "", f.Slug, func(id string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
 			// The dedupe line sits in Evidence, the section a repeat appends to.
 			"\n# %s — %s\n\n## Source\n\n%s\n\n## Problem\n\n%s\n\n## Evidence\n\n%s\n\n## Suggested fix\n\n%s\n",
-			id, f.Title, f.Source, f.Problem, dedupeLine(f.Key), f.SuggestedFix,
+			id, oneLine(f.Title), f.Source, f.Problem, dedupeLine(f.Key), f.SuggestedFix,
 		)
 		return schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusDraft, Type: schema.TypeResearch, Category: schema.CategoryBug}, body
 	})
 	return path, err
 }
 
-// noteOccurrence appends line to Evidence of the open draft carrying key.
+// lockDraftEpic creates a missing epic and locks it, so that looking for an open
+// draft and writing it or a new one are one step.
+func lockDraftEpic(epicPath string) (*tickets.Epic, func(), error) {
+	if err := EnsureDraftEpic(epicPath); err != nil {
+		return nil, nil, err
+	}
+	return ticketmove.LoadLockedEpic(epicPath)
+}
+
+// noteOccurrence rewrites with note the body of the open draft carrying key.
 // Only a draft takes one: once a person opens the ticket a repeat is new work.
-func noteOccurrence(epicPath, key, line string) (path string, found bool, err error) {
+// The caller holds the epic lock.
+func noteOccurrence(epicPath, key string, note func(body string) string) (path string, found bool, err error) {
 	files, err := filepath.Glob(filepath.Join(epicPath, "issues", "*.md"))
 	if err != nil {
 		return "", false, err
@@ -177,11 +191,11 @@ func noteOccurrence(epicPath, key, line string) (path string, found bool, err er
 			continue
 		}
 		raw, err := os.ReadFile(f)
-		if err != nil || !strings.Contains(string(raw), dedupeLine(key)+"\n") {
+		if err != nil || !hasDedupeLine(schema.ParseBody(string(raw)), key) {
 			continue
 		}
 		err = schema.UpdateTicketWithBody(f, func(_ *schema.Ticket, b *string) {
-			*b = schema.AppendToSection(*b, "Evidence", line)
+			*b = note(*b)
 		})
 		return f, true, err
 	}

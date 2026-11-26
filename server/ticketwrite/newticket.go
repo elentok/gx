@@ -19,8 +19,14 @@ func WriteNewTicket(epicPath, parent, slug string, build func(id string) (schema
 		return "", "", fmt.Errorf("load epic %s: %w", epicPath, err)
 	}
 	defer unlock()
+	return WriteNewTicketLocked(*epic, parent, slug, build)
+}
 
-	id, err = ticketmove.NextTicketID(*epic, parent)
+// WriteNewTicketLocked is WriteNewTicket for a caller that already holds the
+// epic lock and loaded epic under it (ticketmove.LoadLockedEpic).
+func WriteNewTicketLocked(epic tickets.Epic, parent, slug string, build func(id string) (schema.Ticket, string)) (path, id string, err error) {
+	epicPath := filepath.Clean(epic.Path)
+	id, err = ticketmove.NextTicketID(epic, parent)
 	if err != nil {
 		return "", "", fmt.Errorf("allocate %s id: %w", slug, err)
 	}

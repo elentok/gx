@@ -242,7 +242,7 @@ func TestWriteFollowUpIn_FilesIntoTheGivenEpicNotTheConfiguredOne(t *testing.T) 
 	from := tickets.Address{Project: "other", Epic: "epic-a", ID: "03"}
 	spec := ticketwrite.FollowUp{Slug: "flaky", Title: "Flaky", Source: "S.", Problem: "P.", SuggestedFix: "F.", Key: "w/build"}
 	for range 2 {
-		if _, err := WriteFollowUpIn(other, from, spec); err != nil {
+		if _, err := WriteFollowUpIn(other, from.String(), spec); err != nil {
 			t.Fatal(err)
 		}
 	}

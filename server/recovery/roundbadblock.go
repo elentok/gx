@@ -70,9 +70,11 @@ func (rec *Recovery) writeBadBlockFollowUp(id string, design chat.DesignRef, rou
 	if err != nil {
 		return "", err
 	}
-	if err := EnsureDraftEpic(epicPath); err != nil {
+	epic, unlock, err := lockDraftEpic(epicPath)
+	if err != nil {
 		return "", err
 	}
+	defer unlock()
 	if _, ok := rec.filedRounds.Load(round); ok {
 		return "", nil
 	}
@@ -87,13 +89,16 @@ func (rec *Recovery) writeBadBlockFollowUp(id string, design chat.DesignRef, rou
 	for _, b := range bad {
 		fmt.Fprintf(&ev, "\nQ%s: %v\n\n```gx-question\n%s\n```\n", b.Label, b.Err, b.Raw)
 	}
-	if path, found, err := noteOccurrence(epicPath, badBlockKey, "Seen again: "+ev.String()); found || err != nil {
+	appendEntry := func(body string) string {
+		return schema.AppendToSection(body, "Evidence", "Seen again: "+ev.String())
+	}
+	if path, found, err := noteOccurrence(epicPath, badBlockKey, appendEntry); found || err != nil {
 		if err == nil {
 			rec.filedRounds.Store(round, struct{}{})
 		}
 		return path, err
 	}
-	path, _, err := ticketwrite.WriteNewTicket(epicPath, "", badBlockSlug, func(tid string) (schema.Ticket, string) {
+	path, _, err := ticketwrite.WriteNewTicketLocked(*epic, "", badBlockSlug, func(tid string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
 			"\n# %s — %s\n\n## Source\n\nThe transcript watcher, on a Design session that went Idle after a grilling round.\n\n## Problem\n\nA gx-question block in a grilling round does not parse, so its question shows without options.\n\n## Evidence\n\n%s\n\n%s\n## Suggested fix\n\nFix the gx-design skill's block format, or the parser if the block is valid.\n",
 			tid, badBlockTitle, dedupeLine(badBlockKey), ev.String(),
