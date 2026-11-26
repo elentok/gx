@@ -1,7 +1,9 @@
-import { createRef } from "react"
+import { ChakraProvider } from "@chakra-ui/react"
+import { createRef, StrictMode } from "react"
 import { fireEvent, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../render"
+import { system } from "../theme"
 import { TextBox, type TextBoxProps } from "./TextBox"
 
 const base = { label: "Note", name: "note" } as const
@@ -68,6 +70,76 @@ describe("TextBox kinds", () => {
     expect(box.getAttribute("name")).toBe("note")
     expect(box.getAttribute("aria-label")).toBeNull()
     expect(box.getAttribute("aria-invalid")).toBeNull()
+  })
+})
+
+describe("TextBox name rule", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const kinds = ["prose", "line", "search"] as const
+  const broken = [
+    ["label", "File name"],
+    ["placeholder", "Rename it"],
+    ["name", "FileNAMEs"],
+  ] as const
+  const cases = kinds.flatMap((kind) => broken.map(([prop, value]) => [kind, prop, value] as const))
+
+  // React logs a render error before it rethrows it.
+  const quiet = () => vi.spyOn(console, "error").mockImplementation(() => {})
+
+  it.each(cases)("throws on a %s box with %s %j", (kind, prop, value) => {
+    quiet()
+    const props = { ...base, kind, [prop]: value } as TextBoxProps
+    expect(() => renderThemed(<TextBox {...props} />)).toThrow(
+      `text-box-name: the ${prop} "${value}"`,
+    )
+  })
+
+  it("leaves a credential box and a hint alone", () => {
+    renderThemed(
+      <>
+        <TextBox
+          kind="credential"
+          autoComplete="username"
+          label="Username"
+          placeholder="Your name"
+          name="username"
+        />
+        <TextBox {...base} kind="line" hint="A short name" />
+      </>,
+    )
+    expect(screen.getByRole("textbox", { name: "Username" })).toBeTruthy()
+    expect(screen.getByText("A short name")).toBeTruthy()
+  })
+
+  it("renders unchanged in production and reports each value once", () => {
+    vi.stubEnv("DEV", false)
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response("{}"))
+    vi.stubGlobal("fetch", fetchMock)
+    quiet()
+    const box = (
+      <TextBox kind="line" label="Branch name" placeholder="Branch name" name="branchName" />
+    )
+    const tree = (
+      <StrictMode>
+        {box}
+        {box}
+      </StrictMode>
+    )
+    const { rerender } = renderThemed(tree)
+    rerender(<ChakraProvider value={system}>{tree}</ChakraProvider>)
+    const [first] = screen.getAllByRole<HTMLInputElement>("textbox", { name: "Branch name" })
+    expect(first.placeholder).toBe("Branch name")
+    expect(first.name).toBe("branchName")
+    const reports = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string))
+    expect(reports.map((r) => [r.rule, r.value])).toEqual([
+      ["text-box-name", "Branch name"],
+      ["text-box-name", "branchName"],
+    ])
   })
 })
 

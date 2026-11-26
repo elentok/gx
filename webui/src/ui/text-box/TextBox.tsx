@@ -1,5 +1,6 @@
 import { Box, chakra, Text, VisuallyHidden, type BoxProps } from "@chakra-ui/react"
 import {
+  useEffect,
   useId,
   type AriaAttributes,
   type ComponentProps,
@@ -10,6 +11,7 @@ import {
   type Ref,
   type TextareaHTMLAttributes,
 } from "react"
+import { reportBrokenRule } from "../../brokenRules"
 import { textBoxLook } from "./look"
 
 type NamingAria = "aria-label" | "aria-labelledby"
@@ -178,7 +180,27 @@ const textareaPadding = {
 // A 36px button and its gap from the box's edge.
 const endRoom = "46px"
 
+const nameRule = "text-box-name"
+
+// On iPhone, "name" in these brings AutoFill Contact instead of word completions.
+function nameRuleBreaks({ kind, label, placeholder, name }: TextBoxProps) {
+  if (kind === "credential") return []
+  return Object.entries({ label, placeholder, name }).flatMap(([prop, value]) =>
+    value && /name/i.test(value)
+      ? [{ value, message: `the ${prop} "${value}" must not contain "name"` }]
+      : [],
+  )
+}
+
 export function TextBox(props: TextBoxProps) {
+  const breaks = nameRuleBreaks(props)
+  if (import.meta.env.DEV && breaks.length > 0) {
+    throw new Error(`${nameRule}: ${breaks[0].message}`)
+  }
+  // The reporter sends each value once, so running after every render is harmless.
+  useEffect(() => {
+    for (const { value, message } of breaks) reportBrokenRule(nameRule, message, value)
+  })
   const id = useId()
   const hintId = `${id}-hint`
   const {

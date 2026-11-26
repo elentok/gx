@@ -1,12 +1,7 @@
+import { pageUrl } from "./pageUrl"
+
 // Plain fetch, not a shared helper: it must work on the login page and never trigger a 401 redirect.
 const ROUTE = "/v1/client-errors"
-
-// A Setup code rides in the hash query (`#/setup?code=...`), so it never leaves the browser.
-function pageUrl(): string {
-  const { origin, pathname, search, hash } = window.location
-  const q = hash.indexOf("?")
-  return origin + pathname + search + (q < 0 ? hash : hash.slice(0, q))
-}
 
 export function reportClientError(error: unknown): void {
   const err = error instanceof Error ? error : undefined
