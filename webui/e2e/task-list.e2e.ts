@@ -14,6 +14,15 @@ const noSideScroll = (page: Page) =>
   expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
     .toBe(false)
+/** The computed color of the `text.faint` token, the grey of a finished row. */
+const faintColor = (page: Page) =>
+  page.evaluate(() => {
+    const probe = document.body.appendChild(document.createElement("span"))
+    probe.style.color = "var(--chakra-colors-text-faint)"
+    const color = getComputedStyle(probe).color
+    probe.remove()
+    return color
+  })
 
 // Why a flow: a real server round trip from the fixture's transcripts and rollouts to the chat read to the page,
 // the same rows on two pages, a real clock ticking and real layout at 390px. WorkingCard.test.tsx (vitest) covers
@@ -274,14 +283,7 @@ test("217. Working card states", async ({ page, start }) => {
   const done = rowOf(two, NAMES)
   await expect(done.getByRole("img", { name: "done" })).toBeVisible()
   await expect(done.getByRole("link")).toHaveCount(0)
-  const faint = await page.evaluate(() => {
-    const probe = document.body.appendChild(document.createElement("span"))
-    probe.style.color = "var(--chakra-colors-text-faint)"
-    const color = getComputedStyle(probe).color
-    probe.remove()
-    return color
-  })
-  await expect(done.getByText(NAMES)).toHaveCSS("color", faint)
+  await expect(done.getByText(NAMES)).toHaveCSS("color", await faintColor(page))
   // Scoped to the card: the log's tools entry names the calls too.
   for (const name of [TICKETS, NAMES, PROBE]) await expect(two.getByText(name)).toHaveCount(1)
 
@@ -375,6 +377,45 @@ test("218. Working card shapes", async ({ page, start }) => {
     )
     await noSideScroll(page)
   }
+})
+
+// Why a flow: the fixture's sessions reach three routes through the server, each page wiring its own header and the
+// Triage page's open round its own view. SteppedPage.test.tsx and WorkingCard.test.tsx (vitest) render given props.
+test("220. Working card pages", async ({ page, start }) => {
+  const fixture = await start("card-pages")
+  const plain = (await sessions(fixture)).find((s) => !s.flow)!
+  const working = page.locator("[data-mock-part='card']")
+  const sameCard = async (header: RegExp) => {
+    await expect(working).toHaveCount(1)
+    await expect(working.getByRole("status")).toHaveText(header)
+    await expect(rows(working)).toHaveCount(2)
+    const running = rowOf(working, "Watch the build in the background")
+    await expect(running.getByRole("img", { name: "running" })).toBeVisible()
+    await expect(running.getByRole("link")).toHaveAttribute("href", /\/subagents\//)
+    const done = rowOf(working, "Check the wire types")
+    await expect(done.getByRole("img", { name: "done" })).toBeVisible()
+    await expect(done.getByRole("link")).toHaveCount(0)
+    await expect(done.getByText("Check the wire types")).toHaveCSS("color", await faintColor(page))
+    await expect(working).toBeInViewport()
+  }
+
+  await go(page, "#/d/demo:design-epic")
+  await expect(page).toHaveURL(/#\/d\/demo:design-epic$/)
+  await sameCard(/^Working: Resolve tickets/)
+
+  await go(page, `#/agents/${plain.id}`)
+  await expect(page).toHaveURL(new RegExp(`#/agents/${plain.id}$`))
+  await sameCard(/^Working(?!:)/)
+
+  // The Triage session has an open round, so its page opens in the Questions view. Its header has no title.
+  await go(page, "#/triage/demo")
+  const view = page.getByRole("group", { name: "View" })
+  const questions = view.getByRole("button", { name: /^Questions/ })
+  await expect(questions).toHaveAttribute("aria-pressed", "true")
+  await sameCard(/^Working: Questions(?! ·)/)
+  await view.getByRole("button", { name: "Chat" }).click()
+  await expect(questions).toHaveAttribute("aria-pressed", "false")
+  await sameCard(/^Working: Questions(?! ·)/)
 })
 
 /** Two Claude transcript lines: a background shell and its launch result. */

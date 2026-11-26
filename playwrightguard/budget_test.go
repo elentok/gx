@@ -116,7 +116,10 @@ import (
 // at two widths; webui/src/design/WorkingCard.test.tsx renders given props in jsdom and sees neither.
 //
 // Working card height cap flow (+1): jsdom cannot see real layout and scroll.
-const maxFlows = 176
+//
+// Working card pages flow (+1): a real server feeds one card to the Design, Triage and chat pages and the Questions
+// view; SteppedPage.test.tsx and WorkingCard.test.tsx render given props.
+const maxFlows = 177
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
