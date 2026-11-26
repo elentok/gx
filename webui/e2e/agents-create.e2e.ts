@@ -27,11 +27,11 @@ test("85. Create session", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await go(page, "#/agents")
 
-  // The page's own "New chat" button opens the same form, with Name focused (not Project or First prompt).
+  // The page's own "New chat" button opens the same form, with Title focused (not Project or First prompt).
   await page.getByRole("main").getByRole("button", { name: "New chat", exact: true }).click()
   await expect(newForm(page)).toBeVisible()
   await expect(projectSelect(page)).not.toHaveValue("")
-  await expect(newForm(page).getByRole("textbox", { name: "Name", exact: true })).toBeFocused()
+  await expect(newForm(page).getByRole("textbox", { name: "Title", exact: true })).toBeFocused()
   await newForm(page).getByRole("button", { name: "Close" }).click()
   await expect(newForm(page)).toHaveCount(0)
 

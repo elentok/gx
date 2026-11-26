@@ -128,7 +128,7 @@ test("fields and defaults: project prefilled, worktree is the project root", asy
     "blog",
   )
   expect(wt.value).toBe("Project root")
-  for (const name of ["Name", "First prompt"])
+  for (const name of ["Title", "First prompt"])
     expect(screen.getByRole("textbox", { name })).toBeTruthy()
   for (const name of ["Cancel", "Create chat"])
     expect(screen.getByRole("button", { name })).toBeTruthy()
@@ -182,10 +182,10 @@ test("a failed last-project write still completes the create", async () => {
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"))
 })
 
-test("once the projects load, Name has focus on a wide device and Project and First prompt do not", async () => {
+test("once the projects load, Title has focus on a wide device and Project and First prompt do not", async () => {
   mount()
   await ready()
-  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }))
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Title" }))
 })
 
 test("on a phone nothing in the form has focus", async () => {
@@ -251,7 +251,7 @@ test("picking a dir posts dir", async () => {
 test("the default root posts its dir, with a typed name and prompt", async () => {
   const { posts, onCreated } = mount()
   await ready()
-  type("Name", " mine ")
+  type("Title", " mine ")
   type("First prompt", "do it")
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
@@ -336,30 +336,54 @@ test("switching harness updates the models and keeps the selected tier", async (
   expect(picker.value).toBe("strongest")
 })
 
-test("the Name placeholder follows the worktree", async () => {
+test("the Title hint says what a blank title does for each worktree choice", async () => {
   mount()
   const wt = await ready()
-  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("gx")
+  const placeholder = () =>
+    screen.getByRole("textbox", { name: "Title" }).getAttribute("placeholder")
+  const unnamed = "Left blank, gx names the chat."
+  expect(screen.getByText(unnamed)).toBeTruthy()
+  expect(placeholder()).toBe("Title")
+  typeWorktree(wt, "gx-stats")
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }))
+  expect(screen.getByText(unnamed)).toBeTruthy()
+  expect(placeholder()).toBe("Title")
   typeWorktree(wt, "fresh")
   fireEvent.click(list().getByRole("option", { name: /Create worktree/ }))
-  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("fresh")
+  expect(screen.getByText("Left blank, the chat is named fresh.")).toBeTruthy()
+  expect(screen.queryByText(unnamed)).toBeNull()
+  expect(placeholder()).toBe("Title")
+})
+
+test("Escape on the open Project picker closes only its list; the next one closes the form", async () => {
+  const { onClose } = mount()
+  await ready()
+  const project = screen.getByRole("combobox", { name: "Project" }) as HTMLInputElement
+  typeWorktree(project, "bl")
+  expect(screen.getByRole("listbox", { name: "Projects" })).toBeTruthy()
+  fireEvent.keyDown(project, { key: "Escape" })
+  expect(screen.queryByRole("listbox")).toBeNull()
+  expect(project.value).toBe("gx")
+  expect(onClose).not.toHaveBeenCalled()
+  fireEvent.keyDown(project, { key: "Escape" })
+  expect(onClose).toHaveBeenCalledTimes(1)
 })
 
 test("the draft survives a remount and clears on create and on discard", async () => {
   mount()
   await ready()
-  type("Name", "keep")
+  type("Title", "keep")
   expect(saved().name).toBe("keep")
   cleanup()
   mount()
   await ready()
-  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("keep")
+  expect((screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement).value).toBe("keep")
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
   expect(saved()).toBeNull()
   cleanup()
   const { onCreated } = mount()
   await ready()
-  type("Name", "again")
+  type("Title", "again")
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
   expect(saved()).toBeNull()

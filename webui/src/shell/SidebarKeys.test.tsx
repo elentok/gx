@@ -444,7 +444,7 @@ test("Space on a Queue agent shows the reason toast and selects nothing", async 
   expect(screen.getByTestId("select-count").textContent).toBe("0 selected")
 })
 
-test("typing `shsl` in the New chat name field starts no mode", async () => {
+test("typing `shsl` in the New chat title field starts no mode", async () => {
   await setup()
   // The form's worktree list comes from the same fetch the sidebar used for its epics.
   vi.stubGlobal(
@@ -452,7 +452,7 @@ test("typing `shsl` in the New chat name field starts no mode", async () => {
     vi.fn(async () => new Response("[]", { status: 200 })),
   )
   act(openNewAgent)
-  const input = await screen.findByRole("textbox", { name: "Name" })
+  const input = await screen.findByRole("textbox", { name: "Title" })
   input.focus()
   for (const key of "shsl") fireEvent.keyDown(input, { key })
   expect(document.activeElement).toBe(input)

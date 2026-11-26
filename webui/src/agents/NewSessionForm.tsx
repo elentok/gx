@@ -11,7 +11,9 @@ import { BottomSheet } from "../ui/modal/BottomSheet"
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
 import { refusalText, useWrite } from "../useWrite"
 import { useShell } from "../shell/ShellContext"
-import { Field, field } from "./formField"
+import { dropdownLook } from "../ui/text-box/look"
+import { TextBox } from "../ui/text-box/TextBox"
+import { Field } from "./formField"
 import {
   fetchDefaultHarnesses,
   fetchWorktrees,
@@ -72,13 +74,14 @@ function PromptField({
     pending.current = null
   }, [value])
   return (
+    // The menu places itself from this parent.
     <Box position="relative">
-      <chakra.textarea
+      <TextBox
+        kind="prose"
+        name="first-prompt"
+        label="First prompt"
+        optional
         ref={area}
-        aria-label="First prompt"
-        {...field}
-        w="100%"
-        py="2"
         minH="96px"
         resize="vertical"
         value={value}
@@ -94,7 +97,7 @@ function PromptField({
   )
 }
 
-/** The New session form: Project, one Worktree picker, Name and First prompt. The draft lives in localStorage until create or discard. */
+/** The New session form: Project, one Worktree picker, Title and First prompt. The draft lives in localStorage until create or discard. */
 export function NewSessionForm({
   drafts,
   fetchTrees = fetchWorktrees,
@@ -168,7 +171,6 @@ export function NewSessionForm({
   // No saved choice: the trunk worktree (main or master), else the project root.
   const trunk = rows.find((r) => r.key !== "root" && TRUNK_NAMES.includes(r.label))
   const picked = rows.find((r) => r.path === draft.dir) ?? trunk ?? rows[0]
-  const worktreeName = draft.create || (picked ? baseName(picked.path) : "")
 
   const patch = (p: Partial<NewSessionDraft>) => update({ project, ...p })
   const pick = (o: Option) =>
@@ -263,32 +265,41 @@ export function NewSessionForm({
         ) : (
           <>
             <WorktreePicker
+              kind="search"
               label="Project"
               canCreate={false}
               rows={projects.map((p) => ({ key: p, label: p, path: "" }))}
               picked={{ key: project, label: project, path: "" }}
               onPick={(o) => patch({ project: o.key, dir: "", create: "" })}
             />
-            <WorktreePicker rows={rows} picked={picked} creating={draft.create} onPick={pick} />
-            <Field label="Name" optional>
-              <chakra.input
-                ref={focusFirst}
-                aria-label="Name"
-                autoComplete="off"
-                spellCheck={false}
-                {...field}
-                h="40px"
-                placeholder={worktreeName}
-                value={draft.name}
-                onChange={(e) => patch({ name: e.target.value })}
-              />
-            </Field>
+            <WorktreePicker
+              kind="line"
+              rows={rows}
+              picked={picked}
+              creating={draft.create}
+              onPick={pick}
+            />
+            <TextBox
+              kind="line"
+              name="chat-title"
+              label="Title"
+              optional
+              placeholder="Title"
+              ref={focusFirst}
+              value={draft.name}
+              onChange={(e) => patch({ name: e.target.value })}
+              hint={
+                draft.create
+                  ? `Left blank, the chat is named ${draft.create}.`
+                  : "Left blank, gx names the chat."
+              }
+            />
             <Field label="Harness" caret>
               <chakra.select
                 aria-label="Harness"
                 value={harness}
                 onChange={(e) => setHarness(e.target.value as Harness)}
-                {...field}
+                {...dropdownLook}
                 h="40px"
                 appearance="none"
                 pr="8"
@@ -305,7 +316,7 @@ export function NewSessionForm({
                 aria-label="Tier"
                 value={tier}
                 onChange={(e) => setTier(e.target.value as TierId)}
-                {...field}
+                {...dropdownLook}
                 h="40px"
                 appearance="none"
                 pr="8"
@@ -317,18 +328,16 @@ export function NewSessionForm({
                 ))}
               </chakra.select>
             </Field>
-            <Field label="First prompt" optional>
-              <PromptField
-                fetcher={fetchCommands}
-                harness={harness}
-                value={draft.prompt}
-                onChange={(prompt) => patch({ prompt })}
-                target={{
-                  project,
-                  dir: draft.create || !picked ? (current?.root ?? "") : picked.path,
-                }}
-              />
-            </Field>
+            <PromptField
+              fetcher={fetchCommands}
+              harness={harness}
+              value={draft.prompt}
+              onChange={(prompt) => patch({ prompt })}
+              target={{
+                project,
+                dir: draft.create || !picked ? (current?.root ?? "") : picked.path,
+              }}
+            />
           </>
         )}
         {failure && (

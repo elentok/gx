@@ -1,7 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useRef, useState, type KeyboardEvent } from "react"
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react"
 import { useOnChange } from "../hooks"
-import { Field, field } from "./formField"
+import { TextBox } from "../ui/text-box/TextBox"
 
 export interface Option {
   key: string
@@ -15,6 +15,7 @@ export const baseName = (path: string) => path.replace(/\/+$/, "").split("/").po
 
 /** A searchable combobox: filter `rows`; with `canCreate`, a typed name offers "+ Create worktree". Arrow keys move, Enter picks. */
 export function WorktreePicker({
+  kind,
   rows,
   picked,
   creating = "",
@@ -23,6 +24,8 @@ export function WorktreePicker({
   canCreate = true,
   hideLabel,
 }: {
+  /** `search` for a lookup in a list, `line` where the text can also name something new. */
+  kind: "search" | "line"
   /** Keeps the label for screen readers only. */
   hideLabel?: boolean
   label?: string
@@ -83,24 +86,22 @@ export function WorktreePicker({
   }
 
   return (
-    <Field label={label} caret hideLabel={hideLabel}>
-      <chakra.input
+    // The list hangs under the box.
+    <Box position="relative">
+      <TextBox
+        {...(kind === "search" ? { kind } : { kind, verbatim: true })}
+        name={listId}
+        label={label}
+        hideLabel={hideLabel}
+        endElement={<span aria-hidden>▾</span>}
         role="combobox"
-        aria-label={label}
         aria-expanded={query !== null}
         aria-controls={listId}
         aria-activedescendant={query !== null && options[at] ? `${listId}-${at}` : undefined}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        {...field}
-        h="40px"
-        pr="8"
         value={query ?? (creating || picked?.label || "")}
         onFocus={() => setQuery((q) => q ?? "")}
         onBlur={() => setQuery(null)}
-        onChange={(e) => {
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
           setQuery(e.target.value)
           setActive(0)
         }}
@@ -152,6 +153,6 @@ export function WorktreePicker({
           ))}
         </Box>
       )}
-    </Field>
+    </Box>
   )
 }

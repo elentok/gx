@@ -8,3 +8,12 @@ export const textBoxLook = {
   borderRadius: "8px",
   _placeholder: { color: "text.dim" },
 } as const
+
+/** The shared look as dropdowns wear it: sunk into the panel, with a stronger, tighter edge. */
+export const dropdownLook = {
+  ...textBoxLook,
+  bg: "surface",
+  borderColor: "border",
+  borderRadius: "6px",
+  px: "3",
+} as const

@@ -1,12 +1,13 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
-import { Field, field } from "../agents/formField"
+import { Field } from "../agents/formField"
 import { fetchWorktrees, type FetchWorktrees } from "../agents/newSession"
 import { EFFORTS, HARNESSES, tierOptions, type Harness } from "../agents/tierOptions"
 import { baseName, WorktreePicker, type Option } from "../agents/WorktreePicker"
 import type { ProjectWorktrees } from "../generated/server"
 import { useLatest } from "../hooks"
 import { modelName } from "../modelName"
+import { dropdownLook } from "../ui/text-box/look"
 import { fetchLaunchDefaults, type FetchDefaults, type LaunchDefaults } from "./chatDraftDefaults"
 import type { ChatSettings } from "./useChatDraftAutosave"
 
@@ -85,6 +86,7 @@ export function ChatDraftCrumb({
     <Box display="flex" alignItems="center" gap="2" pt="2" flexShrink="0">
       <Box flex="0 1 40%" minW="0">
         <WorktreePicker
+          kind="search"
           label="Project"
           hideLabel
           canCreate={false}
@@ -108,6 +110,7 @@ export function ChatDraftCrumb({
           </Text>
         ) : (
           <WorktreePicker
+            kind="line"
             label="Folder"
             hideLabel
             rows={rows}
@@ -290,7 +293,7 @@ export function ChatDraftChips(props: {
                   value={c.value}
                   disabled={c.disabled}
                   onChange={(e) => c.onChange(e.target.value)}
-                  {...field}
+                  {...dropdownLook}
                   h="40px"
                   appearance="none"
                   pr="8"

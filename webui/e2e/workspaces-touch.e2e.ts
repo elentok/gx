@@ -220,8 +220,8 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(dialog.getByRole("textbox", nav("Workspace name"))).toBeFocused()
   await closeDialog()
   await newItem("New chat")
-  await expect(dialog.getByRole("textbox", nav("Name"))).toBeVisible()
-  await expect(dialog.getByRole("textbox", nav("Name"))).toBeFocused()
+  await expect(dialog.getByRole("textbox", nav("Title"))).toBeVisible()
+  await expect(dialog.getByRole("textbox", nav("Title"))).toBeFocused()
   await closeDialog()
   // New design opens a draft page with the Prompt focused, and pressing it on an empty draft's page reuses that draft.
   const draftIds = async () =>
@@ -301,7 +301,7 @@ test("Workspaces touch", async ({ page, start }) => {
   await chatProject.click()
   await page.getByRole("listbox", nav("Projects")).getByRole("option", nav("demo")).click()
   await expect(chatProject).toHaveValue("demo")
-  await chatForm.getByRole("textbox", nav("Name")).fill("demo-made")
+  await chatForm.getByRole("textbox", nav("Title")).fill("demo-made")
   await chatForm.getByRole("textbox", nav("First prompt")).fill("hi")
   await chatForm.getByRole("button", nav("Create chat")).click()
   await expect(chatForm).toHaveCount(0)

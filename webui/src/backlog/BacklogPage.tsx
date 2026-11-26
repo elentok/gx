@@ -1,4 +1,4 @@
-import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
+import { Box, Spinner, Text } from "@chakra-ui/react"
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
@@ -11,6 +11,7 @@ import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { BottomSheet } from "../ui/modal/BottomSheet"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { refusalText, useWrite } from "../useWrite"
@@ -51,19 +52,15 @@ function StartDialog({
         <Text as="h2" fontFamily="condensed" fontSize="xl" fontWeight="600">
           Start Design for {backlog.name}
         </Text>
-        <chakra.textarea
-          aria-label="Hint"
+        <TextBox
+          kind="prose"
+          name="hint"
+          label="Hint"
+          hideLabel
           placeholder="Optional: what should the theme be about?"
           value={hint}
           onChange={(e) => setHint(e.target.value)}
           rows={3}
-          fontSize="16px"
-          bg="surface.raised"
-          borderWidth="1px"
-          borderColor="hairline"
-          borderRadius="8px"
-          px="3"
-          py="2"
         />
         {problem && (
           <Text role="alert" fontSize="sm" color="tone.waiting.fg">
