@@ -9,6 +9,7 @@ packages:
     include_files:
       - archivedlist.go
       - backlog.go
+      - brokenrules.go
       - checkstatus.go
       - designs.go
       - detail.go

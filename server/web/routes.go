@@ -20,7 +20,7 @@ type OnlyRoute struct {
 }
 
 // Routes are the web listener's own endpoints: the socket's web-login admin
-// routes, and the public client-error report only the web mux serves (ADR 0028).
+// routes, and the browser's reports only the web mux serves (ADR 0028).
 func Routes(web func() *Web) []wire.Route {
 	call := func(f func(*Web, http.ResponseWriter, *http.Request)) http.HandlerFunc {
 		return func(rw http.ResponseWriter, r *http.Request) { f(web(), rw, r) }
@@ -35,6 +35,7 @@ func Routes(web func() *Web) []wire.Route {
 		{Pattern: "POST /v1/web/set-password", Handler: call((*Web).SetPassword)},
 		{Pattern: "POST /v1/client-errors", Web: wire.WebPublic, WebHandler: call((*Web).clientErrorReport)},
 		{Pattern: "POST /v1/web-performance", Web: wire.WebWrite, WebHandler: call((*Web).webPerfReport)},
+		{Pattern: "POST /v1/broken-rules", Web: wire.WebWrite, WebHandler: call((*Web).brokenRuleReport)},
 	}
 }
 
@@ -218,12 +219,18 @@ func (w *Web) clientErrorReport(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "bad JSON", http.StatusBadRequest)
 		return
 	}
-	// The page strips the Setup code from the hash query; cut it here too, so a client that does not never leaks it.
-	if i := strings.Index(body.URL, "#"); i >= 0 {
-		if q := strings.Index(body.URL[i:], "?"); q >= 0 {
-			body.URL = body.URL[:i+q]
+	w.log.Warn("client error", "message", body.Message, "stack", body.Stack, "page_url", cleanPageURL(body.URL), "user_agent", body.UserAgent, "ip", ip)
+	wire.WriteJSON(rw, clientErrorResult{})
+}
+
+// cleanPageURL cuts the hash query off a reported page URL. The page strips the
+// Setup code from it; cutting it here too means a client that does not never
+// leaks it.
+func cleanPageURL(url string) string {
+	if i := strings.Index(url, "#"); i >= 0 {
+		if q := strings.Index(url[i:], "?"); q >= 0 {
+			return url[:i+q]
 		}
 	}
-	w.log.Warn("client error", "message", body.Message, "stack", body.Stack, "page_url", body.URL, "user_agent", body.UserAgent, "ip", ip)
-	wire.WriteJSON(rw, clientErrorResult{})
+	return url
 }

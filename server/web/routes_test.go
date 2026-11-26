@@ -20,6 +20,8 @@ func (h fakeHost) Routes() []wire.Route         { return h.routes }
 func (h fakeHost) WebPerf() *webperf.Store      { return nil }
 func (h fakeHost) PushKey() string              { return "" }
 
+func (h fakeHost) FileBrokenRule(wire.BrokenRuleReport) error { return nil }
+
 func tagHandler(tag string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tag)) }
 }

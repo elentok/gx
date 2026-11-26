@@ -41,6 +41,8 @@ type Host interface {
 	WebPerf() *webperf.Store
 	// PushKey is the VAPID public key the server loaded.
 	PushKey() string
+	// FileBrokenRule files a follow-up for an accepted broken rule report.
+	FileBrokenRule(wire.BrokenRuleReport) error
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its
@@ -61,6 +63,7 @@ type Web struct {
 	streams   streams
 	errs      ipLimiter
 	perfLimit ipLimiter
+	rules     ipLimiter
 }
 
 // New makes a Web that is off until Bind opens the listener.

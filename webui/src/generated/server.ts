@@ -85,6 +85,29 @@ export interface BacklogUnfinishedMove {
 }
 
 //////////
+// source: brokenrules.go
+
+/**
+ * BrokenRuleReport is the request of POST /v1/broken-rules: a rule the web UI
+ * found broken. Every field is required.
+ */
+export interface BrokenRuleReport {
+  rule: string; // a short slug, for example "text-box-name"
+  message: string;
+  value: string; // the value that broke the rule
+  url: string;
+  user_agent: string;
+}
+/**
+ * BrokenRuleResult answers a BrokenRuleReport. A refused report has one of the
+ * reasons "rate-limited", "too-large", "incomplete" and "bad-rule".
+ */
+export interface BrokenRuleResult {
+  refused?: boolean;
+  reason?: string;
+}
+
+//////////
 // source: checkstatus.go
 
 /**
@@ -2853,6 +2876,11 @@ export interface SessionFailure {
   text?: string;
   recrashed?: boolean;
 }
+/**
+ * Refusals of the web-only subagent watch write (public contract).
+ */
+export const ReasonSubagentWatchUnknownClient = "subagent-watch-unknown-client";
+export const ReasonUnknownSubagent = "unknown-subagent";
 /**
  * ReasonFocusNotConnected refuses a focus report from a client with no open
  * event stream: the report would never expire.

@@ -60,3 +60,13 @@ export interface SessionSubagent {
    */
   result?: string;
 }
+/**
+ * WatchRequest opens (or, with Closed, ends) the watch of one subagent page.
+ * Client is the page's event-stream client id.
+ */
+export interface WatchRequest {
+  client: string;
+  session: string;
+  call_id: string;
+  closed?: boolean;
+}

@@ -1,9 +1,12 @@
 package web_test
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -130,6 +133,185 @@ func TestWeb_ClientErrorReportDropsReportsPastThePerIPLimit(t *testing.T) {
 	}
 	if refused == 0 {
 		t.Error("no report was rate limited")
+	}
+}
+
+// brokenRuleBody is a complete report; override replaces or adds fields.
+func brokenRuleBody(t *testing.T, override map[string]string) string {
+	t.Helper()
+	body := map[string]string{
+		"rule": "text-box-name", "message": "a box has no name", "value": "search",
+		"url": "http://h/#/setup?code=SECRET", "user_agent": "UA/1",
+	}
+	maps.Copy(body, override)
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// startBrokenRules starts a server that files broken rules into proj:follow-ups
+// and returns it with its URL, a signed-in cookie and the epic's directory.
+func startBrokenRules(t *testing.T) (*servertest.Harness, string, *http.Cookie, string) {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.WebAddr = "127.0.0.1:0"
+		c.RecoverySettings.FollowUps = "proj:follow-ups"
+	})
+	hs, err := h.Client.Handshake(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h, hs.WebURL, servertest.Login(t, h.StateDir, hs.WebURL), filepath.Join(store, "proj", "follow-ups")
+}
+
+func brokenRuleLines(t *testing.T, stateDir string) []string {
+	t.Helper()
+	logs, err := os.ReadFile(server.LogPath(stateDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for l := range strings.SplitSeq(string(logs), "\n") {
+		if strings.Contains(l, `"broken rule"`) {
+			lines = append(lines, l)
+		}
+	}
+	return lines
+}
+
+func TestWeb_BrokenRuleReportKeepsTheLoginAndWriteChecks(t *testing.T) {
+	t.Parallel()
+	if !slices.Contains(server.WebOnlyRoutes(), server.WebOnlyRoute{Pattern: "POST /v1/broken-rules"}) {
+		t.Error("POST /v1/broken-rules is not on the web-only list as a signed-in route")
+	}
+	h, base := servertest.StartWeb(t)
+	cookie := servertest.Login(t, h.StateDir, base)
+	url := base + "/v1/broken-rules"
+	body := brokenRuleBody(t, nil)
+	if code, _ := servertest.WebPostJSON(t, url, body, nil, "", servertest.JSONPost(base)); code != http.StatusUnauthorized {
+		t.Errorf("signed out: status %d, want 401", code)
+	}
+	if code, _ := servertest.WebPostJSON(t, url, body, cookie, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
+		t.Errorf("foreign Origin: status %d, want 403", code)
+	}
+	if code, _ := servertest.WebPostJSON(t, url, body, cookie, "", map[string]string{"Origin": base, "Content-Type": "text/plain"}); code != http.StatusForbidden {
+		t.Errorf("text/plain: status %d, want 403", code)
+	}
+}
+
+func TestWeb_BrokenRuleReportRefusesBadReportsWithoutFilingThem(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, epic := startBrokenRules(t)
+	url := base + "/v1/broken-rules"
+	for name, tc := range map[string]struct{ body, reason string }{
+		"oversize":      {brokenRuleBody(t, map[string]string{"value": strings.Repeat("a", 17<<10)}), "too-large"},
+		"no fields":     {`{}`, "incomplete"},
+		"empty value":   {brokenRuleBody(t, map[string]string{"value": ""}), "incomplete"},
+		"empty agent":   {brokenRuleBody(t, map[string]string{"user_agent": ""}), "incomplete"},
+		"empty rule":    {brokenRuleBody(t, map[string]string{"rule": ""}), "incomplete"},
+		"empty message": {brokenRuleBody(t, map[string]string{"message": ""}), "incomplete"},
+		"empty URL":     {brokenRuleBody(t, map[string]string{"url": ""}), "incomplete"},
+		"upper case":    {brokenRuleBody(t, map[string]string{"rule": "Text"}), "bad-rule"},
+		"double hyphen": {brokenRuleBody(t, map[string]string{"rule": "a--b"}), "bad-rule"},
+		"edge hyphen":   {brokenRuleBody(t, map[string]string{"rule": "a-"}), "bad-rule"},
+		"long rule":     {brokenRuleBody(t, map[string]string{"rule": strings.Repeat("a", 65)}), "bad-rule"},
+		"newline rule":  {brokenRuleBody(t, map[string]string{"rule": "a\n"}), "bad-rule"},
+	} {
+		code, body := servertest.WebPostJSON(t, url, tc.body, cookie, "", servertest.JSONPost(base))
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.reason {
+			t.Errorf("%s: status %d body %q, want a %s refusal", name, code, body, tc.reason)
+		}
+	}
+	if code, _ := servertest.WebPostJSON(t, url, `{"rule":1}`, cookie, "", servertest.JSONPost(base)); code != http.StatusBadRequest {
+		t.Errorf("bad JSON: status %d, want 400", code)
+	}
+	if lines := brokenRuleLines(t, h.StateDir); len(lines) != 0 {
+		t.Errorf("refused reports were logged: %v", lines)
+	}
+	if _, err := os.Stat(epic); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("follow-ups epic: %v, want nothing filed", err)
+	}
+}
+
+func TestWeb_BrokenRuleReportLogsOneLineAndFilesOneDraft(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, epic := startBrokenRules(t)
+	post := func() {
+		t.Helper()
+		code, body := servertest.WebPostJSON(t, base+"/v1/broken-rules", brokenRuleBody(t, map[string]string{"rule": strings.Repeat("a", 64)}), cookie, "", servertest.JSONPost(base))
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
+			t.Fatalf("status %d body %q, want an accepted report", code, body)
+		}
+	}
+	post()
+	lines := brokenRuleLines(t, h.StateDir)
+	if len(lines) != 1 {
+		t.Fatalf("%d broken rule lines, want 1: %v", len(lines), lines)
+	}
+	for _, want := range []string{`"level":"WARN"`, strings.Repeat("a", 64), "a box has no name", "search", "http://h/#/setup", "UA/1", "127.0.0.1"} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("log line %s lacks %q", lines[0], want)
+		}
+	}
+	post()
+	files, err := filepath.Glob(filepath.Join(epic, "issues", "*.md"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("drafts = %v, %v; want one", files, err)
+	}
+	raw, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "Seen again in the web UI on ") {
+		t.Errorf("the repeat is not noted:\n%s", raw)
+	}
+	if strings.Contains(string(raw)+strings.Join(brokenRuleLines(t, h.StateDir), "\n"), "SECRET") {
+		t.Error("the setup code in the hash query was kept")
+	}
+}
+
+func TestWeb_BrokenRuleReportAnswers500WhenTheTicketCannotBeWritten(t *testing.T) {
+	t.Parallel()
+	_, base, cookie, epic := startBrokenRules(t)
+	// A file where the epic directory goes makes the write fail.
+	if err := os.WriteFile(epic, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _ := servertest.WebPostJSON(t, base+"/v1/broken-rules", brokenRuleBody(t, nil), cookie, "", servertest.JSONPost(base))
+	if code != http.StatusInternalServerError {
+		t.Errorf("status %d, want 500", code)
+	}
+}
+
+func TestWeb_BrokenRuleReportHasItsOwnPerIPLimit(t *testing.T) {
+	t.Parallel()
+	h, base := servertest.StartWeb(t)
+	cookie := servertest.Login(t, h.StateDir, base)
+	report := func() string {
+		t.Helper()
+		code, body := servertest.WebPostJSON(t, base+"/v1/broken-rules", brokenRuleBody(t, nil), cookie, "", servertest.JSONPost(base))
+		if code != http.StatusOK {
+			t.Fatalf("status %d body %q", code, body)
+		}
+		return servertest.ReasonOf(t, body)
+	}
+	for i := range 20 {
+		if reason := report(); reason != "" {
+			t.Fatalf("report %d refused: %s", i+1, reason)
+		}
+	}
+	if reason := report(); reason != "rate-limited" {
+		t.Errorf("report 21: reason %q, want rate-limited", reason)
+	}
+	if n := len(brokenRuleLines(t, h.StateDir)); n != 20 {
+		t.Errorf("%d broken rule lines, want 20", n)
+	}
+	if _, body := postReport(t, base, `{"message":"m"}`, servertest.JSONPost(base)); servertest.ReasonOf(t, body) != "" {
+		t.Errorf("client error from the same IP: %q, want it accepted", body)
 	}
 }
 
