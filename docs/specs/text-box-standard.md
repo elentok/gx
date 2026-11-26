@@ -47,8 +47,8 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 20. As a person typing slugs, commands, refs, paths or terminal input, I want typing help off, so that the keyboard does not change my exact text.
 21. As a person searching, I want typing help off and a search key on the keyboard, so that autocorrect does not break my query.
 22. As an iPhone user, I want free-text boxes to keep AutoFill off, so that Safari does not offer saved cards.
-23. As a person signing in or setting up, I want password managers and one-time code AutoFill to work, so that I do not type secrets by hand.
-24. As a person entering a setting secret, I want the text hidden with AutoFill off, so that the browser does not offer my web login password there.
+23. As a person signing in or setting up, I want password managers and authenticator code AutoFill to work, with AutoFill off on the setup code box, so that I do not type secrets by hand and my phone does not offer an authenticator code as the setup code.
+24. As a person entering a setting secret, I want the text hidden, with `autocomplete="off"` and autocorrect, autocapitalize and spellcheck off, so that the secret is not shown on screen and the keyboard does not change it.
 25. As a person using a project or worktree picker, search box or command palette, I want its keys and list behaviour to work as before, so that the move to `TextBox` costs me nothing.
 26. As a person writing in a prompt box, I want the expand button, vi editor, completion menu and send keys to work as before, so that the shared component changes nothing there.
 27. As an agent adding a text box, I want one component that sets the rules for me, so that I cannot forget one.
@@ -98,26 +98,27 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 | search | `off` | off, off, false | `type="search"`, `enterkeyhint="search"` | |
 | credential | required, from the caller | off, off, false | | `autoComplete`, `inputMode` |
 
-- A line box with `secret` hides its text, keeps AutoFill off and turns typing help off. It is not the credential kind.
-- The credential `autoComplete` is `username`, `current-password`, `new-password` or `one-time-code`. The two password values make the input a password input. The other two make it a text input. The login password uses `current-password` and the setup code uses `one-time-code`.
+- A line box with `secret` hides its text, sets `autocomplete="off"` and turns typing help off. It is not the credential kind.
+- The credential `autoComplete` is `username`, `current-password`, `new-password` or `one-time-code`. The two password values make the input a password input. The other two make it a text input. The login password uses `current-password` and the authenticator code uses `one-time-code`.
+- The setup code is not a credential box. It is a line box with `verbatim`, so AutoFill and typing help are off.
 - Dropdown pickers keep their combobox role.
-- Where a box newly becomes a search input, Escape keeps doing what the page does today. The page's key handling wins over the browser's clear-on-Escape.
+- On every search box, `TextBox` calls `preventDefault` on Escape, after the caller's own key handler, so the browser never clears the text. The page decides what Escape does. The Epics filter and the blocker search, which rely on the browser's clear today, clear their query in their own code. Every search box behaves on Escape as it does today.
 - No code comment or doc claims that these attributes change the iOS word strip.
 
 ### Which box gets which kind
 
 - Search: jump menu, command palette, History search, Epics filter, blocker search, settings search, model filter, diff file filter and the project pickers.
-- Line with `verbatim`: worktree and folder pickers, epic slug, rename slug, diff refs, settings value and list boxes, check commands and limits (including "+ add command" and the setup dialog command), schedule times and late limit, and the screen modal's "Type text".
+- Line with `verbatim`: worktree and folder pickers, epic slug, rename slug, diff refs, settings value and list boxes, check commands and limits (including "+ add command" and the setup dialog command), schedule times and late limit, the setup code on the setup and login pages, and the screen modal's "Type text".
 - Line with `secret`: settings secrets.
 - Line: all title boxes and the rest screen unlock box.
 - Prose: every prompt box, the chat draft brief, the design draft prompt, the new chat first prompt and the Start Design hint.
-- Credential: every login, setup and account box.
+- Credential: every login, setup and account box except the setup code.
 
 ### Looks and sizes
 
 - Two looks. `boxed` is the default, with the raised surface background, the hairline border and an 8px radius. `bare` has no border and no background.
 - Bare boxes are the prompt box's inner textarea, the chat draft brief, the design draft prompt, the History search, and the chat draft and schedule titles.
-- Sizes are `sm` 32px, `md` 40px (default) and `lg` 44px, all with 16px text. `sm` is for workspace rename rows and "+ add command". `lg` is for all credential boxes and the screen modal's "Type text". The rest use `md`.
+- Sizes are `sm` 32px, `md` 40px (default) and `lg` 44px, all with 16px text. `sm` is for workspace rename rows and "+ add command". `lg` is for all credential boxes, the setup code boxes and the screen modal's "Type text". The rest use `md`.
 - `size="title"` is an extra size of `bare` for the two large titles, 20px bold, also on touch screens.
 - Textareas take their height from `rows` or the page layout, and `size` changes only their padding. The prompt box's `sm` and `md` map to these sizes. The component owns padding and line height, and the draft pages and prompt box keep the spacing they have today.
 - Focus styles follow from look, kind and size. A boxed box draws a ring. A bare search box draws a ring inside the box. A bare prose box draws none. A title shows a background. The prompt box's outer frame keeps its ring.
@@ -184,12 +185,13 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 
 - `docs/text-boxes.md` is a deliverable, linked from `.ai/index.md` so that an agent reads it before adding a text box. It is written once, from the final standard.
 - It lists each rule, how to pick a kind, look and size, and the iOS reason behind each rule.
+- It says that blocking saved-password offers on a setting secret is not proven, because a browser can ignore `autocomplete="off"` on a password input.
 - It records what the device checks showed and what they did not: no iPad variant showed AutoFill Contact, "username" and a textarea with only `aria-label` outside a form were not tested, the iPad was not tested around a "Title" box, and no attribute is known to change the word strip.
 
 ## Testing Decisions
 
 - A good test checks what a person or a caller can see: roles, accessible names, text, requests sent, files written. Attributes are the exception here, because the attribute is the behaviour.
-- `TextBox` Vitest tests cover the attributes of each kind, `verbatim` and `secret`, the linked label, the hint placement, the focus ring attribute, the name rule's throw, and the production path with its single report per page load. Type tests or `@ts-expect-error` lines cover the refused props.
+- `TextBox` Vitest tests cover the attributes of each kind, `verbatim` and `secret`, the linked label, the hint placement, the focus ring attribute, the name rule's throw, Escape on a search box (the caller's handler sees it first, then the default is prevented), and the production path with its single report per page load. Type tests or `@ts-expect-error` lines cover the refused props.
 - Only `TextBox` gets new attribute tests. Each move ticket updates the tests of the pages it touches, mostly to the new wording.
 - A fixture test runs the lint plugin on bad and allowed examples, with the examples kept in a file that normal lint skips.
 - The ignore-comment scan has planted examples for each suppression form. The prior art is the raw style guard test.
@@ -231,12 +233,13 @@ Look, sizes and focus (stories 12 to 18)
 Typing help and AutoFill (stories 19 to 24)
 
 - Vitest: the `TextBox` kind tests.
-- Browser check of attributes on one box of each kind and variant in the lists under "Which box gets which kind", including login, setup, account pages and a setting secret.
+- Browser check of attributes on one box of each kind and variant in the lists under "Which box gets which kind", including login, setup, account pages, the setup code box and a setting secret.
 
 Unchanged behaviour (stories 25 to 26)
 
 - Flows: `jump`, `model-switch`, `agents-create`, `chat-draft`, `agents-composer`, `agents-commands`, `composer-images`, `vi-editor`, `draft-history`, `epics`, `diff-page`, `settings-page`.
-- Browser check: Escape in the model filter, the settings search, the diff file filter and a project picker does what it did before.
+- Browser check: Escape in each search box (jump menu, command palette, History search, Epics filter, blocker search, settings search, model filter, diff file filter and a project picker) does what it did before.
+- Vitest: Escape clears the query of the Epics filter and the blocker search, and the `TextBox` Escape test.
 
 Guard rails (stories 27 to 31)
 
@@ -269,7 +272,7 @@ Standing doc (stories 39 to 39)
 | How is a workspace rename row identified? | The row is a group named after the workspace. | It keeps the fixed "Title" label and was device checked around a "Title" box. |
 | What `name` do settings boxes use? | A fixed name per control type. | A name built from a key could contain "name". |
 | What stops a future setting label with "name"? | A registry test on the server. | The label is written there, so the mistake fails where it is made. |
-| Does Escape change on new search inputs? | No, the page's handling wins. | The search type must not change how pickers and dialogs behave. |
+| Does Escape change on search boxes? | No. `TextBox` blocks the browser's clear on all of them, and the two pages that rely on it clear themselves. | One rule in one place, and the search type does not change how pickers and dialogs behave. |
 | Where do the old look objects' other users go? | Dropdowns and the vi editor use the shared look kept with `TextBox`. | One look has one home, and the old objects can be removed. |
 | How does a web report reuse the follow-up writer, which expects a ticket? | The writer takes a description of where the repeat was seen. | A fake ticket address or a second writer would be a workaround. |
 | What about simultaneous or hostile reports? | The server files one draft per pair, checks the rule id, bounds the text and keeps it from changing ticket structure. | The browser supplies the content of a file in the ticket store. |
