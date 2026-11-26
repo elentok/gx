@@ -175,7 +175,9 @@ call), `spawnDepth` 2. `starting` ("Warm up the new worker"): the call runs and 
 name paths that do not exist yet (their folder does); a flow writes them. `finished-no-handback` ("Summarise the config files",
 call `marked`): meta `finished: true`, the file has no `SubagentHandback` and ends with an assistant text. `string-background`
 (call `string`, "Audit the string flags"): one assistant line launches that background subagent and the background shell
-"Lint in the background", both with `run_in_background: "true"`, so the chat read has two task rows. `parent-gone`: the
+"Lint in the background", both with `run_in_background: "true"`, so the chat read has two task rows. `file-call`: two
+running subagents, `read` ("Read the task rows") with an open `Read` of a file inside the session's directory and `edit`
+("Edit the shared notes") with an open `Edit` of a long path outside it, which the label cuts from its start. `parent-gone`: the
 `running` subagent of `foreground-running`, with the parent transcript deleted after seeding (no `tools` entry; the chat read still
 answers). `exited`: the same, with the session crashed (exit 1) so it is Exited. Data: `testutil/gxfixture/spec/subagents.go` and
 `bgtx/subagents.go`.

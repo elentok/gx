@@ -72,7 +72,7 @@ func (c *Chat) codexSubagentRead(w http.ResponseWriter, id, dir string, meta Met
 		Messages: msgs, Truncated: snap.Truncated, Subagent: head,
 	}
 	if head.Status == subagent.SubagentStatusRunning {
-		out.Current, out.Others = currentCalls(snap.InFlight)
+		out.Current, out.Others = currentCalls(snap.InFlight, meta.Dir)
 	}
 	wire.WriteJSON(w, out)
 }

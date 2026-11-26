@@ -133,8 +133,8 @@ func TestToolsScenario_ChatListsTheCallsInFlight(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-tools")
 	list := r.seededSessions(t)
-	if len(list) != 3 {
-		t.Fatalf("%d sessions, want 3", len(list))
+	if len(list) != 4 {
+		t.Fatalf("%d sessions, want 4", len(list))
 	}
 	for i, s := range list {
 		if s.Status.State != wire.SessionWorking {
@@ -159,5 +159,13 @@ func TestToolsScenario_ChatListsTheCallsInFlight(t *testing.T) {
 		if wantOthers > 0 && (chat.Current == nil || chat.Current.Kind != transcript.InFlightSearch || chat.Others[0].Kind != transcript.InFlightOther) {
 			t.Errorf("session %d current %+v others %+v, want search, then other", i, chat.Current, chat.Others)
 		}
+	}
+
+	// Session 3 has one file call and so no task.
+	chat := r.waitChat(t, list[3].ID, func(c wire.SessionChatResponse) bool { return c.Current != nil })
+	const path = "server/sessions/chat/read.go"
+	want := wire.SessionInFlightTool{Kind: transcript.InFlightOther, Label: "Read " + path, Path: path}
+	if *chat.Current != want || len(chat.Others) != 0 || len(chat.Tasks) != 0 {
+		t.Errorf("session 3 current = %+v, others %+v, tasks %+v; want only %+v", chat.Current, chat.Others, chat.Tasks, want)
 	}
 }

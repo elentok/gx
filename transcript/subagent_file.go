@@ -11,8 +11,8 @@ type SubagentDetails struct {
 	Model     string
 	Tokens    int
 	ToolCalls int
-	// CurrentCall is the newest tool call with no result yet; empty when none.
-	CurrentCall string
+	// CurrentCall is the newest tool call with no result yet; zero when none.
+	CurrentCall InFlightTool
 }
 
 type subagentLine struct {
@@ -41,7 +41,10 @@ func ReadSubagentFile(path string) (SubagentDetails, error) {
 	}
 	defer f.Close()
 
-	type open struct{ id, label string }
+	type open struct {
+		id   string
+		tool InFlightTool
+	}
 	var out SubagentDetails
 	var calls []open
 	seenMessages, seenCalls := map[string]bool{}, map[string]bool{}
@@ -70,7 +73,7 @@ func ReadSubagentFile(path string) (SubagentDetails, error) {
 				out.ToolCalls++
 				var in map[string]any
 				_ = json.Unmarshal(blk.Input, &in)
-				calls = append(calls, open{blk.ID, NewInFlightTool(blk.Name, in).Label})
+				calls = append(calls, open{blk.ID, NewInFlightTool(blk.Name, in)})
 			case l.Type == "user" && blk.Type == "tool_result":
 				if i := slices.IndexFunc(calls, func(c open) bool { return c.id == blk.ToolUseID }); i >= 0 {
 					calls = slices.Delete(calls, i, i+1)
@@ -82,7 +85,7 @@ func ReadSubagentFile(path string) (SubagentDetails, error) {
 		return SubagentDetails{}, err
 	}
 	if n := len(calls); n > 0 {
-		out.CurrentCall = calls[n-1].label
+		out.CurrentCall = calls[n-1].tool
 	}
 	return out, nil
 }

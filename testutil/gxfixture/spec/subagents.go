@@ -10,7 +10,7 @@ import (
 // the default and holds the mock states of the spec.
 var SubagentsShapes = []string{
 	"claude", "foreground-running", "finished-handback", "file-gone",
-	"stopped-no-handback", "background-returned", "nested", "starting", "finished-no-handback", "string-background", "parent-gone", "exited",
+	"stopped-no-handback", "background-returned", "nested", "starting", "finished-no-handback", "string-background", "file-call", "parent-gone", "exited",
 	"codex-starting", "codex-child", "codex-null-role", "codex-compressed", "codex-nested",
 }
 

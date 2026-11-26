@@ -102,7 +102,7 @@ func (c *Chat) subagentRead(w http.ResponseWriter, id, dir string, meta Meta, ca
 		head.Prompt, out.Messages = out.Messages[0].Text, out.Messages[1:]
 	}
 	if head.Status == subagent.SubagentStatusRunning {
-		out.Current, out.Others = currentCalls(snap.InFlight)
+		out.Current, out.Others = currentCalls(snap.InFlight, meta.Dir)
 	}
 	wire.WriteJSON(w, out)
 }
@@ -147,7 +147,7 @@ func resolveCall(c *Chat, kind agentrunner.Kind, path string, meta Meta, parentR
 			rec, above, inParent = c.nestedCall(parentRecords, path, rec, ref)
 		}
 		if ok {
-			rec = c.withSubagentDetails([]transcript.TaskRecord{rec}, path)[0]
+			rec = c.withSubagentDetails([]transcript.TaskRecord{rec}, path, meta.Dir)[0]
 		}
 		return resolvedCall{rec: rec, ref: ref, hasRef: ok, above: above, inParent: inParent}
 	}
@@ -282,10 +282,12 @@ func (c *Chat) subagentLoader(sessionDir string) func(string) (Snapshot, error) 
 	}
 }
 
-// currentCalls splits the open calls into the newest and the older ones.
-func currentCalls(open []transcript.InFlightTool) (current *wire.SessionInFlightTool, others []wire.SessionInFlightTool) {
+// currentCalls splits the open calls into the newest and the older ones, as a
+// session working in workDir shows them.
+func currentCalls(open []transcript.InFlightTool, workDir string) (current *wire.SessionInFlightTool, others []wire.SessionInFlightTool) {
 	for _, t := range open {
-		tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
+		label, path := t.LabelIn(workDir)
+		tool := wire.SessionInFlightTool{Kind: t.Kind, Label: label, Path: path}
 		if current == nil {
 			current = &tool
 		} else {

@@ -21,7 +21,7 @@ func TestReadSubagentFile_DedupesTokensAndFindsTheOpenCall(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := ReadSubagentFile(p)
-	want := SubagentDetails{Model: "claude-b", Tokens: 298, ToolCalls: 2, CurrentCall: "ls /private/tmp"}
+	want := SubagentDetails{Model: "claude-b", Tokens: 298, ToolCalls: 2, CurrentCall: InFlightTool{Kind: InFlightShell, Label: "ls /private/tmp"}}
 	if err != nil || got != want {
 		t.Fatalf("got %+v, %v; want %+v", got, err, want)
 	}

@@ -27,7 +27,12 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 	}
 	now := time.Now()
 	convID := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	meta, err := sessions.ReadMeta(f.sessionDir(id))
+	if err != nil {
+		return err
+	}
 	seed := s.BgSeed(now, bgtx.Paths{
+		Session:   meta.Dir,
 		Tasks:     filepath.Join(f.root, "tmp", "claude", filepath.Base(filepath.Dir(path)), convID, "tasks"),
 		Subagents: strings.TrimSuffix(path, ".jsonl") + "/subagents",
 		Rollouts:  filepath.Join(f.root, "home", ".codex", "sessions"),
@@ -86,7 +91,7 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 // backdateSession moves the session's creation time back, and with it its
 // run start.
 func (f sessionSeeder) backdateSession(id string, at time.Time) error {
-	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
+	dir := f.sessionDir(id)
 	meta, err := sessions.ReadMeta(dir)
 	if err != nil {
 		return err

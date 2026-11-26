@@ -15,17 +15,21 @@ const (
 	InFlightOther  = "other"
 )
 
-// inFlightLabelCap is the longest label, ellipsis included.
+// inFlightLabelCap is the longest label in runes. A file label includes its
+// ellipsis in it; an end cut adds the ellipsis after it.
 const inFlightLabelCap = 60
 
-// InFlightTool is a tool call the agent is running right now.
+// InFlightTool is a tool call the agent is running right now. Label is built
+// with no session directory; show LabelIn's.
 type InFlightTool struct {
 	Kind  string
 	Label string
+	File  FileCall
 }
 
 // NewInFlightTool maps a tool name and its arguments to the kind and capped
-// label the Working row shows. An unknown tool is "other", labelled by name.
+// label the Working row shows. An unknown tool is "other", labelled by name,
+// and a file tool by name and path.
 func NewInFlightTool(name string, in map[string]any) InFlightTool {
 	arg := func(keys ...string) string {
 		for _, k := range keys {
@@ -49,6 +53,12 @@ func NewInFlightTool(name string, in map[string]any) InFlightTool {
 		kind, value = InFlightSearch, arg("query")
 	case "WebFetch":
 		kind, value = InFlightSearch, arg("url")
+	case "Read", "Edit", "Write":
+		if path := firstLine(arg("file_path")); path != "" {
+			t := InFlightTool{Kind: kind, File: FileCall{Tool: name, Path: path}}
+			t.Label, _ = t.LabelIn("")
+			return t
+		}
 	}
 	if value == "" {
 		value = name
@@ -58,14 +68,17 @@ func NewInFlightTool(name string, in map[string]any) InFlightTool {
 
 // capInFlightLabel keeps the first line, cut to the cap with an ellipsis.
 func capInFlightLabel(s string) string {
-	s = strings.TrimSpace(s)
-	line, _, _ := strings.Cut(s, "\n")
-	line = strings.TrimSpace(line)
+	line := firstLine(s)
 	r := []rune(line)
 	if len(r) > inFlightLabelCap {
 		return string(r[:inFlightLabelCap]) + "…"
 	}
 	return line
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	return strings.TrimSpace(line)
 }
 
 // ReadInFlightTools lists the tool_use calls of the transcript's current turn

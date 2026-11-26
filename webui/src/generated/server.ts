@@ -3217,16 +3217,23 @@ export interface SessionTask {
   tokens?: number /* int */;
   tool_calls?: number /* int */;
   current_call?: string;
+  /**
+   * CurrentCallPath is the end of CurrentCall that names a file, for a view
+   * that shortens a path from its start.
+   */
+  current_call_path?: string;
   event_count?: number /* int */;
   last_event_at?: string;
 }
 /**
  * SessionInFlightTool is a tool call the agent is running right now. Kind is
- * transcript.InFlightShell, ...Agent, ...Search or ...Other.
+ * transcript.InFlightShell, ...Agent, ...Search or ...Other. Path is the end of
+ * Label that names a file, empty for a tool with none.
  */
 export interface SessionInFlightTool {
   kind: string;
   label: string;
+  path?: string;
 }
 /**
  * SessionScreenResponse is a session's screen as plain text rows, without

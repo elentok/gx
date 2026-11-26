@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func ifUse(id, name, input string, sidechain bool) string {
@@ -123,12 +124,53 @@ func TestReadInFlightTools_Kinds(t *testing.T) {
 		{"Glob", `{"pattern":"*.go"}`, InFlightTool{Kind: "search", Label: "*.go"}},
 		{"WebSearch", `{"query":"go generics"}`, InFlightTool{Kind: "search", Label: "go generics"}},
 		{"WebFetch", `{"url":"https://x.dev"}`, InFlightTool{Kind: "search", Label: "https://x.dev"}},
-		{"Read", `{"file_path":"/a"}`, InFlightTool{Kind: "other", Label: "Read"}},
+		{"Read", `{"file_path":"/a"}`, InFlightTool{Kind: "other", Label: "Read /a", File: FileCall{Tool: "Read", Path: "/a"}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			assertInFlight(t, readInFlight(t, ifPrompt, ifUse("a", c.name, c.input, false)), []InFlightTool{c.want})
+		})
+	}
+}
+
+func TestInFlightTool_LabelIn(t *testing.T) {
+	t.Parallel()
+	const dir = "/work/proj"
+	// "Read " leaves 55 of the 60 runes to the path.
+	fits := "/" + strings.Repeat("é", 54)
+	name := strings.Repeat("n", 70) + ".go"
+	cases := []struct {
+		name, tool, filePath, label, path string
+	}{
+		{"relative inside the directory", "Read", dir + "/chat/tasks.go", "Read chat/tasks.go", "chat/tasks.go"},
+		{"outside as written", "Read", "/etc/hosts", "Read /etc/hosts", "/etc/hosts"},
+		{"already relative", "Read", "./chat/../tasks.go", "Read ./chat/../tasks.go", "./chat/../tasks.go"},
+		{"sibling sharing the prefix", "Read", dir + "-two/a.go", "Read /work/proj-two/a.go", "/work/proj-two/a.go"},
+		{"the directory itself", "Read", dir, "Read " + dir, dir},
+		{"60 runes stay whole", "Read", fits, "Read " + fits, fits},
+		{"folder cut", "Read", "/srv/" + strings.Repeat("a", 40) + "/server/chat/tasks.go", "Read …/server/chat/tasks.go", "…/server/chat/tasks.go"},
+		{"folder cut keeps what fits", "Read", "/dropped/" + strings.Repeat("b", 42) + "/tasks.go", "Read …/" + strings.Repeat("b", 42) + "/tasks.go", "…/" + strings.Repeat("b", 42) + "/tasks.go"},
+		{"file name cut", "Read", "/srv/" + name, "Read …" + name[len(name)-54:], "…" + name[len(name)-54:]},
+		{"edit", "Edit", dir + "/a.go", "Edit a.go", "a.go"},
+		{"write", "Write", dir + "/a.go", "Write a.go", "a.go"},
+		{"first line only", "Read", "/a\nsecond", "Read /a", "/a"},
+		{"missing file_path", "Read", "", "Read", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			in := map[string]any{}
+			if c.filePath != "" {
+				in["file_path"] = c.filePath
+			}
+			label, path := NewInFlightTool(c.tool, in).LabelIn(dir)
+			if label != c.label || path != c.path {
+				t.Errorf("LabelIn = %q, path %q; want %q, %q", label, path, c.label, c.path)
+			}
+			if n := utf8.RuneCountInString(label); n > 60 {
+				t.Errorf("label is %d runes", n)
+			}
 		})
 	}
 }

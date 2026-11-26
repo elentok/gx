@@ -772,7 +772,7 @@ var Scenarios = map[string]scenario{
 	// no-chat, a /compact and a no-transcript session, Codex, Queue, Design and
 	// Triage agents. See spec.ContextWindowScenario.
 	"context-window": spec.ContextWindowScenario(),
-	// agents-tools: three Working Claude sessions with tool calls in flight. See spec.ToolsScenario.
+	// agents-tools: four Working Claude sessions with tool calls in flight. See spec.ToolsScenario.
 	"agents-tools": spec.ToolsScenario(),
 	// agents-promote: agents plus a Codex session with one message, a held Queue
 	// agent and two design sessions, for the Promote to Design flows. See spec.PromoteScenario.

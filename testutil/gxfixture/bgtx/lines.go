@@ -17,8 +17,9 @@ const (
 )
 
 // Paths are the folders a seed writes into: shell output files and subagent
-// symlinks, subagent files, and the Codex home's sessions folder.
-type Paths struct{ Tasks, Subagents, Rollouts string }
+// symlinks, subagent files, and the Codex home's sessions folder. Session is the
+// session's working directory, which a seed only names in calls.
+type Paths struct{ Tasks, Subagents, Rollouts, Session string }
 
 // File is one file the seeder writes. A Link makes Path a symlink to Link.
 // Key records Path in Output.TaskFiles under that name.

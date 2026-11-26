@@ -55,6 +55,25 @@ const (
 	SubStringFileKey   = "subagent-string-file"
 	SubStringMetaKey   = "subagent-string-meta"
 
+	// The file-call shape: one subagent reading a file inside the session's
+	// directory, one editing a file with a long path outside it.
+	SubReadCall  = "toolu_sub_read"
+	SubEditCall  = "toolu_sub_edit"
+	SubReadAgent = "a5ub0011"
+	SubEditAgent = "a5ub0012"
+	SubReadDesc  = "Read the task rows"
+	SubEditDesc  = "Edit the shared notes"
+	// SubReadFile is relative to the session's directory.
+	SubReadFile = "server/sessions/chat/tasks.go"
+	SubEditFile = "/opt/shared/team-notes/architecture/decisions/server/sessions/current-call-labels.md"
+	// The labels the chat read shows for those two calls.
+	SubReadLabel   = "Read " + SubReadFile
+	SubEditLabel   = "Edit …/decisions/server/sessions/current-call-labels.md"
+	SubReadFileKey = "subagent-read-file"
+	SubReadMetaKey = "subagent-read-meta"
+	SubEditFileKey = "subagent-edit-file"
+	SubEditMetaKey = "subagent-edit-meta"
+
 	// SubMarkedLast is the last assistant message of the marked-finished subagent,
 	// which has no handback.
 	SubMarkedLast = "The config files only set paths."
@@ -115,8 +134,16 @@ var SubagentShapes = map[string]Subagent{
 	"starting":             {Build: func(b *Lines) { b.subStarting(20 * sec) }, Calls: map[string]string{"starting": SubStartingCall}, Ready: []string{SubStartingDesc}},
 	"finished-no-handback": {Build: func(b *Lines) { b.subMarked(5 * minute) }, Calls: map[string]string{"marked": SubMarkedCall}, Ready: []string{SubMarkedDesc}},
 	"string-background":    {Build: func(b *Lines) { b.subStringBackground(3 * minute) }, Calls: map[string]string{"string": SubStringCall}, Ready: []string{SubStringDesc}},
-	"parent-gone":          {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
-	"exited":               {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
+	"file-call": {
+		Build: func(b *Lines) {
+			b.subOpenCall(3*minute, SubReadCall, SubReadAgent, SubReadDesc, "Read", b.p.Session+"/"+SubReadFile, SubReadFileKey, SubReadMetaKey)
+			b.subOpenCall(2*minute, SubEditCall, SubEditAgent, SubEditDesc, "Edit", SubEditFile, SubEditFileKey, SubEditMetaKey)
+		},
+		Calls: map[string]string{"read": SubReadCall, "edit": SubEditCall},
+		Ready: []string{SubReadDesc, SubEditDesc},
+	},
+	"parent-gone": {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
+	"exited":      {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 }
 
 // CallsShown reports whether the chat read has a tools entry naming every Ready call.
@@ -248,6 +275,13 @@ func (b *Lines) subMarked(ago time.Duration) {
 // finished in the meta, and a file a flow can grow.
 func (b *Lines) subRunning(ago time.Duration) {
 	b.subagentCall(ago, SubRunningCall, SubRunningAgent, SubRunningDesc, false, surveyFile(), SubRunningFileKey, SubRunningMetaKey)
+}
+
+// subOpenCall is a running subagent whose one tool call, on filePath, has no
+// result yet.
+func (b *Lines) subOpenCall(ago time.Duration, useID, id, desc, tool, filePath, fileKey, metaKey string) {
+	file := []string{subAssistant("msg_"+useID, 900, 40, toolUse(useID+"_open", tool, map[string]any{"file_path": filePath}))}
+	b.subagentCall(ago, useID, id, desc, false, file, fileKey, metaKey)
 }
 
 // subFinished is a subagent whose file ends with its handback and whose parent

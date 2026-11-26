@@ -5,9 +5,9 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// ToolsScenario is three Working Claude sessions with tool calls in flight: one
-// shell call, one shell, sub-agent and search together, and a design chat on a
-// map with one shell call. A held Queue agent runs beside them.
+// ToolsScenario is four Working Claude sessions with tool calls in flight: one
+// shell call, one shell, sub-agent and search together, a design chat on a map
+// with one shell call, and one file read. A held Queue agent runs beside them.
 func ToolsScenario() scenario {
 	const mapAddr = "design-epic"
 	inFlight := func(calls ...agentfake.ToolCall) *agentfake.Control {
@@ -27,6 +27,9 @@ func ToolsScenario() scenario {
 				agentfake.ToolCall{Name: "Grep", Input: map[string]any{"pattern": "InFlightTool"}},
 			)},
 			{Project: project, Prompt: "hello", Link: project + ":" + mapAddr, Control: inFlight(shell)},
+			{Project: project, Prompt: "hello", Control: inFlight(
+				agentfake.ToolCall{Name: "Read", Input: map[string]any{"file_path": "server/sessions/chat/read.go"}},
+			)},
 		},
 	}
 	addQueueAgent(&sc)

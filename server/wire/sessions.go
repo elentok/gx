@@ -514,15 +514,20 @@ type SessionTask struct {
 	Tokens      int    `json:"tokens,omitempty"`
 	ToolCalls   int    `json:"tool_calls,omitempty"`
 	CurrentCall string `json:"current_call,omitempty"`
-	EventCount  int    `json:"event_count,omitempty"`
-	LastEventAt string `json:"last_event_at,omitempty"`
+	// CurrentCallPath is the end of CurrentCall that names a file, for a view
+	// that shortens a path from its start.
+	CurrentCallPath string `json:"current_call_path,omitempty"`
+	EventCount      int    `json:"event_count,omitempty"`
+	LastEventAt     string `json:"last_event_at,omitempty"`
 }
 
 // SessionInFlightTool is a tool call the agent is running right now. Kind is
-// transcript.InFlightShell, ...Agent, ...Search or ...Other.
+// transcript.InFlightShell, ...Agent, ...Search or ...Other. Path is the end of
+// Label that names a file, empty for a tool with none.
 type SessionInFlightTool struct {
 	Kind  string `json:"kind"`
 	Label string `json:"label"`
+	Path  string `json:"path,omitempty"`
 }
 
 // SessionScreenResponse is a session's screen as plain text rows, without

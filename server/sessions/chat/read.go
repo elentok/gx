@@ -109,7 +109,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			out.Tasks, open = c.tasksFor(snap, kind, meta, path)
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
-			out.Current, out.Others = currentCalls(open)
+			out.Current, out.Others = currentCalls(open, meta.Dir)
 		}
 	}
 	wire.WriteJSON(w, out)
@@ -123,7 +123,7 @@ func (c *Chat) tasksFor(snap Snapshot, kind agentrunner.Kind, meta Meta, path st
 	if kind == harness.Codex {
 		records = c.withCodexChildren(records, meta)
 	} else {
-		records = c.withSubagentDetails(c.withShellOutputs(records), path)
+		records = c.withSubagentDetails(c.withShellOutputs(records), path, meta.Dir)
 	}
 	hasList := kind != harness.Codex || hasExecShape(snap.CodexVersion)
 	var open []transcript.InFlightTool

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,7 +51,7 @@ func TestSubagents_Shapes(t *testing.T) {
 	}
 	descs := map[string]string{"running": bgtx.SubRunningDesc, "finished": bgtx.SubFinishedDesc, "missing": bgtx.SubMissingDesc,
 		"stopped": bgtx.SubStoppedDesc, "background": bgtx.SubBackgroundDesc, "nested": bgtx.SubNestedDesc, "starting": bgtx.SubStartingDesc, "marked": bgtx.SubMarkedDesc,
-		"string": bgtx.SubStringDesc}
+		"string": bgtx.SubStringDesc, "read": bgtx.SubReadDesc, "edit": bgtx.SubEditDesc}
 	checkRunning := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
 		var row *wire.SessionTask
 		for i := range chat.Tasks {
@@ -186,7 +187,23 @@ func TestSubagents_Shapes(t *testing.T) {
 			t.Fatalf("task rows = %+v, want the subagent row with its call id and the shell row", chat.Tasks)
 		}
 	}
+	fileCall := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
+		metaOf(t, r, bgtx.SubReadMetaKey, "read", false)
+		metaOf(t, r, bgtx.SubEditMetaKey, "edit", false)
+		got := map[string]string{}
+		for _, row := range chat.Tasks {
+			got[row.Label] = row.CurrentCall
+			if !strings.HasSuffix(row.CurrentCall, " "+row.CurrentCallPath) {
+				t.Errorf("row %q path = %q, want the end of %q", row.Label, row.CurrentCallPath, row.CurrentCall)
+			}
+		}
+		want := map[string]string{bgtx.SubReadDesc: bgtx.SubReadLabel, bgtx.SubEditDesc: bgtx.SubEditLabel}
+		if !maps.Equal(got, want) {
+			t.Errorf("current calls = %q, want %q", got, want)
+		}
+	}
 	cases := []shape{
+		{"file-call", []string{"read", "edit"}, fileCall},
 		{"claude", []string{"running", "finished", "missing"}, func(t *testing.T, r *running, c wire.SessionChatResponse) {
 			checkRunning(t, r, c)
 			finished(t, r, c)

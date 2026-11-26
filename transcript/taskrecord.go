@@ -91,6 +91,8 @@ type TaskRecord struct {
 	Tokens      int
 	ToolCalls   int
 	CurrentCall string
-	EventCount  int
-	LastEventAt time.Time
+	// CurrentCallPath is the part of CurrentCall that names a file.
+	CurrentCallPath string
+	EventCount      int
+	LastEventAt     time.Time
 }

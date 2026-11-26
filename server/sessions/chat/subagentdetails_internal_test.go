@@ -1,7 +1,9 @@
 package chat
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,6 +94,37 @@ func TestRead_SubagentDetailsFromOutputFileAndGrowthRefreshes(t *testing.T) {
 		`{"isSidechain":true,"type":"assistant","message":{"id":"m2","model":"claude-x","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"hi"}]}}`)
 	if got = f.agent(t); got.Tokens != 165 || got.CurrentCall != "" {
 		t.Fatalf("after growth = %+v (parent file unchanged)", got)
+	}
+}
+
+func TestRead_FileCallShowsTheSameLabelEverywhere(t *testing.T) {
+	t.Parallel()
+	read := `{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"` + testCwd + `/chat/tasks.go"}}`
+	f := newSubagentFixture(t, `{"status":"async_launched","agentId":"ag1","outputFile":"/x/tasks/"}`, "")
+	writeLines(t, f.file, `{"isSidechain":true,"type":"assistant","message":{"id":"m1","content":[`+read+`]}}`)
+	parent, err := os.ReadFile(f.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLines(t, f.path, string(parent)+`{"type":"assistant","message":{"content":[`+
+		strings.Replace(read, "t1", "p1", 1)+`,`+strings.Replace(read, "t1", "p2", 1)+`]}}`)
+
+	const label, path = "Read chat/tasks.go", "chat/tasks.go"
+	want := wire.SessionInFlightTool{Kind: transcript.InFlightOther, Label: label, Path: path}
+	got := f.chat(t, "/v1/sessions/chat")
+	if got.Current == nil || *got.Current != want || len(got.Others) != 1 || got.Others[0] != want {
+		t.Errorf("parent current = %+v, others = %+v; want %+v", got.Current, got.Others, want)
+	}
+	if row := f.agent(t); row.CurrentCall != label || row.CurrentCallPath != path {
+		t.Errorf("row call = %q, path %q", row.CurrentCall, row.CurrentCallPath)
+	}
+	var page wire.SessionChatResponse
+	code, body := f.getQuery(t, "/v1/sessions/chat", "subagent=a1")
+	if err := json.Unmarshal(body, &page); err != nil || code != http.StatusOK {
+		t.Fatalf("page = %d %q (%v)", code, body, err)
+	}
+	if page.Current == nil || *page.Current != want {
+		t.Errorf("page current = %+v; want %+v", page.Current, want)
 	}
 }
 

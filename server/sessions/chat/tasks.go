@@ -111,7 +111,7 @@ func wireTask(s taskState) wire.SessionTask {
 		Finished: s.finished, Outcome: s.outcome, NoDuration: s.noDuration,
 		Command: r.Command, ExitCode: r.ExitCode, OutputBytes: r.OutputBytes, LastLine: r.LastLine,
 		Model: r.Model, Tokens: r.Tokens, ToolCalls: r.ToolCalls, CurrentCall: r.CurrentCall,
-		EventCount: r.EventCount,
+		CurrentCallPath: r.CurrentCallPath, EventCount: r.EventCount,
 	}
 	if !s.at.IsZero() {
 		t.FinishedAt = s.at.Format(time.RFC3339)
