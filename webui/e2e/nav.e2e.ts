@@ -17,6 +17,17 @@ async function onFirstPage(page: Page) {
   expect(await page.evaluate(() => navigation.canGoBack)).toBe(false)
 }
 
+/**
+ * The Show sidebar button of the settled page titled `title`. During a page change the shell's
+ * stand-in button and the page's own can both be there for a moment.
+ */
+async function showSidebarButton(page: Page, title: string) {
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible()
+  const button = page.getByRole("button", nav("Show sidebar"))
+  await expect(button).toHaveCount(1)
+  return button
+}
+
 async function hoverShowsTooltip(page: Page) {
   await sidebarKit(page).sidebar.getByRole("button", nav("Back")).hover()
   await expect(page.getByRole("tooltip")).toHaveText(LEADER_TOOLTIP)
@@ -87,8 +98,8 @@ test("Nav buttons", async ({ page, start, browser }) => {
 
   // `data-open`, not visibility: a closing sidebar stays visible while it slides out.
   const open = () => expect(sidebar).toHaveAttribute("data-open", "true")
-  const show = async () => {
-    await page.getByRole("button", nav("Show sidebar")).click()
+  const show = async (title: string) => {
+    await (await showSidebarButton(page, title)).click()
     await open()
   }
   for (const size of [
@@ -96,11 +107,11 @@ test("Nav buttons", async ({ page, start, browser }) => {
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(size)
-    await show()
+    await show("Epics")
     for (const b of header) await expect(b).toBeVisible()
     await row("paused-epic").click()
     await expect(sidebar).toBeHidden()
-    await show()
+    await show("paused-epic")
     await back.click()
     await at(epics, false, true)
     await open()
@@ -150,13 +161,14 @@ test("Nav buttons", async ({ page, start, browser }) => {
     await phone.goto(origin, { waitUntil: "domcontentloaded" })
     await expect(phone).toHaveURL(epics)
     const kit = sidebarKit(phone)
-    const showButton = phone.getByRole("button", nav("Show sidebar"))
-    await showButton.tap()
+    await (await showSidebarButton(phone, "Epics")).tap()
     await kit.row("ready-epic").tap()
     await expect(phone).toHaveURL(ready)
+    // The page must be there before the step back, or the two page changes overlap.
+    await showSidebarButton(phone, "ready-epic")
     await phone.goBack()
     await expect(phone).toHaveURL(epics)
-    await showButton.tap()
+    await (await showSidebarButton(phone, "Epics")).tap()
     await kit.sidebar.getByRole("button", nav("Forward")).tap()
     await expect(phone).toHaveURL(ready)
     await expect(kit.sidebar).toHaveAttribute("data-open", "true")
