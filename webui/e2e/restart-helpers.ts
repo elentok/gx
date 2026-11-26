@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { expect, menu, menuButton, nav, type Fixture } from "./fixture"
+import { expect, menu, menuButton, nav, openMenu, type Fixture } from "./fixture"
 
 // Shared by the restart flows (restart.e2e.ts, restart-run.e2e.ts). They run on the restart-*
 // scenarios, whose server path is a fake gx binary that a flow steers through its control files
@@ -16,11 +16,20 @@ export const openDialog = async (page: Page) => {
   await expect(dialog(page)).toBeVisible()
 }
 
-/** The build text in the sidebar header, e.g. what the dialog calls the running version. */
+/**
+ * The build from the app menu's last line, e.g. what the dialog calls the running version.
+ * It opens the menu and closes it again, since `openDialog` clicks the menu button next.
+ */
 export const buildText = async (page: Page) => {
-  const build = page.getByTestId("server-build")
+  await openMenu(page)
+  const build = menu(page).getByTestId("server-build")
   await expect(build).toBeVisible()
-  return (await build.textContent())!.trim()
+  const text = (await build.textContent())!.trim()
+  // An Escape pressed before the menu takes focus is lost.
+  await expect(menu(page)).toBeFocused()
+  await page.keyboard.press("Escape")
+  await expect(menu(page)).toHaveCount(0)
+  return text.replace(/^gx /, "")
 }
 
 /** What `restart-check` prints when every project passes, on restart-projects (projects demo and broken). */

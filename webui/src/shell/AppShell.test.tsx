@@ -118,12 +118,12 @@ describe("offline empty state", () => {
   })
 })
 
-test("desktop docks the sidebar at 280px, with the brand, the build and a hide button", () => {
+test("desktop docks the sidebar at 280px, with the brand, no version and a hide button", () => {
   setup("desktop")
   expect(isOpen()).toBe(true)
   expect(getComputedStyle(sidebar()).width).toBe("280px")
   expect(sidebar().querySelector("img")?.getAttribute("src")).toBe("/gx-logo-wide.png")
-  expect(screen.getByText("v1.2.3")).toBeTruthy()
+  expect(sidebar().textContent).not.toContain("v1.2.3")
   expect(mascot()).toBeNull()
 })
 

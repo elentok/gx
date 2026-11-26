@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react"
 import { useState } from "react"
 import { toggleAfk } from "../afk"
+import { copyText } from "../clipboard"
 import { useConnectionContext, useConnectionState } from "../connection"
 import {
   SortActivity,
@@ -19,6 +20,7 @@ import { useWorkerRegistration } from "../pwa/registerWorker"
 import { RestartDialog } from "../restart/RestartDialog"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
 import { guarded } from "../ui/reportWriteFailure"
+import { showToast } from "../ui/toaster"
 import { postDevFrontend as defaultPostDevFrontend, useDev } from "../dev"
 import { DevDetails } from "../dev/DevPopover"
 import { DEV_LOOK } from "../dev/DevPill"
@@ -45,6 +47,35 @@ const SORT_OPTIONS = [
 
 const defaultPostSort = (workspace: string, sort: string) =>
   postWorkspace("sort", { name: workspace, sort })
+
+const copyVersion = async (build: string) => {
+  const ok = await copyText(build, null)
+  showToast(
+    ok ? { type: "info", title: "Version copied" } : { type: "error", title: "Could not copy" },
+  )
+}
+
+const versionEntries = (build: string): MenuEntry[] => [
+  { kind: "separator" },
+  {
+    value: "version",
+    label: (
+      <Box
+        as="span"
+        color="text.faint"
+        fontSize="12px"
+        // A taller line box than the item's own text would make this row taller than its siblings.
+        lineHeight="1"
+        whiteSpace="nowrap"
+        data-testid="server-build"
+        data-mock-part="version-item"
+      >
+        gx {build}
+      </Box>
+    ),
+    onSelect: () => void copyVersion(build),
+  },
+]
 
 function DotsIcon() {
   return (
@@ -195,6 +226,7 @@ export function GearMenu({
             label: "Force refresh",
             onSelect: () => void forceRefresh(connected),
           },
+          ...(snapshot?.build ? versionEntries(snapshot.build) : []),
         ]}
       />
       {sheetOpen && (install.mode === "ios" || install.mode === "mac-safari") && (

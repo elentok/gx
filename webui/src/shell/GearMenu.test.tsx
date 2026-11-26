@@ -81,7 +81,7 @@ function setup(
   fireEvent.click(screen.getByRole("button", { name: "Menu" }))
 }
 
-test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with no build or limits", async () => {
+test("lists AFK, Vi mode, Sort, Restart server and More settings in order, then the version, with no limits", async () => {
   setup({ build: "v1.2.3" }, { activeWorkspace: research })
   await screen.findByRole("menuitemcheckbox", { name: "AFK" })
   const items = [...screen.getByRole("menu").querySelectorAll('[role^="menuitem"]')].map((el) =>
@@ -96,9 +96,50 @@ test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with 
     "Cleanup",
     "Tips",
     "Force refresh",
+    "gx v1.2.3",
   ])
-  expect(screen.queryByTestId("server-build")).toBeNull()
   expect(screen.queryByText("Claude limits")).toBeNull()
+})
+
+test.each(["desktop", "phone"] as const)(
+  "%s: the version is the last menu item, after a separator",
+  async (device) => {
+    setup({ build: "v1.2.3" }, {}, () => {}, true, {}, device)
+    const item = await screen.findByRole("menuitem", { name: "gx v1.2.3" })
+    const menu = screen.getByRole("menu")
+    const entries = [...menu.querySelectorAll('[role^="menuitem"], [role="separator"]')]
+    expect(entries.at(-1)).toBe(item)
+    expect(entries.at(-2)?.getAttribute("role")).toBe("separator")
+  },
+)
+
+test.each([
+  { name: "copies", write: async () => {}, toast: { type: "info", title: "Version copied" } },
+  {
+    name: "reports a failed copy of",
+    write: async () => {
+      throw new Error("denied")
+    },
+    toast: { type: "error", title: "Could not copy" },
+  },
+])("a click on the version $name the build and closes the menu", async ({ write, toast }) => {
+  const writeText = vi.fn(write)
+  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } })
+  setup({ build: "v1.2.3" })
+  fireEvent.click(await screen.findByRole("menuitem", { name: "gx v1.2.3" }))
+  await waitFor(() => expect(showToast).toHaveBeenCalledWith(toast))
+  expect(writeText).toHaveBeenCalledWith("v1.2.3")
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull())
+})
+
+test("with no build there is no version item", async () => {
+  setup()
+  await screen.findByRole("menuitem", { name: "Tips" })
+  expect(screen.queryByTestId("server-build")).toBeNull()
+  const entries = screen
+    .getByRole("menu")
+    .querySelectorAll('[role^="menuitem"], [role="separator"]')
+  expect(entries[entries.length - 1].textContent).toBe("Force refresh")
 })
 
 test("one divider separates AFK, Vi mode and Sort from Restart server and More settings", async () => {

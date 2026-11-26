@@ -254,21 +254,6 @@ export function AppShell({
             <SidebarSelectProvider fetcher={fetchEpicList} active={active}>
               <Box display="flex" alignItems="center" gap="2" pt="10px" pr="2" pb="6px" pl="3">
                 <Image src="/gx-logo-wide.png" alt="gx" h="26px" w="auto" draggable={false} />
-                {snapshot?.build && (
-                  <Box
-                    as="span"
-                    color="text.faint"
-                    fontSize="12px"
-                    minW="0"
-                    whiteSpace="nowrap"
-                    overflow="hidden"
-                    textOverflow="ellipsis"
-                    title={snapshot.build}
-                    data-testid="server-build"
-                  >
-                    {snapshot.build}
-                  </Box>
-                )}
                 <Box flex="1" />
                 <chakra.button
                   type="button"

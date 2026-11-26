@@ -437,6 +437,7 @@ test("Workspaces", async ({ page, start }) => {
     /^Cleanup/,
     /^Tips$/,
     /^Force refresh$/,
+    /^gx \S+$/,
   ])
   const sortOptions = page.getByRole("menuitemradio")
   const openSort = async (workspace: string) => {
