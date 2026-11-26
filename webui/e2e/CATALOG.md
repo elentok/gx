@@ -199,6 +199,11 @@ lines (encrypted `agent_message`, `turn_context` model, tool calls, `token_count
 `codex-old-call` differs: the parent rollout is 0.143.0, so its `spawn_agent` call (`spawn`, no `thread`, no child rollout)
 is marked with no record and there is no task row; the session is linked to `demo:design-epic`.
 Data: `bgtx/codex_subagents.go`.
+The `card-pages` scenario seeds three Working Claude sessions, each with the running "Watch the build in the background" and
+the finished "Check the wire types" subagent: a Design of `demo:design-epic` (`#/d/demo:design-epic`), a session linked to
+the Triage of `demo` (`#/triage/demo`, at the questions step, with an open round) and a plain chat with no link
+(`#/agents/<id>`). It has no `subagents` output key: find a session's id in the session list by its flow. Data:
+`testutil/gxfixture/spec/cardpages.go` and `bgtx/cardpages.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

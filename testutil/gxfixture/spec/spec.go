@@ -383,6 +383,8 @@ type SessionSpec struct {
 	Workspace string
 	// Link is the map address the finished session is marked a design session of.
 	Link string
+	// Triage is the project whose Triage the settled session is linked to.
+	Triage string
 	// Read clears the Unread the finished turn (or the crash) raised.
 	Read bool
 	// Actionable is the reason the session raises with `gx agent actionable`.

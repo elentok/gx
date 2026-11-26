@@ -708,6 +708,9 @@ var Scenarios = map[string]scenario{
 	// subagents, in the shape --shape names (default claude). run swaps in
 	// spec.SubagentsScenario(shape).
 	"subagents": {SubagentsShaped: true},
+	// card-pages: Working sessions with subagents on the Design, Triage and chat
+	// pages. See spec.CardPagesScenario.
+	"card-pages": spec.CardPagesScenario(),
 	// dev-mode: a Dev checkout and a fake pnpm in the state --shape names (default running).
 	"dev-mode": {DevMode: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout

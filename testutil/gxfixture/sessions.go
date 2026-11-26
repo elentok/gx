@@ -25,6 +25,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/holderdiag"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -187,6 +188,12 @@ func (f sessionSeeder) settleSession(s sessionSpec, id string) error {
 	if s.Link != "" {
 		if err := f.linkSession(id, s.Link); err != nil {
 			return err
+		}
+	}
+	if s.Triage != "" {
+		req := wire.LinkSessionRequest{ID: id, Flow: string(tickets.FlowTriage), FlowKey: s.Triage}
+		if res, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.Link(context.Background(), req); err != nil || res.Refused {
+			return fmt.Errorf("link %s to the Triage of %s: %v (refused %v: %s)", id, s.Triage, err, res.Refused, res.Reason)
 		}
 	}
 	if s.Actionable != "" {
