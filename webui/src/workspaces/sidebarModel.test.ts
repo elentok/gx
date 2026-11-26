@@ -168,6 +168,27 @@ describe("buildSidebar", () => {
     ])
   })
 
+  it("gives card rows, and only them, each epic address once", () => {
+    const rows = [
+      row("p:a", {
+        card_kind: CardKindDesign,
+        section: SectionDesigning,
+        addresses: ["p:a-impl", "p:a"],
+      }),
+      row("p:b", {}),
+      row("p:h", { section: SectionOnHold, addresses: ["p:h"] }),
+    ]
+    const sessions = [session("c", "p")]
+    const placements = [place("c", "chat", { workspace: "Default" })]
+    const s = buildSidebar({ ...base, rows, sessions, placements })
+    expect(Object.fromEntries([...s.rows, ...s.held].map((r) => [r.key, r.addresses]))).toEqual({
+      "p:a": ["p:a", "p:a-impl"],
+      "p:b": ["p:b"],
+      "p:h": ["p:h"],
+      c: undefined,
+    })
+  })
+
   it("nests agents under their epic", () => {
     const rows = [row("p:a", { addresses: ["p:a"] }), row("p:b", {})]
     const sessions = [session("s1", "p", { name: "q", queue: true }), session("s2", "p")]

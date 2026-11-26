@@ -92,6 +92,8 @@ export interface SidebarRow {
   /** A chat, or a Design with a session, has Unread; the title is drawn bold. */
   unread?: boolean
   agents: SidebarAgent[]
+  /** A card row's epic addresses (both of a joined pair); only card rows have it. */
+  addresses?: string[]
 }
 
 export interface Sidebar {
@@ -152,6 +154,7 @@ function cardRow(
   const kind = RING_KIND[r.card_kind ?? CardKindImplementation]
   return {
     key: r.address,
+    addresses: [...new Set([r.address, ...(r.addresses ?? [])])],
     kind,
     title: r.name,
     href: kind === "design" ? designHref(r.address) : titleHref(r),
