@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/webperf"
 )
 
@@ -33,7 +34,7 @@ func (h webHost) Routes() []wire.Route    { return h.s.routes }
 func (h webHost) WebPerf() *webperf.Store { return h.s.webPerf }
 func (h webHost) PushKey() string         { return h.s.vapid.Public() }
 
-func (h webHost) FileBrokenRule(r wire.BrokenRuleReport) error {
+func (h webHost) FileBrokenRule(r ops.BrokenRuleReport) error {
 	return h.s.recovery.FileBrokenRule(r)
 }
 

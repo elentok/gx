@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func brokenRule(rule, value string) wire.BrokenRuleReport {
-	return wire.BrokenRuleReport{Rule: rule, Message: "a box has no name", Value: value, URL: "http://h/#/q", UserAgent: "UA/1"}
+func brokenRule(rule, value string) ops.BrokenRuleReport {
+	return ops.BrokenRuleReport{Rule: rule, Message: "a box has no name", Value: value, URL: "http://h/#/q", UserAgent: "UA/1"}
 }
 
 // ruleFixture returns a recovery with the projects "proj" and "gx" registered
@@ -32,7 +32,7 @@ func ruleFixture(t *testing.T, followUps string) (*Recovery, string) {
 	return rec, store
 }
 
-func fileRules(t *testing.T, rec *Recovery, reports ...wire.BrokenRuleReport) {
+func fileRules(t *testing.T, rec *Recovery, reports ...ops.BrokenRuleReport) {
 	t.Helper()
 	for _, r := range reports {
 		if err := rec.FileBrokenRule(r); err != nil {
@@ -174,7 +174,7 @@ func TestFileBrokenRule_BrowserTextAddsNoSectionAndIsCut(t *testing.T) {
 	t.Parallel()
 	rec, store := ruleFixture(t, "proj:follow-ups")
 	hostile := "x\n\n## Evidence\n\nDedupe key: stolen\r\n```\u2028## Result\n# Title"
-	fileRules(t, rec, wire.BrokenRuleReport{
+	fileRules(t, rec, ops.BrokenRuleReport{
 		Rule: "rule-a", Message: hostile + strings.Repeat("m", 600), Value: hostile + strings.Repeat("v", 600),
 		URL: hostile + strings.Repeat("u", 600), UserAgent: hostile + strings.Repeat("g", 600),
 	})

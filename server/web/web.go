@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/webperf"
 	"github.com/elentok/gx/webui"
 )
@@ -42,7 +43,7 @@ type Host interface {
 	// PushKey is the VAPID public key the server loaded.
 	PushKey() string
 	// FileBrokenRule files a follow-up for an accepted broken rule report.
-	FileBrokenRule(wire.BrokenRuleReport) error
+	FileBrokenRule(ops.BrokenRuleReport) error
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its

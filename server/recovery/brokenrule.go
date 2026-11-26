@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/ticketwrite"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // webUISource names where a broken rule report's repeats are seen.
@@ -16,7 +16,7 @@ const webUISource = "the web UI"
 // FileBrokenRule files a draft follow-up for a broken rule the web UI reported,
 // or counts a repeat on the open draft of the same rule and value. An
 // unregistered target project only logs: the browser has nothing to retry.
-func (rec *Recovery) FileBrokenRule(r wire.BrokenRuleReport) error {
+func (rec *Recovery) FileBrokenRule(r ops.BrokenRuleReport) error {
 	// A bare epic name in the setting means that epic in gx, whose web UI this is.
 	epicPath, err := rec.FollowUpsEpicPath("gx")
 	if errors.Is(err, errNoFollowUpProject) {
@@ -30,7 +30,7 @@ func (rec *Recovery) FileBrokenRule(r wire.BrokenRuleReport) error {
 	return err
 }
 
-func brokenRuleFollowUp(r wire.BrokenRuleReport) ticketwrite.FollowUp {
+func brokenRuleFollowUp(r ops.BrokenRuleReport) ticketwrite.FollowUp {
 	return ticketwrite.FollowUp{
 		Slug:   "broken-rule-" + r.Rule,
 		Title:  "Broken rule in the web UI: " + r.Rule,

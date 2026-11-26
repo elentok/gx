@@ -9,7 +9,6 @@ packages:
     include_files:
       - archivedlist.go
       - backlog.go
-      - brokenrules.go
       - checkstatus.go
       - designs.go
       - detail.go
@@ -52,6 +51,7 @@ packages:
     output_path: "webui/src/generated/ops.ts"
     frontmatter: "import type { HealthReason, HealthState, MapStep } from './server';"
     include_files:
+      - brokenrules.go
       - chatdrafts.go
       - cleanup.go
       - designdrafts.go

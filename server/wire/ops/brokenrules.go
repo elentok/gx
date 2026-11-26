@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // BrokenRuleReport is the request of POST /v1/broken-rules: a rule the web UI
 // found broken. Every field is required.

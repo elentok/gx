@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const (
@@ -21,9 +22,9 @@ var brokenRuleID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // brokenRuleReport logs and files a rule the web UI found broken.
 func (w *Web) brokenRuleReport(rw http.ResponseWriter, r *http.Request) {
-	refuse := func(reason string) { wire.WriteJSON(rw, wire.BrokenRuleResult{Refused: true, Reason: reason}) }
+	refuse := func(reason string) { wire.WriteJSON(rw, ops.BrokenRuleResult{Refused: true, Reason: reason}) }
 	ip := webauth.RemoteIP(r)
-	var report wire.BrokenRuleReport
+	var report ops.BrokenRuleReport
 	if !readReport(rw, r, w.rules.allow(ip, brokenRuleRateLimit, brokenRuleWindow), brokenRuleMaxBody, &report, refuse) {
 		return
 	}
@@ -42,5 +43,5 @@ func (w *Web) brokenRuleReport(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "filing failed", http.StatusInternalServerError)
 		return
 	}
-	wire.WriteJSON(rw, wire.BrokenRuleResult{})
+	wire.WriteJSON(rw, ops.BrokenRuleResult{})
 }
