@@ -3,11 +3,14 @@
 
 import { parseDiffUrl } from "../diff/diffUrl"
 import { currentAddress } from "../hrefs"
-import type { Sidebar, SidebarAgent, SidebarRow } from "./sidebarModel"
-
-/** The `data-nav` values SidebarRows puts on its anchors. */
-export const rowNavId = (key: string) => `row:${key}`
-export const agentNavId = (id: string) => `agent:${id}`
+import {
+  agentNavId,
+  rowNavId,
+  sidebarEntries,
+  type Sidebar,
+  type SidebarAgent,
+  type SidebarRow,
+} from "./sidebarModel"
 
 export interface NextPrevInput {
   pathname: string // the router location's pathname
@@ -50,8 +53,7 @@ interface Item extends NavTarget {
   owns: boolean
 }
 
-/** Every row of the model, in the order SidebarRows renders them. */
-function modelItems({ rows, held, other }: Sidebar, page: Page): Item[] {
+function modelItems(model: Sidebar, page: Page): Item[] {
   const agentItem = (a: SidebarAgent): Item => ({
     id: agentNavId(a.id),
     href: a.href,
@@ -65,10 +67,7 @@ function modelItems({ rows, held, other }: Sidebar, page: Page): Item[] {
       (!!page.epic && !!r.addresses?.includes(page.epic)) ||
       (r.kind === "chat" && r.key === page.session),
   })
-  return [
-    ...[...rows, ...held].flatMap((r) => [rowItem(r), ...r.agents.map(agentItem)]),
-    ...other.map(agentItem),
-  ]
+  return sidebarEntries(model).map((e) => ("row" in e ? rowItem(e.row) : agentItem(e.agent)))
 }
 
 export function nextPrev({ pathname, search, model, rendered, lastRow }: NextPrevInput): NextPrev {

@@ -10,8 +10,8 @@ import {
   type SessionPlacement,
 } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
-import { buildSidebar, type Sidebar } from "./sidebarModel"
-import { agentNavId, nextPrev, rowNavId, type NextPrevInput } from "./nextPrev"
+import { agentNavId, buildSidebar, rowNavId, type Sidebar } from "./sidebarModel"
+import { nextPrev, type NextPrevInput } from "./nextPrev"
 
 const row = (address: string, over: Partial<EpicListRow> = {}): EpicListRow =>
   ({
@@ -175,7 +175,7 @@ describe("nextPrev targets", () => {
   })
 
   it("ignores rendered values that are no row", () => {
-    const rendered = ["section:other", design, "section:held", epic, "row:gone"]
+    const rendered = ["section:other", design, "section:held", epic, rowNavId("gone")]
     expect(step("/e/p:b-epic", { rendered })).toEqual([design, undefined])
     expect(step("/settings", { rendered })).toEqual([epic, design])
   })
@@ -217,7 +217,7 @@ describe("nextPrev last row", () => {
 
   it.each([
     ["there is none", undefined],
-    ["the model no longer holds it", "row:gone"],
+    ["the model no longer holds it", rowNavId("gone")],
   ])("goes to the first or last row when %s", (_, lastRow) => {
     const r = at("/settings", { lastRow })
     expect([r.pageRow, r.next?.id, r.prev?.id]).toEqual([undefined, design, triage])

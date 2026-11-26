@@ -4,8 +4,10 @@ import { useLocation, useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList, type FetchEpicList } from "../epics/list"
 import {
+  agentNavId,
   buildSidebar,
   rowItemKind,
+  rowNavId,
   type SidebarAgent,
   type SidebarRow,
   type SidebarStatus,
@@ -362,7 +364,7 @@ function AgentLink({
       {selecting && managed && <RowCheck id={agent.id} label={agent.label} />}
       <chakra.a
         href={agent.href}
-        {...{ [NAV_ATTR]: `agent:${agent.id}` }}
+        {...{ [NAV_ATTR]: agentNavId(agent.id) }}
         aria-current={current ? "page" : undefined}
         {...rowStyle}
         flex="1"
@@ -497,7 +499,10 @@ function Row({
         {selecting && <RowCheck id={row.key} label={row.title} />}
         <chakra.a
           href={row.href}
-          {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }}
+          {...{
+            [NAV_ATTR]: rowNavId(row.key),
+            ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}),
+          }}
           aria-current={current ? "page" : undefined}
           {...rowStyle}
           flex="1"

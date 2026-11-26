@@ -18,7 +18,27 @@ import {
   type SessionPlacement,
 } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
-import { buildSidebar, NEEDS_YOU, rowItemKind } from "./sidebarModel"
+import {
+  agentNavId,
+  buildSidebar,
+  NEEDS_YOU,
+  parseNavId,
+  rowItemKind,
+  rowNavId,
+} from "./sidebarModel"
+
+describe("parseNavId", () => {
+  it.each([
+    ["row", rowNavId("p:a-epic")],
+    ["agent", agentNavId("p:a-epic")],
+  ] as const)("reads a %s id back", (kind, id) => {
+    expect(parseNavId(id)).toEqual({ kind, key: "p:a-epic" })
+  })
+
+  it.each(["section:other", "row", ""])("gives undefined for %o", (id) => {
+    expect(parseNavId(id)).toBeUndefined()
+  })
+})
 
 describe("rowItemKind", () => {
   it.each(["chat", "design", "draft", "chat-draft"] as const)("keeps %s", (kind) => {

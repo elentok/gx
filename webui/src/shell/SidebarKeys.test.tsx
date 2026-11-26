@@ -14,6 +14,7 @@ import {
 } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { DeviceContext } from "../useWide"
+import { rowNavId } from "../workspaces/sidebarModel"
 import { AppShell } from "./AppShell"
 import { closeNewItem, openNewAgent } from "./newItemOpen"
 import type { Shell } from "./ShellContext"
@@ -337,7 +338,7 @@ function Rows({ keys }: { keys: string[] }) {
       <ul data-nav-list="" tabIndex={-1} data-testid="list">
         {keys.map((k) => (
           <li key={k}>
-            <a href={`#/${k}`} data-nav={`row:${k}`}>
+            <a href={`#/${k}`} data-nav={rowNavId(k)}>
               {k}
             </a>
           </li>

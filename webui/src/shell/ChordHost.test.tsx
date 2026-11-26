@@ -16,6 +16,7 @@ import { registerChatDraftPage, registerDraftPage } from "./draftPageActions"
 import { WorkspacePickerHost } from "./WorkspacePickerHost"
 import { closeRename, useRenameRequest } from "./renameOpen"
 import type { FetchEpicList } from "../epics/list"
+import { rowNavId } from "../workspaces/sidebarModel"
 
 beforeEach(() => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64")
@@ -619,7 +620,7 @@ describe("Leader then j and k", () => {
       <ul data-nav-list="">
         {ids.map((id) => (
           <li key={id}>
-            <a href={`#/agents/${id}`} data-nav={`row:${id}`}>
+            <a href={`#/agents/${id}`} data-nav={rowNavId(id)}>
               {id}
             </a>
           </li>
@@ -692,13 +693,13 @@ describe("Leader then j and k", () => {
   test("on a page with no row, j continues from the last row, also after a remount", async () => {
     const router = mount("/agents/s1")
     // Stored with no chord run.
-    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe("row:s1"))
+    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe(rowNavId("s1")))
     await act(() => router.navigate("/settings"))
     await step("KeyJ", "Next item")
     await waitFor(() => expect(path()).toBe("/agents/s2"))
 
     await act(() => router.navigate("/agents/s1"))
-    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe("row:s1"))
+    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe(rowNavId("s1")))
     cleanup()
     mount("/settings")
     await step("KeyJ", "Next item")

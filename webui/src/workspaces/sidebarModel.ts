@@ -102,6 +102,37 @@ export interface Sidebar {
   other: SidebarAgent[]
 }
 
+export type NavKind = "row" | "agent"
+
+/** The `data-nav` values of the sidebar's row anchors; `parseNavId` reads them back. */
+export const rowNavId = (key: string) => `row:${key}`
+export const agentNavId = (id: string) => `agent:${id}`
+
+/** Undefined for any other stop, such as a section header. */
+export function parseNavId(navId: string): { kind: NavKind; key: string } | undefined {
+  const [, kind, key] = /^(row|agent):(.*)$/.exec(navId) ?? []
+  return kind ? { kind: kind as NavKind, key: key! } : undefined
+}
+
+export type SidebarEntry = { section: keyof Sidebar } & (
+  | { row: SidebarRow }
+  | { agent: SidebarAgent }
+)
+
+/** Every row and agent of the model, in the order SidebarRows renders them. */
+export function sidebarEntries({ rows, held, other }: Sidebar): SidebarEntry[] {
+  const withAgents = (section: "rows" | "held", list: SidebarRow[]) =>
+    list.flatMap((row): SidebarEntry[] => [
+      { section, row },
+      ...row.agents.map((agent) => ({ section, agent })),
+    ])
+  return [
+    ...withAgents("rows", rows),
+    ...withAgents("held", held),
+    ...other.map((agent): SidebarEntry => ({ section: "other", agent })),
+  ]
+}
+
 export interface SidebarInput {
   rows: EpicListRow[]
   sessions: SessionInfo[]

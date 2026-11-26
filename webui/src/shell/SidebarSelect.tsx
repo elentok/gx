@@ -32,7 +32,12 @@ import {
   type SelectState,
 } from "../select/selectModel"
 import { dispatchSelectKey, openItemMenu, selectIntent } from "../select/selectKeys"
-import { rowItemKind, type SidebarRow } from "../workspaces/sidebarModel"
+import {
+  parseNavId,
+  rowItemKind,
+  sidebarEntries,
+  type SidebarRow,
+} from "../workspaces/sidebarModel"
 import { showToast } from "../ui/toaster"
 import { isTextTarget } from "./keys"
 import { NAV_ATTR } from "./SidebarKeys"
@@ -169,17 +174,12 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
       if (e.defaultPrevented || !sidebarOwnsKey(e.target)) return
       const { state, rows, enter, toggle } = ref.current
       const nav = stop?.getAttribute(NAV_ATTR) ?? ""
-      const key = nav.startsWith("row:")
-        ? nav.slice(4)
-        : nav.startsWith("agent:")
-          ? nav.slice(6)
-          : ""
       dispatchSelectKey(e, state.on, hasLayer() || isTextTarget(e.target), {
         enter: () => {
           enter()
           return undefined
         },
-        itemKey: key || null,
+        itemKey: parseNavId(nav)?.key || null,
         // The menu button is the anchor's sibling inside the row frame.
         menu: () => openItemMenu(stop?.parentElement),
         toggle: (k) => {
@@ -249,31 +249,22 @@ export function SidebarSelectProvider({
   // Agents nested under a row are not visible to Select all: their parent's expanded state is local to the row.
   const rows = useMemo<SelectRow[]>(() => {
     if (!model) return []
-    const out: SelectRow[] = []
-    for (const r of model.rows) {
-      out.push(rowOf(r, true))
-      for (const a of r.agents) out.push(rowOfAgent(a.session, false))
-    }
-    for (const r of model.held) {
-      out.push(rowOf(r, !!sectionOpen[GROUP_ON_HOLD]))
-      for (const a of r.agents) out.push(rowOfAgent(a.session, false))
-    }
-    for (const a of model.other)
-      out.push(rowOfAgent(a.session, !!sectionOpen[GROUP_OTHER], GROUP_OTHER))
-    return out
+    return sidebarEntries(model).map((e) => {
+      if ("row" in e) return rowOf(e.row, e.section === "rows" || !!sectionOpen[GROUP_ON_HOLD])
+      if (e.section !== "other") return rowOfAgent(e.agent.session, false)
+      return rowOfAgent(e.agent.session, !!sectionOpen[GROUP_OTHER], GROUP_OTHER)
+    })
   }, [model, sectionOpen])
 
-  const names = useMemo(() => {
-    const out = new Map<string, string>()
-    if (!model) return out
-    const add = (name: string, key: string) => out.set(key, name)
-    for (const r of [...model.rows, ...model.held]) {
-      add(r.title, r.key)
-      for (const a of r.agents) add(a.label, a.session.id)
-    }
-    for (const a of model.other) add(a.label, a.session.id)
-    return out
-  }, [model])
+  const names = useMemo(
+    () =>
+      new Map(
+        (model ? sidebarEntries(model) : []).map((e) =>
+          "row" in e ? [e.row.key, e.row.title] : [e.agent.session.id, e.agent.label],
+        ),
+      ),
+    [model],
+  )
 
   const api = useSelectApi(rows, names, !!model, sidebarOwnsKey)
   const select = useMemo<SidebarSelect>(
