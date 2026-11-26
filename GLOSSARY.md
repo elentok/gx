@@ -881,9 +881,10 @@ the **Chord box**, even while the person is typing in a text field, and `b` afte
 _Avoid_: prefix key, escape key.
 
 **Chord box** — the small box at the bottom right that lists the keys that may follow the **Leader
-key**, each with what it does. It lists only the chords that work on the open page, except the big
-prompt box chord (Leader then `b`), which shows on every page; its label names what it will do
-("Big prompt box" or "Normal prompt box").
+key**, each with what it does. A key is a letter or a punctuation mark, such as `,` for back. It
+lists only the chords that work on the open page, except the big prompt box chord (Leader then `b`),
+which shows on every page; its label names what it will do ("Big prompt box" or "Normal prompt
+box").
 _Avoid_: which-key, hint popup.
 
 **Copy mode** — a mode of an embedded terminal where keys move a cursor through the session's
