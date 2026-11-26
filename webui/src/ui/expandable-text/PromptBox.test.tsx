@@ -615,6 +615,20 @@ test("an unfocused box is still unfocused after the swap", async () => {
   expect(document.activeElement).not.toBe(field())
 })
 
+test("in vi mode the expand button comes after the editor in DOM order", async () => {
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  expect(view.dom.compareDocumentPosition(expand()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+test("focus on the expand button is not carried into the textarea on swap", async () => {
+  withVi(true, <Live fine />)
+  await inlineView()
+  expand().focus()
+  fireEvent.click(screen.getByText("flip"))
+  expect(document.activeElement).not.toBe(field())
+})
+
 test.each([
   [3, false, "3"],
   [undefined, false, "2"],

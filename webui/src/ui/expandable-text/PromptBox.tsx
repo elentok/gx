@@ -15,7 +15,7 @@ import { useInlineEditor, useSwapCarry } from "./useInlineEditor"
 import { PROMPT_BOX_ATTR } from "./look"
 import { isMac } from "../../platform"
 import { ModeText } from "./ModeText"
-import { TextBox } from "../text-box/TextBox"
+import { TextBox, TextBoxEndSlot } from "../text-box/TextBox"
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
 export function submitOnCmdEnter(e: KeyboardEvent<HTMLTextAreaElement>, submit: () => void) {
@@ -269,34 +269,34 @@ function Field({
       }}
     >
       {showEditor && Editor ? (
-        <Box ref={wrap}>
-          {/* Where TextBox's end slot puts it over the textarea. */}
-          <Box position="absolute" top="1.5" insetEnd="1.5" zIndex="1">
-            {expandButton}
+        <>
+          {/* Focus inside `wrap` is carried to the textarea on a swap, so the button stays out. */}
+          <Box ref={wrap}>
+            <Editor
+              inline={{ rows: effectiveRows, name, disabled, holdMode: !!selection }}
+              onSubmit={onSubmit}
+              label={label}
+              value={value}
+              onChange={onChange}
+              placeholder={placeholder}
+              selection={carry.current?.sel ?? editorSel.current}
+              onSelectionChange={(s) => {
+                // The large editor owns the selection and the menu cursor while it is open.
+                if (selection) return
+                editorSel.current = s
+                menu?.onCursor(s.end)
+              }}
+              onMenuKey={menu?.onKeyDown}
+              caret={selection ? undefined : menu?.pending}
+              onModeChange={setMode}
+              onToggle={disabled ? undefined : open}
+              handle={editorHandle}
+              autoFocus={carry.current?.focus ?? false}
+              viMode
+            />
           </Box>
-          <Editor
-            inline={{ rows: effectiveRows, name, disabled, holdMode: !!selection }}
-            onSubmit={onSubmit}
-            label={label}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            selection={carry.current?.sel ?? editorSel.current}
-            onSelectionChange={(s) => {
-              // The large editor owns the selection and the menu cursor while it is open.
-              if (selection) return
-              editorSel.current = s
-              menu?.onCursor(s.end)
-            }}
-            onMenuKey={menu?.onKeyDown}
-            caret={selection ? undefined : menu?.pending}
-            onModeChange={setMode}
-            onToggle={disabled ? undefined : open}
-            handle={editorHandle}
-            autoFocus={carry.current?.focus ?? false}
-            viMode
-          />
-        </Box>
+          <TextBoxEndSlot prose>{expandButton}</TextBoxEndSlot>
+        </>
       ) : (
         <TextBox
           kind="prose"

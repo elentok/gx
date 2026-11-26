@@ -11,11 +11,13 @@ A text box is any native input or textarea the person types text into. These are
 ## Use `TextBox`
 
 Draw every text box with `TextBox` from `webui/src/ui/text-box/TextBox.tsx`. One component sets the
-attributes, label and focus style, so no page can forget one.
+attributes, label and focus style, so no page can forget one. The iOS reasons are those of the
+attributes and labels below.
 
 `PromptBox` (`webui/src/ui/expandable-text/PromptBox.tsx`) is the box for writing to an agent. Its
 textarea is a `bare` prose `TextBox` with a hidden label. Its frame draws the focus ring, and its
-expand button sits in `endElement`. When it shows the vi editor, no `TextBox` is rendered.
+expand button sits in `endElement`. When it shows the vi editor, no `TextBox` is rendered, and the
+button sits in `TextBoxEndSlot`, after the editor, so Tab reaches the editor first. No iOS reason.
 
 | Prop | What it does |
 | --- | --- |
@@ -37,9 +39,14 @@ expand button sits in `endElement`. When it shows the vi editor, no `TextBox` is
 `autoFocus`, `role`, `minLength`, `list`, event handlers, `data-*` and other ARIA attributes. `rows`
 is for prose.
 
+The limits in the table, such as "credential boxes only", have no iOS reason of their own. The
+sections below give the reasons for the attributes behind them.
+
 The prop types refuse `id`, `type`, `autoCapitalize`, `autoCorrect`, `spellCheck`, `enterKeyHint`,
 `aria-label`, `aria-labelledby`, `data-focus-ring` and style props that are not layout. `TextBox`
-owns these.
+owns these. For the typing help and `enterkeyhint`, see "Kinds". For `aria-label`, see "Labels".
+**Not proven:** that `aria-labelledby` causes the same problem on iOS. `id`, `type`,
+`data-focus-ring` and the style props: no iOS reason.
 
 ## Kinds
 
@@ -56,12 +63,14 @@ Prose renders a textarea. The other kinds render an input.
 
 "Typing help off" means `autocapitalize="off"`, `autocorrect="off"` and `spellcheck="false"`.
 
-Reasons:
+Which kind a box takes has no iOS reason beyond the attributes the kind sets:
 
 - `autocomplete="off"`: saved-value popups cover the page. Only a credential box wants AutoFill.
+  **Not proven** on iOS.
 - Typing help off: queries, paths, codes and passwords must not get a capital first letter, a
-  dictionary rewrite or a spelling underline.
-- `type="search"` and `enterkeyhint="search"`: the phone keyboard shows search keys.
+  dictionary rewrite or a spelling underline. **Not proven:** no device check below covers it.
+- `type="search"` and `enterkeyhint="search"`: the phone keyboard shows search keys. **Not proven:**
+  no device check below covers it.
 
 The setup code is a `line` box with `verbatim`, not a credential box, so that AutoFill and typing
 help are off. **Not proven:** that browsers and password managers leave it alone on the login and
@@ -72,9 +81,12 @@ setup pages. They can ignore `autocomplete="off"` there.
 
 No attribute is known to change the iOS word strip.
 
-Dropdown pickers set `role="combobox"` on their box.
+Dropdown pickers set `role="combobox"` on their box, so a screen reader knows the box opens a list.
+No iOS reason.
 
 ## Looks and sizes
+
+The looks and sizes in both tables have no iOS reason. The one iOS rule here is the 16px text.
 
 | `look` | Draws |
 | --- | --- |
@@ -90,12 +102,15 @@ Dropdown pickers set `role="combobox"` on their box.
 
 - Text is 16px, because iOS Safari zooms into a focused box with smaller text. A `title` box stays at
   20px on touch screens.
-- A textarea takes its height from `rows` or the layout. `size` has no effect on it.
-- `page` is the roomy spacing of a page that is one big textarea. Prose with `look="bare"` only.
+- A textarea takes its height from `rows` or the layout. `size` has no effect on it. No iOS reason.
+- `page` is the roomy spacing of a page that is one big textarea. Prose with `look="bare"` only. No
+  iOS reason.
 - Use `mono` only for the diff file filter, the diff refs and the setup dialog command. No iOS reason.
 - Pass anything drawn inside the end edge, such as a picker caret or an expand button, as
-  `endElement`. `TextBox` places it and reserves the room, so set no padding. Clicks pass through it,
-  except on a button. No iOS reason.
+  `endElement`. `TextBox` places it with `TextBoxEndSlot`, which `TextBox.tsx` exports, and
+  reserves the room, so set no padding. Clicks pass through it, except on a button. A control that is
+  not a `TextBox`, such as the vi editor, uses `TextBoxEndSlot` itself inside a positioned parent;
+  the slot reserves no room. No iOS reason.
 - Style props place the box only: width, margin, flex and grid placement. A prose box also takes
   minimum and maximum height and `resize`. The lists are `layoutKeys` and `textareaKeys` in
   `TextBox.tsx`. No iOS reason.
@@ -110,7 +125,7 @@ Focus styles follow from `look`, `kind` and `size`. No iOS reason.
 
 The ring is in `webui/src/ui/theme.ts`. `webui/src/ui/text-box/look.ts` holds the shared look for
 controls that must look like a text box, such as dropdowns and the vi editor. The gallery cases are
-in `webui/src/gallery/textBoxEntries.tsx`. Add a case there for a new look or size.
+in `webui/src/gallery/textBoxEntries.tsx`. Add a case there for a new look or size. No iOS reason.
 
 ## Labels
 
@@ -140,6 +155,8 @@ case. "Filename" and "Rename" count. Credential boxes are skipped, because they 
 "name" brings AutoFill Contact instead of word completions. The match on longer words is wider than
 what was tested.
 
+How a break is reported has no iOS reason.
+
 - In dev and tests, `TextBox` throws.
 - In a production build, the box renders unchanged. `TextBox` calls `reportBrokenRule` from
   `webui/src/brokenRules.ts` in an effect.
@@ -156,6 +173,8 @@ A settings label comes from the server's registry. `TestNameRuleGuard` in
 its key's last segment where it has no label. A read-only setting is exempt.
 
 ## Lint guard
+
+The guard and its exemptions have no iOS reason of their own: they keep every box on `TextBox`.
 
 `webui/biome-plugins/raw-text-box.grit` fails `pnpm --dir webui run lint` on a raw text box:
 

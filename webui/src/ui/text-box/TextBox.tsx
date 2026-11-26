@@ -192,6 +192,29 @@ function nameRuleBreaks({ kind, label, placeholder, name }: TextBoxProps) {
   )
 }
 
+/** Places its child inside the end edge of a text box. The parent must be positioned; the room under the slot is the caller's to reserve. */
+export function TextBoxEndSlot({ prose, children }: { prose: boolean; children: ReactNode }) {
+  return (
+    <Box
+      position="absolute"
+      insetEnd="1.5"
+      // A multi-line box holds it at the top; an input centers it.
+      top={prose ? "1.5" : "0"}
+      bottom={prose ? undefined : "0"}
+      minW="36px"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      color="text.dim"
+      // A click on a decoration reaches the box under it.
+      pointerEvents="none"
+      css={{ "& button": { pointerEvents: "auto" } }}
+    >
+      {children}
+    </Box>
+  )
+}
+
 export function TextBox(props: TextBoxProps) {
   const breaks = nameRuleBreaks(props)
   if (import.meta.env.DEV && breaks.length > 0) {
@@ -331,25 +354,7 @@ export function TextBox(props: TextBoxProps) {
             }}
           />
         )}
-        {endElement !== undefined && (
-          <Box
-            position="absolute"
-            insetEnd="1.5"
-            // A textarea holds it at the top; an input centers it.
-            top={prose ? "1.5" : "0"}
-            bottom={prose ? undefined : "0"}
-            minW="36px"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            color="text.dim"
-            // A click on a decoration reaches the box under it.
-            pointerEvents="none"
-            css={{ "& button": { pointerEvents: "auto" } }}
-          >
-            {endElement}
-          </Box>
-        )}
+        {endElement !== undefined && <TextBoxEndSlot prose={prose}>{endElement}</TextBoxEndSlot>}
       </Box>
       {hint && (
         <Text id={hintId} fontSize="xs" color="text.dim">
