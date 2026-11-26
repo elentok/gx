@@ -160,6 +160,14 @@ test("208. Task list", async ({ page, start }) => {
   await go(page, "#/d/demo:design-epic")
   await purple(headerRing)
   await turn.controlClaude(workerConv, { action: "finish" })
+  // The turn is over and its subagent still runs: rows alone, with no header and no moving border.
+  await go(page, `#/agents/${worker.id}`)
+  const waiting = page.locator("[data-mock-part='card']")
+  await expect(rows(waiting).first()).toBeVisible()
+  await expect(waiting.getByRole("status")).toHaveCount(0)
+  await expect(
+    page.locator("[data-mock-part='card'][data-live], [data-mock-part='card'] [data-live]"),
+  ).toHaveCount(0)
   appendFileSync(
     turn.transcripts["subagent-with-inner-task"],
     `${JSON.stringify({
@@ -170,6 +178,8 @@ test("208. Task list", async ({ page, start }) => {
         "<task-notification>\n<task-id>a1ner0001</task-id>\n<status>completed</status>\n<summary>Agent done</summary>\n<usage>\n<subagent_tokens>900</subagent_tokens>\n<tool_uses>1</tool_uses>\n</usage>\n</task-notification>",
     })}\n`,
   )
+  await expect(waiting).toHaveCount(0)
+  await go(page, "#/d/demo:design-epic")
   await grey(rowRing)
   await stopped(headerRing)
   await go(page, "#/epics")
@@ -207,19 +217,32 @@ test("208. Task list", async ({ page, start }) => {
   await expect(elapsed(page, "make build")).toBeVisible()
   await expect(elapsed(page, "make build")).toHaveText(/\S/)
 
-  // Old Codex: no list, the Working row keeps its in-flight text.
+  // Old Codex: the card's header names the open call and there are no rows. The seeded fake Codex reads Idle in
+  // the page, so a prompt starts a turn, which it holds until a finish control.
   const old = await start("bg-progress", { shape: "old-codex" })
   const oc = (await sessions(old)).find((s) => s.harness === "codex")!
   await go(page, `#/agents/${oc.id}`)
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
+  await old.cli("agents", "prompt", oc.id, "one more")
+  const oldCard = page.locator("[data-mock-part='card']")
+  await expect(oldCard.getByRole("status")).toContainText("Working")
+  // The new turn drops the seeded open call, so the rollout gets another one, after the prompt's own line.
+  await expect(page.getByText("one more", { exact: true })).toBeVisible()
+  appendFileSync(
+    old.transcripts["old-codex"],
+    `${JSON.stringify({
+      type: "response_item",
+      timestamp: new Date().toISOString(),
+      payload: {
+        type: "function_call",
+        name: "exec_command",
+        call_id: "old2",
+        arguments: JSON.stringify({ cmd: "make old" }),
+      },
+    })}\n`,
+  )
+  await expect(oldCard.getByRole("status")).toContainText("make old")
   await expect(list(page)).toHaveCount(0)
-  // The fake Codex reads Idle in the page, so no Working row renders; the chat read still labels the open call.
-  await expect
-    .poll(async () => {
-      const chat = JSON.parse(await old.cli("agents", "chat", oc.id, "--json"))
-      return chat.current?.label
-    })
-    .toBe("make old")
 })
 
 const TICKETS = "Explore tickets package"
@@ -304,4 +327,52 @@ test("217. Working card states", async ({ page, start }) => {
   await expect(page.getByText("Still waiting on the explorer.")).toBeVisible()
   await expect(row.locator(":scope > *")).toHaveCount(1)
   await expect(row).not.toContainText(READ)
+})
+
+// Why a flow: Codex rollouts and Claude subagent files reach the card through the server, and a file path is
+// shortened by real layout. WorkingCard.test.tsx (vitest) renders given props in jsdom and sees neither.
+test("218. Working card shapes", async ({ page, start }) => {
+  const open = async (shape: string) => {
+    const fixture = await start("subagents", { shape })
+    const { sessionId, calls } = fixture.subagents!
+    await go(page, `#/agents/${sessionId}`)
+    return { fixture, sessionId, calls, working: page.locator("[data-mock-part='card']") }
+  }
+
+  // Codex child (bgtx.CodexSubRunningCmd and CodexSubInheritedCmd): its own open call, none it inherited.
+  const codex = await open("codex-running-call")
+  await expect(rows(codex.working)).toHaveCount(1)
+  await expect(codex.working).toContainText("go vet ./...")
+  await expect(codex.working).not.toContainText("git log --oneline")
+  await expect(codex.working.getByRole("status")).toHaveCount(0)
+  const chat = JSON.parse(await codex.fixture.cli("agents", "chat", codex.sessionId, "--json"))
+  expect(chat.tasks.map((t: { current_call?: string }) => t.current_call)).toEqual(["go vet ./..."])
+
+  // A subagent started with a string flag (bgtx.SubStringDesc, SubStringShellDesc) beside a background shell.
+  const str = await open("string-background")
+  await expect(rows(str.working)).toHaveCount(2)
+  await expect(
+    str.working.getByRole("link", { name: "Audit the string flags ↗", exact: true }),
+  ).toHaveAttribute("href", `#/agents/${str.sessionId}/subagents/${str.calls.string}`)
+  await expect(rowOf(str.working, "Lint in the background")).toBeVisible()
+
+  // File calls (bgtx.SubReadDesc and SubEditDesc), the older one first.
+  const { working } = await open("file-call")
+  const [read, edit] = [rows(working).nth(0), rows(working).nth(1)]
+  await expect(read).toContainText("Read the task rows")
+  await expect(edit).toContainText("Edit the shared notes")
+  // The server cuts the long path's start; the browser may cut more of the middle part, never the ends.
+  for (const width of [920, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await expect(read.locator(":scope > *").nth(1)).toHaveText("Read server/sessions/chat/tasks.go")
+    await edit.scrollIntoViewIfNeeded()
+    for (const part of ["call-tool", "call-file"])
+      await expect(edit.locator(`[data-part='${part}']`)).toBeInViewport({ ratio: 0.99 })
+    await expect(edit.locator("[data-part='call-tool']")).toHaveText(/^Edit /)
+    await expect(edit.locator("[data-part='call-file']")).toHaveText("/current-call-labels.md")
+    await expect(edit.locator(":scope > *").nth(1)).toHaveText(
+      "Edit …/decisions/server/sessions/current-call-labels.md",
+    )
+    await noSideScroll(page)
+  }
 })

@@ -111,7 +111,10 @@ import (
 //
 // Working card states flow (+1): fixture transcripts to server to page, including a result appended to a subagent file;
 // webui/src/design/WorkingCard.test.tsx renders given props and cannot see that.
-const maxFlows = 174
+//
+// Working card shapes flow (+1): Codex rollouts and Claude fixture files through the server, and real path shortening
+// at two widths; webui/src/design/WorkingCard.test.tsx renders given props in jsdom and sees neither.
+const maxFlows = 175
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
