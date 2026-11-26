@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Button } from "../ui/button/Button"
 import { TextBox } from "../ui/text-box/TextBox"
 import { AuthCard } from "./AuthCard"
-import { ErrorLine, formValues } from "./AuthFields"
+import { CodeBox, ErrorLine, formValues, PasswordBox } from "./AuthFields"
 import type { AuthResult, AuthState } from "./authState"
 import { AddAuthenticator } from "./AddAuthenticator"
 import { TrustHelp } from "./cert"
@@ -81,30 +81,15 @@ export function LoginCard({
             />
           </Box>
         )}
-        <Box data-mock-part="password">
-          <TextBox
-            kind="credential"
-            autoComplete="current-password"
-            size="lg"
-            label="Password"
-            name="password"
-            defaultValue={password}
-            autoFocus
-          />
-        </Box>
-        {totpOn && (
-          <Box data-mock-part="code">
-            <TextBox
-              kind="credential"
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              size="lg"
-              label="Code from your authenticator app"
-              name="totp_code"
-              placeholder="123456"
-            />
-          </Box>
-        )}
+        <PasswordBox
+          part="password"
+          autoComplete="current-password"
+          label="Password"
+          name="password"
+          defaultValue={password}
+          autoFocus
+        />
+        {totpOn && <CodeBox label="Code from your authenticator app" />}
         <Button
           type="submit"
           data-mock-part="submit"

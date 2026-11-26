@@ -4,7 +4,7 @@ import { Button } from "../ui/button/Button"
 import { ProgressBar } from "../ui/progress-bar/ProgressBar"
 import { TextBox } from "../ui/text-box/TextBox"
 import { AuthCard } from "./AuthCard"
-import { ErrorLine, formValues } from "./AuthFields"
+import { ErrorLine, formValues, PasswordBox } from "./AuthFields"
 import type { AuthResult, AuthState } from "./authState"
 import { AddAuthenticator } from "./AddAuthenticator"
 import { TrustHelp } from "./cert"
@@ -101,26 +101,20 @@ export function SetupPasswordCard({ totpOn, error, onSubmit }: SetupPasswordCard
           Choose a password
         </Heading>
         {error && <ErrorLine>{error}</ErrorLine>}
-        <Box data-mock-part="password">
-          <TextBox
-            kind="credential"
-            autoComplete="new-password"
-            size="lg"
-            label="Password"
-            name="password"
-            hint={PASSWORD_HINT}
-            autoFocus
-          />
-        </Box>
-        <Box data-mock-part="password-again">
-          <TextBox
-            kind="credential"
-            autoComplete="new-password"
-            size="lg"
-            label="Password again"
-            name="again"
-          />
-        </Box>
+        <PasswordBox
+          part="password"
+          autoComplete="new-password"
+          label="Password"
+          name="password"
+          hint={PASSWORD_HINT}
+          autoFocus
+        />
+        <PasswordBox
+          part="password-again"
+          autoComplete="new-password"
+          label="Password again"
+          name="again"
+        />
         <Button type="submit" data-mock-part="submit">
           {totpOn ? "Continue" : "Finish setup"}
         </Button>

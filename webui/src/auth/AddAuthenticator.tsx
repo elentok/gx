@@ -1,8 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import qrcode from "qrcode-generator"
 import { useLayoutEffect, useRef } from "react"
-import { TextBox } from "../ui/text-box/TextBox"
-import { ErrorLine } from "./AuthFields"
+import { CodeBox, ErrorLine } from "./AuthFields"
 
 function qrSvg(uri: string): string {
   const qr = qrcode(0, "M")
@@ -67,19 +66,7 @@ export function AddAuthenticator({
         Can't scan? Enter this key: <chakra.code fontFamily="inherit">{spaced(secret)}</chakra.code>
       </Text>
       {error && <ErrorLine>{error}</ErrorLine>}
-      <Box data-mock-part="code">
-        <TextBox
-          kind="credential"
-          autoComplete="one-time-code"
-          inputMode="numeric"
-          size="lg"
-          label={codeLabel}
-          name="totp_code"
-          invalid={!!error}
-          placeholder="123456"
-          autoFocus
-        />
-      </Box>
+      <CodeBox label={codeLabel} invalid={!!error} autoFocus />
     </>
   )
 }
