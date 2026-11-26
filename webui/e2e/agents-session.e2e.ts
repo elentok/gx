@@ -188,13 +188,18 @@ test("75. Tools in flight and Interrupt", async ({ page, start }) => {
   await expect(titleHeading(page)).toContainText("busy-renamed")
   await expect.poll(() => toolsFixture.input(toolsConv)).toContain("/rename busy-renamed")
   await expect(row).toHaveText("Working")
+  // A session whose only call is a file tool: the header shows the tool and the path.
+  await go(page, `#/agents/${tools[3].id}`)
+  await expect(row).toHaveText("Working · Read server/sessions/chat/read.go")
   await go(page, `#/agents/${tools[1].id}`)
   await expect(row).toContainText("searching: InFlightTool")
   const more = row.getByRole("button", { name: "(+1 more)" })
   await expect(more).toBeVisible()
   const popover = page.getByLabel("Other tools in flight")
   await more.hover()
-  await expect(popover.getByRole("listitem")).toHaveText([/tool\s*Read/])
+  await expect(popover.getByRole("listitem")).toHaveText([
+    /tool\s*Read server\/sessions\/chat\/read\.go/,
+  ])
   await page.mouse.move(0, 0)
   await expect(popover).toHaveCount(0)
   // Tab to the button opens it; Escape closes it.

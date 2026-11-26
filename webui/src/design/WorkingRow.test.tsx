@@ -37,6 +37,23 @@ test("nothing in flight reads Working", () => {
   expect(row()).toBe("Working")
 })
 
+test("a file label keeps its tool and file name apart from the part that may shorten", async () => {
+  const path = "server/sessions/chat/read.go"
+  const call = { kind: "other", label: `Read ${path}`, path }
+  renderThemed(<WorkingRow current={call} others={[call]} />)
+  const parts = (within: Element) =>
+    ["call-tool", "call-dir", "call-file"].map(
+      (part) => within.querySelector(`[data-part='${part}']`)?.textContent,
+    )
+  const split = ["Read ", "server/sessions/chat", "/read.go"]
+  expect(row()).toBe(`Working · Read ${path} (+1 more)`)
+  expect(parts(screen.getByRole("status"))).toEqual(split)
+  fireEvent.click(screen.getByRole("button", { name: "(+1 more)" }))
+  const item = await screen.findByRole("listitem")
+  expect(item.textContent).toBe(`toolRead ${path}`)
+  expect(parts(item)).toEqual(split)
+})
+
 test("the count button opens the list of the others on click and on focus, and Escape closes it", async () => {
   renderThemed(
     <WorkingRow

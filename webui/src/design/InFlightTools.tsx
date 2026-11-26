@@ -2,6 +2,7 @@ import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import type { SessionInFlightTool } from "../generated/server"
 import { withKeys } from "../uniqueKeys"
+import { CallLabel } from "./CallLabel"
 
 const VERBS: Record<string, string> = {
   shell: "running shell: ",
@@ -26,10 +27,14 @@ export function InFlightTools({
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <Box as="span" display="flex" minW="0" gap="1">
-      <Text as="span" minW="0" truncate>
-        {`${VERBS[current.kind] ?? ""}${current.label}`}
-      </Text>
+    // With a path, no minW 0: the call shrinks before the text in front of it, down to its tool and file name.
+    <Box
+      as="span"
+      display="flex"
+      gap="1"
+      {...(current.path ? { flexShrink: 1000 } : { minW: "0" })}
+    >
+      <CallLabel label={`${VERBS[current.kind] ?? ""}${current.label}`} path={current.path} />
       {others.length > 0 && (
         <>
           {" "}
@@ -79,9 +84,7 @@ export function InFlightTools({
                         <Text as="span" color="text.dim">
                           {KIND_WORDS[t.kind] ?? t.kind}
                         </Text>
-                        <Text as="span" overflowWrap="anywhere">
-                          {t.label}
-                        </Text>
+                        <CallLabel label={t.label} path={t.path} wrap />
                       </Box>
                     ))}
                   </Box>

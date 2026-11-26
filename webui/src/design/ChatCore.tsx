@@ -368,7 +368,8 @@ export function WorkingRow({
     >
       <ChakraSpinner size="sm" flexShrink="0" />
       {/* A flex row with minW 0, so a long step, title or tool label ends in an ellipsis instead of widening the page. */}
-      <Text as="span" display="flex" minW="0" flex="1">
+      {/* overflow hidden: a file name wider than the whole row is cut here too. */}
+      <Text as="span" display="flex" minW="0" flex="1" overflow="hidden">
         <Text as="span" minW="0" truncate whiteSpace="pre">
           Working
           {step && `: ${step}`}

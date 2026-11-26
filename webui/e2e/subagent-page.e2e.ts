@@ -137,6 +137,32 @@ test("216. Subagent page", async ({ page, start }) => {
   await expect(page.getByText(/ › /).first()).toContainText(owner.name || owner.id)
   await expect(page.getByRole("link", { name: NESTED, exact: true })).toBeVisible()
 
+  // 8. A current file call keeps its tool and file name; on a phone the long path is cut.
+  const files = await start("subagents", { shape: "file-call" })
+  const fs = files.subagents!
+  const working = page.getByRole("status").filter({ hasText: /^Working/ })
+  const calls = [
+    [fs.calls.read, "Read server/sessions/chat/tasks.go"],
+    [fs.calls.edit, "Edit …/decisions/server/sessions/current-call-labels.md"],
+  ]
+  for (const width of [920, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    for (const [call, label] of calls) {
+      await go(page, `#/agents/${fs.sessionId}/subagents/${call}`)
+      await expect(page).toHaveURL(new RegExp(`/subagents/${call}$`))
+      await expect(working).toHaveText(`Working · ${label}`)
+      if (width !== 390) continue
+      for (const part of ["call-tool", "call-file"])
+        await expect(working.locator(`[data-part='${part}']`)).toBeInViewport({ ratio: 0.99 })
+      await noSideScroll(page)
+    }
+  }
+  const dir = working.locator("[data-part='call-dir']")
+  await expect(dir).toBeVisible()
+  await expect.poll(() => dir.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true)
+  await page.screenshot({ path: test.info().outputPath("file-call-390.png") })
+  await page.setViewportSize({ width: 1280, height: 800 })
+
   // 5. Codex child: its nested call has a line and no link.
   const codex = await start("subagents", { shape: "codex-nested" })
   const cs = codex.subagents!
