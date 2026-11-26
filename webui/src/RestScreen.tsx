@@ -1,8 +1,9 @@
-import { Box, Button, Input, Text } from "@chakra-ui/react"
+import { Box, Button, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { createPortal } from "react-dom"
 import { RestKindBedtime, RestKindBreak } from "./generated/server"
 import { isUnlockSentence, postRestUnlock, useRestState, type RestState } from "./rest"
+import { TextBox } from "./ui/text-box/TextBox"
 
 // Above the modal token (1400) and the toast layer, so no sheet or modal shows over it.
 const REST_Z_INDEX = 2000
@@ -229,19 +230,14 @@ function UnlockSection({
           <Text color={DIM} fontSize="13px" m="0 0 6px">
             Type exactly: <i>I'm [anything] and I'm addicted to AI</i>
           </Text>
-          <Input
-            aria-label="Unlock sentence"
+          <TextBox
+            kind="line"
+            label="Unlock sentence"
+            hideLabel
+            name="unlock-sentence"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => setText(e.currentTarget.value)}
             autoFocus
-            bg="rest.input.bg"
-            borderColor="rest.input.border"
-            borderRadius="6px"
-            color={FG}
-            h="auto"
-            p="8px 10px"
-            fontSize="inherit"
-            textAlign="left"
           />
           {refusal && (
             <Text role="alert" color="rest.error" fontSize="12px" m="6px 0 0">

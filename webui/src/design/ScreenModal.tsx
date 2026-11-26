@@ -1,9 +1,10 @@
-import { Box, chakra, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
 import { withKeys } from "../uniqueKeys"
 import { Modal } from "../ui/modal/Modal"
+import { TextBox } from "../ui/text-box/TextBox"
 import { refusalText, useWrite } from "../useWrite"
 import {
   OWNER_TEXT,
@@ -275,18 +276,18 @@ export function ScreenModal({
               Type text
             </Text>
             <Box display="flex" gap="2">
-              <chakra.input
-                aria-label="Text to type"
+              <TextBox
+                kind="line"
+                verbatim
+                size="lg"
+                label="Text to type"
+                hideLabel
+                name="screen-text"
                 placeholder="Text is typed as is, without Enter"
                 value={text}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)}
+                onChange={(e) => setText(e.currentTarget.value)}
                 flex="1"
                 minW="0"
-                h="44px"
-                px="3"
-                borderWidth="1px"
-                borderRadius="8px"
-                bg="surface.raised"
               />
               <Button
                 type="submit"

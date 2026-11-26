@@ -140,7 +140,7 @@ export const themeConfig = defineConfig({
           dim: { value: "#8b98a5" },
           accent: { value: "#4da3ff" },
           error: { value: "#ff7b72" },
-          input: { bg: { value: "#0d1117" }, border: { value: "#30363d" } },
+          input: { border: { value: "#30363d" } },
           unlock: {
             bg: { value: "#b4472f" },
             fg: { value: "#ffffff" },
