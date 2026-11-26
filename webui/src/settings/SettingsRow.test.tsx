@@ -524,6 +524,16 @@ describe("SettingsRow", () => {
       expect(getComputedStyle(link).flexShrink).toBe("0")
     })
 
+    // A row of chips that cannot wrap widens the whole card past a phone screen.
+    it("the chips wrap beside the label, apart from the reset link", () => {
+      const v = inProject(cap({ set: true, value: 2, risky: true, restart: true }))
+      const group = v.getByText("Max live agents for this project", { selector: "p" })
+        .parentElement as HTMLElement
+      expect(group.contains(v.getByText("Needs restart"))).toBe(true)
+      expect(group.contains(v.getByRole("button", { name: "Remove cap" }))).toBe(false)
+      expect(getComputedStyle(group).flexWrap).toBe("wrap")
+    })
+
     it("an unset key shows the global value; Override writes that value", async () => {
       const v = inProject(per({}))
       expect(inherits(v)).toBe("Uses the global value 3")

@@ -450,26 +450,27 @@ export function SettingsRow({
       gap="1.5"
       _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}
     >
-      {/* No wrap: a long label wraps itself, so the reset link stays top-right on this row. */}
+      {/* No wrap: the label and chips wrap in their own group, so the reset link stays top-right. */}
       <Box data-mock-part="title-row" display="flex" gap="2" alignItems="center">
-        <Text fontWeight="600" minW="0">
-          <Highlight text={entryLabel(entry)} query={highlight} />
-        </Text>
-        {entry.set && entry.type !== "secret" && <ChangedDot />}
-        {entry.risky && <Chip tone="waiting">Careful</Chip>}
-        {entry.restart && (
-          <Box data-mock-part="restart-badge">
-            <Chip tone="waiting">
-              {restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}
-            </Chip>
-          </Box>
-        )}
-        {overridable && entry.set && (
-          <Box data-mock-part="overridden-chip">
-            <Chip tone="running">{entry.override === "add" ? "Added" : "Overridden"}</Chip>
-          </Box>
-        )}
-        <Box flex="1" />
+        <Box display="flex" flexWrap="wrap" gap="2" alignItems="center" flex="1" minW="0">
+          <Text fontWeight="600" minW="0">
+            <Highlight text={entryLabel(entry)} query={highlight} />
+          </Text>
+          {entry.set && entry.type !== "secret" && <ChangedDot />}
+          {entry.risky && <Chip tone="waiting">Careful</Chip>}
+          {entry.restart && (
+            <Box data-mock-part="restart-badge">
+              <Chip tone="waiting">
+                {restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}
+              </Chip>
+            </Box>
+          )}
+          {overridable && entry.set && (
+            <Box data-mock-part="overridden-chip">
+              <Chip tone="running">{entry.override === "add" ? "Added" : "Overridden"}</Chip>
+            </Box>
+          )}
+        </Box>
         {entry.set && entry.type !== "secret" && (
           <chakra.button
             type="button"
