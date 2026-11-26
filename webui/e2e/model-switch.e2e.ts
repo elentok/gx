@@ -74,7 +74,7 @@ test("205. Model switch", async ({ page, start }) => {
   // Stories 1, 3, 8 to 12: the chord opens the picker with the filter focused. It lists only Codex's own
   // models, grouped by family, newest first; the outdated ones are dimmed, the unparseable id is last in Other.
   let dialog = await openPicker(page, codex, 5)
-  const filter = dialog.getByRole("textbox", nav("Filter models"))
+  const filter = dialog.getByRole("searchbox", nav("Filter models"))
   await expect(filter).toBeFocused()
   const group = dialog.getByRole("radiogroup", nav("Model"))
   const rows = group.getByRole("radio")

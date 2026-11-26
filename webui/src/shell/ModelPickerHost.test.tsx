@@ -127,7 +127,7 @@ describe("the list", () => {
 describe("filter and focus", () => {
   test("opens with the filter focused and typing filters fuzzily", async () => {
     open()
-    const filter = (await screen.findByPlaceholderText("Filter models…")) as HTMLInputElement
+    const filter = await screen.findByRole("searchbox", { name: "Filter models" })
     expect(document.activeElement).toBe(filter)
     fireEvent.change(filter, { target: { value: "lna" } })
     expect(names()).toEqual([expect.stringContaining("GPT-6-Luna")])

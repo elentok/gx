@@ -1,4 +1,4 @@
-import { Box, Input, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
 import {
@@ -12,6 +12,7 @@ import { titleHref } from "../epics/cardLinks"
 import { isLive, RING_KIND, ringArc, ringProgress, ringTone } from "../epics/ring"
 import { Button } from "../ui/button/Button"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
+import { TextBox } from "../ui/text-box/TextBox"
 import { fuzzyScore } from "./fuzzy"
 
 /**
@@ -254,20 +255,21 @@ export function Menu({
             })}
     >
       <Box display="flex" alignItems="center" gap="2">
-        <Input
+        <TextBox
+          kind="search"
+          label={label}
+          hideLabel
+          name="menu-query"
           autoFocus
-          type="search"
-          aria-label={label}
           placeholder={placeholder}
-          h="40px"
-          fontSize="16px"
+          flex="1"
           value={query}
           role="combobox"
           aria-expanded
           aria-controls="jump-list"
           aria-activedescendant={activeId}
           onChange={(e) => {
-            setQuery(e.target.value)
+            setQuery(e.currentTarget.value)
             setCursor(0)
           }}
           onKeyDown={onKeyDown}

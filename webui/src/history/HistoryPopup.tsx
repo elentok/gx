@@ -1,9 +1,10 @@
-import { Box, Input, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState } from "react"
 import { LuImage, LuSearch } from "react-icons/lu"
 import type { DraftHistoryEntry } from "../generated/ops"
 import { Button } from "../ui/button/Button"
 import { BottomSheet } from "../ui/modal/BottomSheet"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useWide } from "../useWide"
 import type { HistoryList } from "./api"
 import { historyTime } from "./historyTime"
@@ -207,25 +208,22 @@ export function HistoryPopup({
         <Box color="text.faint" display="inline-flex">
           <LuSearch size={16} aria-hidden />
         </Box>
-        <Input
+        <TextBox
+          kind="search"
+          look="bare"
+          label={placeholder}
+          hideLabel
+          name="history-filter"
           autoFocus
-          type="search"
           role="combobox"
-          aria-label={placeholder}
           aria-expanded
           aria-controls="history-list"
           aria-activedescendant={activeId}
           placeholder={placeholder}
+          flex="1"
           value={filter}
-          variant="flushed"
-          borderWidth="0"
-          px="0"
-          h="auto"
-          fontSize="16px"
-          color="text"
-          _placeholder={{ color: "text.faint" }}
           onChange={(e) => {
-            setFilter(e.target.value)
+            setFilter(e.currentTarget.value)
             setCursor(wide ? 0 : -1)
           }}
           onKeyDown={onKeyDown}

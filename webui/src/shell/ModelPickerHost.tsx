@@ -8,6 +8,7 @@ import type { SessionInfo, SessionModelsResponse } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
+import { TextBox } from "../ui/text-box/TextBox"
 import { refusalText, useWrite } from "../useWrite"
 import { buildGroups, effortFor, filterGroups } from "./modelPickerList"
 import {
@@ -178,29 +179,18 @@ function ModelPicker({
           {blocked ? "" : " · this chat only"}
         </Text>
       </chakra.div>
-      <chakra.input
-        aria-label="Filter models"
+      <TextBox
+        kind="search"
+        label="Filter models"
+        hideLabel
+        name="model-filter"
         placeholder="Filter models…"
-        autoComplete="off"
-        spellCheck={false}
         ref={focusFirst}
         disabled={blocked}
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        fontSize="16px"
-        color="text"
-        bg="surface"
-        borderWidth="1px"
-        borderColor="blue.500"
-        borderRadius="8px"
-        h="40px"
+        onChange={(e) => setQuery(e.currentTarget.value)}
         mx="3.5"
         mt="2.5"
-        px="3"
-        // The blue border is the focus mark, as in the mock; the global ring would double it.
-        data-focus-ring="none"
-        _placeholder={{ color: "text.faint" }}
-        _disabled={{ borderColor: "border", opacity: 0.5 }}
       />
       {note && (
         <Text
