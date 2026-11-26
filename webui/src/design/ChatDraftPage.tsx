@@ -21,6 +21,7 @@ import { ChatDraftIcon } from "../shell/SidebarRows"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import { submitOnCmdEnter } from "../ui/expandable-text/PromptBox"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useReadyWhen } from "../useReady"
 import { useViMode } from "../vimode"
 import { realChatDrafts, type ChatDraftsClient } from "./chatDrafts"
@@ -33,7 +34,6 @@ import { DraftSlots, useDraftImages } from "./useDraftImages"
 import { DraftBanner } from "./DraftBanner"
 import { DraftFooter } from "./DraftFooter"
 import { useDraftMenu } from "./useDraftMenu"
-import { field } from "./DraftHeader"
 import { SaveIndicator } from "./SaveIndicator"
 import { useChatDraftAutosave } from "./useChatDraftAutosave"
 import { CREATING_STATE, REMOVED_NOTE, useLeaveGone } from "./useDraftLifecycle"
@@ -228,31 +228,24 @@ function ChatDraftForm({
 
   return (
     <DetailPage fill title={{ kind: "Chat draft", name: facts.label }}>
-      {/* Not a <form>: with a "Name" field in a form, iOS shows AutoFill Contact over the brief's keyboard. */}
+      {/* Not a <form>: nothing is submitted, Start calls `startNow`. */}
       <Box ref={formRef} flex="1" minH="0" display="flex" flexDirection="column" overflow="hidden">
         <Box display="flex" alignItems="center" gap="2" pt="3" flexShrink="0">
           <MascotToggle />
           <ChatDraftIcon />
-          <chakra.input
+          <TextBox
+            kind="line"
+            look="bare"
+            size="title"
+            label="Title"
+            hideLabel
+            name="chat-title"
             ref={titleInput}
-            aria-label="Name"
-            autoComplete="off"
-            spellCheck={false}
             placeholder="Untitled chat"
             value={settings.name}
-            onChange={(e) => editSettings({ name: e.target.value })}
+            onChange={(e) => editSettings({ name: e.currentTarget.value })}
             flex="1"
             minW="0"
-            h="36px"
-            px="1"
-            bg="transparent"
-            color="text"
-            fontSize="lg"
-            fontWeight="600"
-            borderRadius="6px"
-            textOverflow="ellipsis"
-            _placeholder={{ color: "text.dim" }}
-            _focus={{ bg: "surface.raised", outline: "none", textOverflow: "clip" }}
           />
           <chakra.button
             type="button"
@@ -322,24 +315,19 @@ function ChatDraftForm({
               </Suspense>
             </Box>
           ) : (
-            <chakra.textarea
-              aria-label="Brief"
+            <TextBox
+              kind="prose"
+              look="bare"
+              page
+              label="Brief"
+              hideLabel
               name="chat-brief"
-              autoComplete="off"
-              data-focus-ring="none"
-              {...field}
-              borderWidth="0"
-              bg="transparent"
               flex="1"
               minH="0"
               resize="none"
-              px="4"
-              py="3"
-              lineHeight="1.6"
-              _focus={{ outline: "none" }}
               placeholder={PLACEHOLDER}
               value={brief}
-              onChange={(e) => edit(e.target.value)}
+              onChange={(e) => edit(e.currentTarget.value)}
               onKeyDown={(e) => submitOnCmdEnter(e, startNow)}
             />
           )}

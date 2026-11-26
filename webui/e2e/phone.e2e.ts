@@ -310,7 +310,7 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   }[]
   await page.evaluate((hash) => (location.hash = hash), `#/chat-drafts/${chatDraft!.id}`)
   // The chat draft's name field is its heading.
-  await expectMoreAtRowEnd(page, page.getByRole("textbox", nav("Name")))
+  await expectMoreAtRowEnd(page, page.getByRole("textbox", nav("Title")))
 
   // A third start on `bulk-actions`: an archived epic's page.
   const bulkFx = await start("bulk-actions")

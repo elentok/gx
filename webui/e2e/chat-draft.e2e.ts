@@ -45,12 +45,12 @@ test("209. Chat draft page", async ({ page, start }) => {
   await expect(d.brief).toHaveValue("Brief of the Claude draft")
   await expect(d.start).toBeVisible()
   await expect(d.remove).toBeVisible()
-  // The ⋯ is the far-right control of the title row, right of the Name field, and lists Rename, Move to workspace, Remove.
+  // The ⋯ is the far-right control of the title row, right of the Title field, and lists Rename, Move to workspace, Remove.
   // The sidebar rows have their own ⋯ buttons; the page's comes last in the document.
   const more = page.getByRole("button", nav("More actions")).last()
-  const nameBox = (await page.getByRole("textbox", nav("Name")).boundingBox())!
+  const titleBox = (await page.getByRole("textbox", nav("Title")).boundingBox())!
   const moreBox = (await more.boundingBox())!
-  expect(moreBox.x).toBeGreaterThan(nameBox.x + nameBox.width - 1)
+  expect(moreBox.x).toBeGreaterThan(titleBox.x + titleBox.width - 1)
   await more.click()
   await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
   await closeMenus()

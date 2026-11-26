@@ -285,14 +285,15 @@ test("the settings and the brief render and Start is enabled", async () => {
   expect(control("Harness").value).toBe("claude")
   expect(control("Model").value).toBe("opus")
   expect(control("Effort").value).toBe("high")
-  expect(control("Name").value).toBe("split-auth")
+  expect(screen.getByRole("textbox", { name: "Title" })).toBe(control("Title"))
+  expect(control("Title").value).toBe("split-auth")
   expect(brief().value).toBe("Split the auth work out.")
   expect(startBlocked()).toBe(false)
 })
 
-test("a long Name ends in an ellipsis instead of a hard clip", async () => {
+test("a long Title ends in an ellipsis instead of a hard clip", async () => {
   await mountOpen(fakeDrafts())
-  expect(getComputedStyle(control("Name")).textOverflow).toBe("ellipsis")
+  expect(getComputedStyle(control("Title")).textOverflow).toBe("ellipsis")
 })
 
 test("only tiers with a resolved model are offered as models", async () => {
@@ -344,12 +345,12 @@ test.each([
   ["Harness", "codex", { harness: "codex" }],
   ["Model", "", { model: "" }],
   ["Effort", "max", { effort: "max" }],
-  ["Name", "renamed", { name: "renamed" }],
+  ["Title", "renamed", { name: "renamed" }],
 ])("changing %s saves once with the revision and only that field", async (label, value, body) => {
   vi.useFakeTimers()
   const fake = fakeDrafts()
   await mount(fake)
-  if (label !== "Name") await openSettings()
+  if (label !== "Title") await openSettings()
   fireEvent.change(control(label), { target: { value } })
   await wait(800)
   expect(fake.save).toHaveBeenCalledTimes(1)
@@ -423,8 +424,8 @@ test("the title is the name: editing it saves the name", async () => {
   vi.useFakeTimers()
   const fake = fakeDrafts({ name: "" })
   await mount(fake)
-  expect((control("Name") as HTMLInputElement).placeholder).toBe("Untitled chat")
-  fireEvent.change(control("Name"), { target: { value: "auth" } })
+  expect((control("Title") as HTMLInputElement).placeholder).toBe("Untitled chat")
+  fireEvent.change(control("Title"), { target: { value: "auth" } })
   await wait(800)
   expect(fake.save).toHaveBeenCalledWith({
     id: "c1",
@@ -647,11 +648,11 @@ test("a chat draft with an image and no brief asks before Remove", async () => {
   expect(fake.remove).not.toHaveBeenCalled()
 })
 
-test("Rename from the ⋯ focuses the Name field", async () => {
+test("Rename from the ⋯ focuses the Title field", async () => {
   await mount(fakeDrafts())
   fireEvent.click(screen.getByRole("button", { name: "More actions" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Rename" }))
-  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Name")))
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Title")))
 })
 
 test("a draft that is gone goes to the Epics page with the note", async () => {
@@ -779,9 +780,10 @@ test("on a wide screen the settings are one pill too, and the paperclip is in th
   await openSettings()
   for (const name of ["Harness", "Model", "Effort"]) expect(control(name)).toBeTruthy()
   const attach = screen.getByRole("button", { name: "Add image" })
-  expect(control("Name").parentElement?.parentElement?.lastElementChild?.contains(attach)).toBe(
-    true,
-  )
+  const footer = screen.getByRole("button", { name: "Start chat" }).parentElement
+  expect(footer?.contains(attach)).toBe(true)
+  expect(footer?.contains(control("Title"))).toBe(false)
+  expect(footer?.parentElement?.lastElementChild).toBe(footer)
 })
 
 test("on a phone one pill sums up the settings, and its sheet changes them", async () => {
@@ -883,7 +885,7 @@ describe("History", () => {
     await act(async () => void fireEvent.click(restore()))
     expect(pickHistory).toHaveBeenCalledWith({ entry_id: "e1", draft_id: "c1", revision: 3 })
     expect(brief().value).toBe("Restored brief")
-    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe(
+    expect((screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement).value).toBe(
       "restored-name",
     )
     expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(1)

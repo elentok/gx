@@ -178,7 +178,7 @@ test("Draft history popup", async ({ page, start }) => {
     await rowOf(popup.popup, "History chat draft of Codex").click()
     await expect(popup.popup).toHaveCount(0)
     await expect(brief).toHaveValue("History chat draft of Codex")
-    await expect(page.getByRole("textbox", nav("Name"))).toHaveValue("chat-codex")
+    await expect(page.getByRole("textbox", nav("Title"))).toHaveValue("chat-codex")
     await popup.open()
     await expect(popup.rows.first()).toContainText("Brief of the history chat draft, edited")
     await rowOf(popup.popup, "History chat draft with an image").click()

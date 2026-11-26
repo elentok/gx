@@ -1,5 +1,6 @@
-import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
-import { DraftHeader, field } from "./DraftHeader"
+import { Box, Spinner, Text } from "@chakra-ui/react"
+import { TextBox } from "../ui/text-box/TextBox"
+import { DraftHeader } from "./DraftHeader"
 import { DraftFooter } from "./DraftFooter"
 import { useDraftMenu } from "./useDraftMenu"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
@@ -392,23 +393,21 @@ function DraftForm({
             <ModeText mode={viModeNow} />
           </Box>
         ) : (
-          <chakra.textarea
-            aria-label="Prompt"
+          <TextBox
+            kind="prose"
+            look="bare"
+            page
+            label="Prompt"
+            hideLabel
             name="design-idea"
-            autoComplete="off"
-            data-focus-ring="none"
-            {...field}
             flex="1"
             minH="0"
             mx="0"
             my="3"
             resize="none"
-            px="4"
-            py="3"
-            lineHeight="1.6"
             placeholder={PLACEHOLDER}
             value={draft.idea}
-            onChange={(e) => patch({ idea: e.target.value })}
+            onChange={(e) => patch({ idea: e.currentTarget.value })}
             onPaste={(e) => {
               const files = imageFiles(e.clipboardData?.files)
               if (files.length === 0) return

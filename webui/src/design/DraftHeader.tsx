@@ -3,17 +3,8 @@ import type { ReactNode, RefObject } from "react"
 import { HistoryButton } from "../history/HistoryButton"
 import { MascotToggle } from "../shell/MascotToggle"
 import { DraftIcon } from "../shell/SidebarRows"
+import { TextBox } from "../ui/text-box/TextBox"
 import { SaveIndicator, type SaveStatus } from "./SaveIndicator"
-
-export const field = {
-  fontSize: "16px",
-  color: "text",
-  bg: "surface.raised",
-  borderWidth: "1px",
-  borderColor: "hairline",
-  borderRadius: "8px",
-  _placeholder: { color: "text.dim" },
-} as const
 
 interface Props {
   label: string
@@ -126,23 +117,19 @@ export function DraftHeader({
             </Text>
           </>
         )}
-        <chakra.input
-          aria-label="Epic slug"
-          aria-invalid={!!slugError}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <TextBox
+          kind="line"
+          verbatim
+          label="Epic slug"
+          hideLabel
+          name="epic-slug"
+          invalid={!!slugError}
           ref={slugInput}
-          {...field}
           flex="1"
           minW="0"
-          h="40px"
-          px="3"
-          fontWeight="600"
           placeholder="my-epic"
           value={slug}
-          onChange={(e) => onSlug(e.target.value)}
+          onChange={(e) => onSlug(e.currentTarget.value)}
         />
       </Box>
     </>
