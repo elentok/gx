@@ -13,7 +13,8 @@ in installed apps. A button is greyed out when there is nowhere to go. The versi
 header and moves to the end of the footer ⋮ menu.
 
 The Leader key gets four new chords. `,` goes back and `.` goes forward. `j` opens the next sidebar
-item and `k` opens the previous one. Focus stays where it was.
+item and `k` opens the previous one. `j` and `k` leave focus where it was. Back and forward treat focus
+as the browser's own back and forward do in gx today.
 
 Back and Forward need the browser's Navigation API. A browser without it shows no Back or Forward
 button and no Back or Forward chord. `j` and `k` work in every browser.
@@ -160,11 +161,15 @@ Next and previous sidebar item
 ### Sidebar header
 
 - The header holds, in order, the gx logo, a spacer, Search, Hide sidebar, Back and Forward.
-- All four buttons are 34px icon buttons that do not shrink, with a radius of 8px, dim text colour and
-  the raised surface on hover. This is the style the Search and Hide sidebar buttons declare today.
-- Back and Forward use new inline chevron icons, 20px, stroke 1.6, round caps and joins, in the style
-  of the Hide sidebar icon.
-- A greyed-out button is `disabled` and has opacity 0.5.
+- All four buttons are 34px icon buttons with a radius of 8px, dim text colour and the raised surface
+  on hover. This is the style the Search and Hide sidebar buttons declare today.
+- None of the four buttons shrinks (`flex: none`). This is new: today's buttons do not declare it.
+- Back and Forward use `LuChevronLeft` and `LuChevronRight` from the app's icon library, at 20px. The
+  stroke width makes the lines as thick as the Hide sidebar icon's, 1.6px on screen, which is 1.92 in
+  the icon's 24-unit box.
+- A greyed-out button has `aria-disabled="true"`, not the `disabled` attribute, so that it still gets
+  pointer and focus events for its tooltip. It ignores clicks, has opacity 0.5 and shows no hover
+  surface.
 - The buttons exist only in the sidebar header. A hidden sidebar shows none.
 - On the sliding sidebar, a tap on Back or Forward leaves the sidebar open.
 - The accessible names are "Back" and "Forward".
@@ -203,6 +208,9 @@ Next and previous sidebar item
   chord.
 - The four chords never open, close or expand anything in the sidebar. `j` and `k` do not move
   focus.
+- `,` and `.` do not change the prompt focus rule. A chat page that was opened with a prompt focus
+  request, for example by Enter on its sidebar row, focuses the prompt again when a step back or
+  forward lands on it. The person chose to keep this behaviour.
 
 ### Next and previous item
 
@@ -240,18 +248,27 @@ Next and previous sidebar item
 - A good test drives what a person does, a key press or a click, and checks what the person sees: the
   address, the button state, the Chord box rows, the menu and the toast. It does not check which
   history call ran or how the module is built.
-- The highest seam is the browser flow against a fixture server. The `workspaces` scenario already has
-  epic, Design and chat rows, nested agents, held epics and an Other section. The `web-setup` scenario
-  covers the setup entry.
+- The browser flow against a fixture server covers only what needs a real browser: history moves,
+  reload, the three layouts, real key presses, focus, hover and sidebar scroll. The `workspaces`
+  scenario already has epic, Design and chat rows, nested agents, held epics and an Other section. The
+  `web-setup` scenario covers the setup entry.
+- The nav steps are a new flow, although "Workspaces" and "Chords" start the same scenario. Both run
+  with a 120 s time limit and were already split to stay inside it, and this journey does not fit in
+  either. The ticket that adds the flow raises the `playwrightguard` flow budget if needed and says why
+  in its title.
+- What a component renders for its props is tested in component tests, not in a flow.
 - The one new unit seam is the pure next and previous module. Its table tests cover page ownership,
   hidden rows, nested agents, the last row and the ends of the list. Prior art is the sidebar model's
   tests.
-- Component tests of the Chord host and the app shell cover the chords, the buttons and the tooltips.
+- Component tests of the app shell, the Chord host, the Chord box and the gear menu cover the buttons,
+  tooltip text, the empty Leader key, the missing `title` attribute, the header and Chord box rows
+  without the Navigation API, and the version menu line.
   The test environment has no Navigation API, so a test installs a small fake `window.navigation`, and
   leaves it out for the unsupported-browser cases. Prior art is the Chord host, Chord box, app shell
   and gear menu tests.
-- A browser flow imitates an unsupported browser with an init script that sets `window.navigation` to
-  `undefined` before the app loads.
+- The hover on a greyed-out button also runs in WebKit, the engine of the Safari Dock app. The flow
+  starts a WebKit browser for that step, and the CI workflow and the Makefile e2e target install WebKit
+  beside Chromium.
 
 ## Verification
 
@@ -270,40 +287,39 @@ Buttons and history state (stories 1 to 5, 7 to 9, 12 to 14, 16)
 First page (stories 6, 10, 11)
 - Flows: a step in the new nav flow opens the root address in a new page, and then an unknown
   address in another new page. Each lands on `#/epics` with Back greyed out. The flows
-  "99. First-run setup" and "100. Setup from the QR link" in `setup.e2e.ts` end with Back greyed out.
+  "99. First-run setup", "100. Setup from the QR link" and "101. Setup and login with TOTP off" in
+  `setup.e2e.ts` end with Back greyed out.
 - Checks: on each of those pages, `navigation.canGoBack` is `false`.
 - New flows to write: the steps above.
 
 Unsupported browser (stories 15, 53)
-- Flows: a step in the new nav flow with `window.navigation` set to `undefined` by an init script. The
-  header has Search and Hide sidebar only. The Chord box has "Next item" and no "Back" or "Forward"
-  row. Leader then `,` closes the box and leaves the address. Leader then `j` opens a row.
-- Checks: the page shows no error after these steps.
-- New flows to write: the step above.
+- Checks: component tests with no `window.navigation`. The header has Search and Hide sidebar only. The
+  Chord box has "Next item" and no "Back" or "Forward" row. Leader then `,` closes the box and leaves
+  the address. Leader then `j` opens a row.
 
 Tooltips (stories 17 to 21)
-- Flows: a step in the new nav flow hovers each header button and reads its tooltip, on a Mac context
-  and on a Linux context as the "Chords" flow sets them up, on a greyed-out Back, and after
-  both Leader key settings are set to an empty value. At 390px with touch, a tap on Forward shows no
-  tooltip.
-- Checks: no header button has a `title` attribute.
+- Flows: a step in the new nav flow hovers a greyed-out Back in Chromium and in WebKit and sees its
+  tooltip. At 390px with touch, a tap on Forward shows no tooltip.
+- Checks: component tests read each header button's tooltip with a Mac and a Linux platform and with an
+  empty Leader key. They find no `title` attribute on any header button, and a click on a greyed-out
+  button moves nowhere.
 - New flows to write: the step above.
 
 Version line (stories 22 to 25)
-- Flows: the "Workspaces" flow's footer menu step, extended. The header shows no version. The last menu
-  item reads "gx <version>". A click copies the version without "gx ", closes the menu and shows
-  "Version copied". With the clipboard write made to fail, the toast reads "Could not copy". The
-  restart flows that compare versions read the version from this item and still pass. Look check: the
-  Mock state `b2-shown-menu`.
-- Checks: the copied text equals the `build` value the server sends in its snapshot. A component test
-  with no `build` finds neither the item nor its separator.
-- New flows to write: the menu step above and the change to the restart helpers.
+- Flows: the existing restart flows that compare versions read the version from the footer menu line
+  and still pass. Look check: the Mock state `b2-shown-menu`.
+- Checks: component tests of the gear menu. The header shows no version. The last menu item reads
+  "gx <version>". A click copies the `build` value without "gx ", closes the menu and shows "Version
+  copied". With a failing clipboard write the toast reads "Could not copy". With no `build` there is
+  neither the item nor its separator.
+- New flows to write: none. The restart helpers change.
 
 Back and forward chords (stories 26 to 32)
 - Flows: the "Chords" flow in `chords.e2e.ts` and the new nav flow. Leader then `,` and `.` move
   through history, also with the sidebar hidden. Leader then Shift+`,` closes the box and leaves the
-  address. The box lists "Back" and "Forward" after "History" or the last other app row, and hides the
-  one with no entry. A click on a row runs it.
+  address. A step back to a chat opened with Enter focuses its prompt, as the browser's own back does.
+- Checks: component tests of the Chord box and the Chord host. The box lists "Back" and "Forward" after
+  "History" or the last other app row, hides the one with no entry, and a click on a row runs it.
 - Checks: a component test sends `code: "Comma"` with a Hebrew `key` value and gets Back.
 - New flows to write: the steps above.
 
@@ -343,12 +359,15 @@ Current row (stories 46 to 51)
 - Wrapping at the ends of the sidebar, key repeat after one Leader press, and expanding rows or
   sections.
 - Changing which row the sidebar highlights.
+- Changing when a chat page focuses its prompt after a step back or forward, or after a reload.
 
 ## Further Notes
 
 - The stored mock shows the header buttons, the greyed-out state, the menu line and the hidden
   sidebar. It was approved before the tooltips, the phone and tablet header and the click on the
-  version line were decided. This spec adds those. Phone and tablet need no mock of their own.
+  version line were decided. This spec adds those. Phone and tablet need no mock of their own. The
+  review later switched the chevrons to the icon library and the greyed-out state to `aria-disabled`,
+  and the stored mock shows both.
 - Chromium 157 and WebKit 27.2 keep `canGoBack` and `canGoForward` across a reload. A real Safari Dock
   app and a real Chrome app window were not tested. They use the same engines.
 - The glossary entry **Chord box** covers the new punctuation chords.
