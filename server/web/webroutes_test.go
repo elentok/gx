@@ -107,10 +107,14 @@ func TestWeb_ClientErrorReportKeepsTheWriteChecks(t *testing.T) {
 func TestWeb_ClientErrorReportRefusesAnOversizeBody(t *testing.T) {
 	t.Parallel()
 	h, base := servertest.StartWeb(t)
-	big := `{"message":"` + strings.Repeat("a", 64<<10) + `"}`
-	code, body := postReport(t, base, big, servertest.JSONPost(base))
-	if code != http.StatusOK || servertest.ReasonOf(t, body) != "too-large" {
-		t.Errorf("status %d body %q, want a too-large refusal", code, body)
+	for name, big := range map[string]string{
+		"oversize": `{"message":"` + strings.Repeat("a", 64<<10) + `"}`,
+		"padded":   `{"message":"m"}` + strings.Repeat(" ", 17<<10),
+	} {
+		code, body := postReport(t, base, big, servertest.JSONPost(base))
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != "too-large" {
+			t.Errorf("%s: status %d body %q, want a too-large refusal", name, code, body)
+		}
 	}
 	logs, _ := os.ReadFile(server.LogPath(h.StateDir))
 	if strings.Contains(string(logs), `"client error"`) {
@@ -209,6 +213,7 @@ func TestWeb_BrokenRuleReportRefusesBadReportsWithoutFilingThem(t *testing.T) {
 	url := base + "/v1/broken-rules"
 	for name, tc := range map[string]struct{ body, reason string }{
 		"oversize":      {brokenRuleBody(t, map[string]string{"value": strings.Repeat("a", 17<<10)}), "too-large"},
+		"padded":        {brokenRuleBody(t, nil) + strings.Repeat(" ", 17<<10), "too-large"},
 		"no fields":     {`{}`, "incomplete"},
 		"empty value":   {brokenRuleBody(t, map[string]string{"value": ""}), "incomplete"},
 		"empty agent":   {brokenRuleBody(t, map[string]string{"user_agent": ""}), "incomplete"},

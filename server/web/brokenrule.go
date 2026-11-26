@@ -1,8 +1,6 @@
 package web
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"regexp"
 	"slices"
@@ -25,19 +23,8 @@ var brokenRuleID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 func (w *Web) brokenRuleReport(rw http.ResponseWriter, r *http.Request) {
 	refuse := func(reason string) { wire.WriteJSON(rw, wire.BrokenRuleResult{Refused: true, Reason: reason}) }
 	ip := webauth.RemoteIP(r)
-	if !w.rules.allow(ip, brokenRuleRateLimit, brokenRuleWindow) {
-		refuse("rate-limited")
-		return
-	}
 	var report wire.BrokenRuleReport
-	r.Body = http.MaxBytesReader(rw, r.Body, brokenRuleMaxBody)
-	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			refuse("too-large")
-			return
-		}
-		http.Error(rw, "bad JSON", http.StatusBadRequest)
+	if !readReport(rw, r, w.rules.allow(ip, brokenRuleRateLimit, brokenRuleWindow), brokenRuleMaxBody, &report, refuse) {
 		return
 	}
 	if slices.Contains([]string{report.Rule, report.Message, report.Value, report.URL, report.UserAgent}, "") {

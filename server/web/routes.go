@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -204,23 +205,36 @@ type clientErrorResult struct {
 func (w *Web) clientErrorReport(rw http.ResponseWriter, r *http.Request) {
 	refuse := func(reason string) { wire.WriteJSON(rw, clientErrorResult{Refused: true, Reason: reason}) }
 	ip := webauth.RemoteIP(r)
-	if !w.errs.allow(ip, clientErrorRateLimit, clientErrorWindow) {
-		refuse("rate-limited")
-		return
-	}
 	var body clientErrorBody
-	r.Body = http.MaxBytesReader(rw, r.Body, clientErrorMaxBody)
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			refuse("too-large")
-			return
-		}
-		http.Error(rw, "bad JSON", http.StatusBadRequest)
+	if !readReport(rw, r, w.errs.allow(ip, clientErrorRateLimit, clientErrorWindow), clientErrorMaxBody, &body, refuse) {
 		return
 	}
 	w.log.Warn("client error", "message", body.Message, "stack", body.Stack, "page_url", cleanPageURL(body.URL), "user_agent", body.UserAgent, "ip", ip)
 	wire.WriteJSON(rw, clientErrorResult{})
+}
+
+// readReport is the intake shared by the browser report routes: it reads the
+// body into report, or answers the request itself and returns false. allowed is
+// the verdict of the route's own limiter.
+func readReport(rw http.ResponseWriter, r *http.Request, allowed bool, maxBody int64, report any, refuse func(reason string)) bool {
+	if !allowed {
+		refuse("rate-limited")
+		return false
+	}
+	r.Body = http.MaxBytesReader(rw, r.Body, maxBody)
+	err := json.NewDecoder(r.Body).Decode(report)
+	if err == nil {
+		// Decode stops after the first value, so read on to catch padding.
+		_, err = io.Copy(io.Discard, r.Body)
+	}
+	var tooBig *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooBig):
+		refuse("too-large")
+	case err != nil:
+		http.Error(rw, "bad JSON", http.StatusBadRequest)
+	}
+	return err == nil
 }
 
 // cleanPageURL cuts the hash query off a reported page URL. The page strips the
