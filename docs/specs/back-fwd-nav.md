@@ -272,7 +272,7 @@ Next and previous sidebar item
 
 ## Verification
 
-Buttons and history state (stories 1 to 5, 7 to 9, 12 to 14, 16)
+Buttons and history state (stories 1 to 5, 7 to 9, 12 to 14, 16 to 16)
 - Flows: a new nav flow on scenario `workspaces`. The implementer picks the file and the flow's name.
   At 1280px it checks the header order, opens two rows by click, and checks Back and Forward after
   each of a row click, a link inside a page, a Back click, the browser's own back, and a reload. With
@@ -284,7 +284,7 @@ Buttons and history state (stories 1 to 5, 7 to 9, 12 to 14, 16)
   flow sees Meta+[ and Meta+] arrive with `defaultPrevented` false.
 - New flows to write: the nav flow above. It becomes an implementation ticket.
 
-First page (stories 6, 10, 11)
+First page (stories 6 to 6, 10 to 11)
 - Flows: a step in the new nav flow opens the root address in a new page, and then an unknown
   address in another new page. Each lands on `#/epics` with Back greyed out. The flows
   "99. First-run setup", "100. Setup from the QR link" and "101. Setup and login with TOTP off" in
@@ -292,7 +292,7 @@ First page (stories 6, 10, 11)
 - Checks: on each of those pages, `navigation.canGoBack` is `false`.
 - New flows to write: the steps above.
 
-Unsupported browser (stories 15, 53)
+Unsupported browser (stories 15 to 15, 53 to 53)
 - Checks: component tests with no `window.navigation`. The header has Search and Hide sidebar only. The
   Chord box has "Next item" and no "Back" or "Forward" row. Leader then `,` closes the box and leaves
   the address. Leader then `j` opens a row.
@@ -323,7 +323,7 @@ Back and forward chords (stories 26 to 32)
 - Checks: a component test sends `code: "Comma"` with a Hebrew `key` value and gets Back.
 - New flows to write: the steps above.
 
-Next and previous order (stories 33 to 45, 52)
+Next and previous order (stories 33 to 45, 52 to 52)
 - Flows: the new nav flow on `workspaces`. From the first row, repeated Leader then `j` visits the
   visible rows in the sidebar's order and stops at the last, where "Next item" is hidden. `k` walks
   back. Collapsed rows and closed sections are skipped and stay closed. Focus stays in the Message box
