@@ -1,8 +1,8 @@
 import { chatOf, row, sessions, titleHeading } from "./agentsKit"
+import { chordKit } from "./chordKit"
 import { draftPage } from "./draftKit"
 import { expect, nav, test } from "./fixture"
-import type { Locator } from "@playwright/test"
-import { goto } from "./sidebarKit"
+import { goto, sidebarKit, stillMotion } from "./sidebarKit"
 
 // The Leader key's Chord box over the `workspaces` scenario; split from the Workspaces flow so each stays inside its time limit.
 test("Chords", async ({ page, start, context }) => {
@@ -32,8 +32,7 @@ test("Chords", async ({ page, start, context }) => {
   await expect(queueAgent).toHaveCount(1)
 
   // Chords: the Leader key opens the Chord box, any other key closes it, and open layers keep it shut.
-  const chordBox = page.getByRole("menu", nav("Chords"))
-  const leader = "ControlOrMeta+e"
+  const { box: chordBox, leader, open: openBox } = chordKit(page)
   // The chip follows the platform: a Mac context reads ⌘E and Meta+E opens the box, any other reads Ctrl+E.
   for (const [platform, chip, key] of [
     ["MacIntel", "⌘E", "Meta+e"],
@@ -163,15 +162,6 @@ test("Chords", async ({ page, start, context }) => {
 
   // The chords: C (Shift+c) and d open the new chat form and a design draft, a click on the C row does the same, and the
   // palette's New chat opens the same form on the same project.
-  // After a hash change the old route can still render for a moment, and the route change then closes a box opened on it.
-  // `ready` is a row of the new page's box: the retry opens the box again until that row shows.
-  const openBox = async (ready: Locator = chordBox) => {
-    await expect(async () => {
-      if (await chordBox.isVisible()) await page.keyboard.press("Escape")
-      await page.keyboard.press(leader)
-      await expect(ready).toBeVisible({ timeout: 1_000 })
-    }).toPass({ timeout: 10_000 })
-  }
   const draftIds = async () =>
     (await fx.cli("designs", "drafts", "list"))
       .split("\n")
@@ -440,4 +430,58 @@ test("Chords", async ({ page, start, context }) => {
   await removeConfirm.getByRole("button", { name: /^Cancel/ }).click()
   await expect(removeConfirm).toHaveCount(0)
   await expectNoRenameInPalette()
+
+  // Back and forward chords, on a new tab with its own history.
+  const tab = await context.newPage()
+  await tab.goto(new URL(page.url()).origin, { waitUntil: "domcontentloaded" })
+  await expect(tab).toHaveURL(/#\/epics$/)
+  await stillMotion(tab)
+  const { sidebar: tabSidebar, row: tabRow } = sidebarKit(tab)
+  const chords = chordKit(tab)
+  const epics = /#\/epics$/
+  const ready = /#\/e\/demo:ready-epic$/
+  await expect(tabRow("ready-epic")).toBeVisible()
+  await chords.open(chords.next)
+  await expect(chords.back).toHaveCount(0)
+  await expect(chords.forward).toHaveCount(0)
+  await tab.keyboard.press("Escape")
+  await tabRow("ready-epic").click()
+  await expect(tab).toHaveURL(ready)
+  await chords.open(chords.back)
+  await expect(chords.forward).toHaveCount(0)
+  await tab.keyboard.press("Comma")
+  await expect(tab).toHaveURL(epics)
+  await chords.open(chords.forward)
+  await expect(chords.back).toHaveCount(0)
+  await tab.keyboard.press("Period")
+  await expect(tab).toHaveURL(ready)
+  // Leader then Shift+, is no chord: the box closes and the page stays.
+  await chords.open(chords.back)
+  await tab.keyboard.press("Shift+Comma")
+  await expect(chords.box).toHaveCount(0)
+  await expect(tab).toHaveURL(ready)
+  await tabSidebar.getByRole("button", nav("Hide sidebar")).click()
+  await expect(tabSidebar).toBeHidden()
+  await chords.open(chords.back)
+  await tab.keyboard.press("Comma")
+  await expect(tab).toHaveURL(epics)
+  await chords.open(chords.forward)
+  await tab.keyboard.press("Period")
+  await expect(tab).toHaveURL(ready)
+  await expect(tabSidebar).toBeHidden()
+  await tab.getByRole("button", nav("Show sidebar")).click()
+  // A step back to a chat opened with Enter focuses its prompt again.
+  const tabPrompt = tab.getByRole("form", nav("Composer")).getByRole("textbox")
+  await tabSidebar.locator("a[data-chat]").first().focus()
+  await tab.keyboard.press("Enter")
+  await expect(tab).toHaveURL(/#\/agents\/[^/]+$/)
+  const enteredChat = tab.url()
+  await expect(tabPrompt).toBeFocused()
+  await tabRow("ready-epic").click()
+  await expect(tab).toHaveURL(ready)
+  await expect(tabPrompt).toHaveCount(0)
+  await chords.open(chords.back)
+  await tab.keyboard.press("Comma")
+  await expect(tab).toHaveURL(enteredChat)
+  await expect(tabPrompt).toBeFocused()
 })

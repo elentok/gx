@@ -102,7 +102,10 @@ import (
 //
 // Nav buttons flow (+1): history moves, reload, three layouts, hover in WebKit and a touch tap need a real browser;
 // component tests cover each rule alone.
-const maxFlows = 171
+//
+// Nav keys flow (+1): real chord keys through history, focus, sidebar scroll, new tabs and a reload need a real
+// browser; ChordHost and nextPrev tests cover each rule alone; split from Nav buttons for the time limit.
+const maxFlows = 172
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
