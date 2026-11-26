@@ -17,6 +17,7 @@ import {
   type SessionResult,
 } from "../generated/server"
 import { roundCards } from "../design/roundFixture"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { renderThemed } from "../ui/render"
 import { AgentChat } from "./AgentChat"
 
@@ -80,6 +81,7 @@ function render(
   c: SessionChatResponse,
   post?: PostAnswer,
   refetch: () => void = () => {},
+  origin?: string,
 ) {
   const state = {
     snapshot: { sessions: [s] },
@@ -98,15 +100,17 @@ function render(
     {
       path: "/",
       element: (
-        <Holder
-          session={s}
-          initial={c}
-          refetch={refetch}
-          post={post}
-          register={(set) => {
-            setChat = set
-          }}
-        />
+        <SubagentOriginContext.Provider value={origin}>
+          <Holder
+            session={s}
+            initial={c}
+            refetch={refetch}
+            post={post}
+            register={(set) => {
+              setChat = set
+            }}
+          />
+        </SubagentOriginContext.Provider>
       ),
     },
   ])
@@ -561,12 +565,14 @@ test("only a finished call is a link: below the folded group, or once among the 
       mark(3, "Old one", "no_record"),
     ],
   }
-  render(session(), chat({ messages: [tools] }))
+  render(session(), chat({ messages: [tools] }), undefined, undefined, "/agents/s-a")
   const details = (await screen.findByTestId("tool-calls")) as HTMLDetailsElement
   const onlyLink = () => {
     const links = screen.getAllByRole("link", { name: /↗/ })
     expect(links).toHaveLength(1)
-    expect(links[0].getAttribute("href")).toBe(`#/agents/${session().id}/subagents/toolu_1`)
+    expect(links[0].getAttribute("href")).toBe(
+      `#/agents/${session().id}/subagents/toolu_1?from=%2Fagents%2Fs-a`,
+    )
     expect(links[0].parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
     return links[0]
   }

@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs"
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 import type { SessionChatResponse } from "../src/generated/server"
 import { expect, test } from "./fixture"
 import { go, sessions } from "./agentsKit"
@@ -13,6 +13,8 @@ const RUNNING = "Survey the sessions code"
 const MISSING = "Read the old notes"
 const NESTED = "Map the server packages"
 const GRANDCHILD = "Read the wire package"
+/** The running subagent of the card-pages scenario. */
+const WATCH = "Watch the build in the background"
 
 const namedLink = (page: Page, description: string) =>
   page.getByRole("link", { name: `${description} ↗`, exact: true })
@@ -24,6 +26,11 @@ const cardLink = (page: Page, description: string) =>
 const backLink = (page: Page) => page.getByRole("link", { name: "← Back to parent chat" })
 const title = (page: Page, text: string) =>
   expect(page.getByRole("heading", { level: 1, name: text })).toBeVisible()
+/** A subagent URL; `origin` is the router path of the page whose link was followed. */
+const subUrl = (session: string, callId: string, origin?: string) =>
+  `#/agents/${session}/subagents/${callId}${origin ? `?from=${encodeURIComponent(origin)}` : ""}`
+/** Matches the end of the address bar, or of an href, exactly. */
+const ending = (hash: string) => new RegExp(`${hash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`)
 const noSideScroll = (page: Page) =>
   expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
@@ -37,38 +44,41 @@ const openTools = async (page: Page) => {
 
 // Why a flow: a real server round trip from the fixture's transcripts, meta.json files and rollouts to the chat read to
 // the page, a page-to-page journey across the Agents, Design and subagent pages with the browser Back button and a
-// reload, a live file growth seen with no reload, and real layout at 390px. SubagentPage.test.tsx,
-// AgentsPage.sessionView.test.tsx, WorkingCard.test.tsx and ChatLog.test.tsx and the Go server tests cover each rule
-// alone and cannot see these together. The scenario seeds no Initiative or Triage session, so the third page of the
-// link step is not covered here.
+// reload, a live file growth seen with no reload, real layout at 390px, and the back link's origin carried through
+// real URLs from the Design, chat and Triage pages. SubagentPage.test.tsx, AgentsPage.subagent.test.tsx,
+// WorkingCard.test.tsx, ChatLog.test.tsx and the Go server tests cover each rule alone and cannot see these together.
 test("216. Subagent page", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   const fixture = await start("subagents", { shape: "claude", reloads: 1 })
   const sub = fixture.subagents!
   const session = sub.sessionId
-  const runningUrl = new RegExp(`#/agents/${session}/subagents/${sub.calls.running}$`)
+  const runningUrl = ending(subUrl(session, sub.calls.running))
+  const fromDesign = ending(subUrl(session, sub.calls.running, DESIGN.slice(1)))
 
   // 1. A running call is linked by the working card only, on the Agents page and on the Design page.
   await go(page, `#/agents/${session}`)
   await openTools(page)
-  await expect(cardLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(cardLink(page, RUNNING)).toHaveAttribute(
+    "href",
+    ending(subUrl(session, sub.calls.running, `/agents/${session}`)),
+  )
   await expect(callLink(page, RUNNING)).toHaveCount(0)
   await go(page, DESIGN)
   await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
-  await expect(cardLink(page, RUNNING)).toHaveAttribute("href", runningUrl)
+  await expect(cardLink(page, RUNNING)).toHaveAttribute("href", fromDesign)
   await expect(callLink(page, RUNNING)).toHaveCount(0)
 
   // 2. Open from the Design page, Back, open again, the back link, then a reload.
   await cardLink(page, RUNNING).click()
-  await expect(page).toHaveURL(runningUrl)
+  await expect(page).toHaveURL(fromDesign)
   await title(page, RUNNING)
   await page.goBack()
   await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
   await cardLink(page, RUNNING).click()
-  await expect(page).toHaveURL(runningUrl)
+  await expect(page).toHaveURL(fromDesign)
   await backLink(page).click()
-  await expect(page).toHaveURL(new RegExp(`#/agents/${session}$`))
-  await go(page, `#/agents/${session}/subagents/${sub.calls.running}`)
+  await expect(page).toHaveURL(new RegExp(`${DESIGN}$`))
+  await go(page, subUrl(session, sub.calls.running))
   await expect(page).toHaveURL(runningUrl)
   await title(page, RUNNING)
   await page.reload()
@@ -131,7 +141,7 @@ test("216. Subagent page", async ({ page, start }) => {
   await expect(callLink(page, FINISHED)).toHaveCount(1)
   await callLink(page, FINISHED).click()
   await expect(page).toHaveURL(
-    new RegExp(`#/agents/${endedSub.sessionId}/subagents/${endedSub.calls.finished}$`),
+    ending(subUrl(endedSub.sessionId, endedSub.calls.finished, `/agents/${endedSub.sessionId}`)),
   )
   await title(page, FINISHED)
 
@@ -220,6 +230,26 @@ test("216. Subagent page", async ({ page, start }) => {
   await expect(page.getByText(/ › /).first()).toContainText(owner.name || owner.id)
   await expect(page.getByRole("link", { name: NESTED, exact: true })).toBeVisible()
 
+  // 11. Nested from the Design page: back to the parent subagent, then again, then to the Design page.
+  const origin = DESIGN.slice(1)
+  const fromParent = ending(subUrl(ns.sessionId, ns.calls.nested, origin))
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(ending(DESIGN))
+  await cardLink(page, NESTED).click()
+  await expect(page).toHaveURL(fromParent)
+  await openTools(page)
+  await callLink(page, GRANDCHILD).click()
+  await expect(page).toHaveURL(ending(subUrl(ns.sessionId, ns.calls.grandchild, origin)))
+  await expect(page.getByRole("link", { name: NESTED, exact: true })).toHaveAttribute(
+    "href",
+    fromParent,
+  )
+  await backLink(page).click()
+  await expect(page).toHaveURL(fromParent)
+  await title(page, NESTED)
+  await backLink(page).click()
+  await expect(page).toHaveURL(ending(DESIGN))
+
   // 8. A current file call keeps its tool and file name; on a phone the long path is cut.
   const files = await start("subagents", { shape: "file-call" })
   const fs = files.subagents!
@@ -256,6 +286,63 @@ test("216. Subagent page", async ({ page, start }) => {
   const entry = page.getByTestId("tool-calls")
   await expect(entry.getByText("spawn_agent", { exact: true })).toBeVisible()
   await expect(entry.getByRole("link")).toHaveCount(0)
+
+  // 12. Back link, from the card and from a log link on the Design, chat and Triage pages.
+  const pages = await start("card-pages", { reloads: 1 })
+  const plain = (await sessions(pages)).find((s) => !s.flow)!
+  const view = page.getByRole("group", { name: "View" })
+  // Opens a link, checks the origin its URL carries, and follows the back link to that page.
+  const roundTrip = async (link: Locator, origin: string) => {
+    await link.click()
+    await expect(page).toHaveURL(ending(`?from=${encodeURIComponent(origin)}`))
+    await expect(page).toHaveURL(/#\/agents\/[^/]+\/subagents\//)
+    await backLink(page).click()
+    await expect(page).toHaveURL(ending(`#${origin}`))
+  }
+
+  for (const origin of [DESIGN.slice(1), `/agents/${plain.id}`, "/triage/demo"]) {
+    await go(page, `#${origin}`)
+    await expect(page).toHaveURL(ending(`#${origin}`))
+    await roundTrip(cardLink(page, WATCH), origin)
+    // The Triage session has an open round, so its page comes back in the Questions view, which has no log.
+    if (origin.startsWith("/triage")) await view.getByRole("button", { name: "Chat" }).click()
+    await roundTrip(callLink(page, FINISHED), origin)
+  }
+
+  // A reload keeps the target. No origin, or an address outside the app, opens the chat page.
+  await go(page, DESIGN)
+  await cardLink(page, WATCH).click()
+  await expect(page).toHaveURL(/\/subagents\/[^?]+\?from=/)
+  const [bare] = new URL(page.url()).hash.split("?")
+  await page.reload()
+  await expect(backLink(page)).toHaveAttribute("href", DESIGN)
+  await backLink(page).click()
+  await expect(page).toHaveURL(ending(DESIGN))
+  const chatHref = `#/agents/${bare.split("/")[2]}`
+  for (const query of ["", `?from=${encodeURIComponent("https://example.com/d/x")}`]) {
+    await go(page, bare + query)
+    await expect(backLink(page)).toHaveAttribute("href", chatHref)
+    await backLink(page).click()
+    await expect(page).toHaveURL(ending(chatHref))
+  }
+
+  // 13. The page of a call whose file is gone follows the origin.
+  const gone = await start("subagents", { shape: "file-gone" })
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(ending(DESIGN))
+  await callLink(page, MISSING).click()
+  await expect(page.getByText("Transcript no longer available")).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/agents/${gone.subagents!.sessionId}/subagents/`))
+  await backLink(page).click()
+  await expect(page).toHaveURL(ending(DESIGN))
+
+  // 14. A parent with no transcript has no log link, so the address is typed.
+  const orphan = (await start("subagents", { shape: "parent-gone" })).subagents!
+  await go(page, subUrl(orphan.sessionId, orphan.calls.running, DESIGN.slice(1)))
+  await expect(page.getByText("Transcript no longer available")).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0)
+  await backLink(page).click()
+  await expect(page).toHaveURL(ending(DESIGN))
 })
 
 // Why a flow: an old Codex rollout reaches the chat read and two pages through the server, which decides that the call

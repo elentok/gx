@@ -355,7 +355,10 @@ test("218. Working card shapes", async ({ page, start }) => {
   await expect(rows(str.working)).toHaveCount(2)
   await expect(
     str.working.getByRole("link", { name: "Audit the string flags ↗", exact: true }),
-  ).toHaveAttribute("href", `#/agents/${str.sessionId}/subagents/${str.calls.string}`)
+  ).toHaveAttribute(
+    "href",
+    `#/agents/${str.sessionId}/subagents/${str.calls.string}?from=%2Fagents%2F${str.sessionId}`,
+  )
   await expect(rowOf(str.working, "Lint in the background")).toBeVisible()
 
   // File calls (bgtx.SubReadDesc and SubEditDesc), the older one first.

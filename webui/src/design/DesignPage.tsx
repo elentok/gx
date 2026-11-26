@@ -23,6 +23,7 @@ import type { FetchScreen } from "./screen"
 import { SectionOnHold, type EpicListRow } from "../generated/server"
 import { slugOf } from "../slug"
 import { useWide } from "../useWide"
+import { designHref, routePath } from "../hrefs"
 import { DesignPageMenu } from "./DesignPageMenu"
 import { designSession, liveSessions } from "./view"
 
@@ -79,6 +80,7 @@ function DesignBody({
   return (
     <SteppedPage
       address={address}
+      origin={routePath(designHref(address))}
       title={name}
       icon={<PageIcon kind="design" />}
       wide={wide}

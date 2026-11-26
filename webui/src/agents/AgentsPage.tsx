@@ -12,7 +12,8 @@ import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useReadyWhen } from "../useReady"
 import { useWide } from "../useWide"
-import { parseAgentSplat } from "../hrefs"
+import { agentPath, parseAgentSplat, subagentOrigin } from "../hrefs"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { SessionView } from "./SessionView"
 import { SubagentView } from "./SubagentView"
 import type { PostSubagentWatch } from "./subagentWatch"
@@ -88,7 +89,10 @@ export function AgentsPage({
   const sessions = snapshot?.sessions
   const session = selected ? sessions?.find((s) => s.id === selected) : undefined
   const listed = !!session
-  const justCreated = !!(useLocation().state as { creating?: boolean } | null)?.creating
+  const location = useLocation()
+  const justCreated = !!(location.state as { creating?: boolean } | null)?.creating
+  // A chat page is its own origin; a subagent page hands on the one it was opened with.
+  const origin = callId ? subagentOrigin(location.search) : selected && agentPath(selected)
   const [graceOverFor, setGraceOverFor] = useState<string>()
   const graceOver = graceOverFor !== undefined
   useEffect(() => {
@@ -133,18 +137,20 @@ export function AgentsPage({
               </Box>
             </Box>
           )}
-          {session && callId ? (
-            <SubagentView
-              session={session}
-              callId={callId}
-              fetchSubagentChat={fetchSubagentChat}
-              postWatch={postSubagentWatch}
-            />
-          ) : (
-            session && (
-              <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />
-            )
-          )}
+          <SubagentOriginContext.Provider value={origin}>
+            {session && callId ? (
+              <SubagentView
+                session={session}
+                callId={callId}
+                fetchSubagentChat={fetchSubagentChat}
+                postWatch={postSubagentWatch}
+              />
+            ) : (
+              session && (
+                <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />
+              )
+            )}
+          </SubagentOriginContext.Provider>
         </Box>
       )}
     </DetailPage>

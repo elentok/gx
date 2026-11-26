@@ -106,6 +106,59 @@ test("the watch starts on mount, repeats when streams rise and ends on unmount",
   expect(posts.at(-1)).toMatchObject({ call_id: "call-1", closed: true })
 })
 
+const backLink = () => screen.findByRole("link", { name: "← Back to parent chat" })
+const openWithQuery = (query: string) =>
+  render([session("s-1", "p")], `/agents/s-1/subagents/call-1${query}`, true, {
+    subagentChat: async () => ({ kind: "ok" as const, detail: subChat("call-1") }),
+    subagentWatch: noWatch,
+  })
+
+test.each(["/d/demo:x", "/triage/demo", "/agents/s-1"])(
+  "the back link returns to the origin %s",
+  async (origin) => {
+    openWithQuery(`?from=${encodeURIComponent(origin)}`)
+    expect((await backLink()).getAttribute("href")).toBe(`#${origin}`)
+  },
+)
+
+test.each([
+  "",
+  "?from=https%3A%2F%2Fexample.com%2Fd%2Fx",
+  "?from=%2F%2Fexample.com%2Fd%2Fx",
+  "?from=%2Fagents%2Fs-1%2Fsubagents%2Fcall-0",
+])("the back link goes to the chat page for the query %s", async (query) => {
+  openWithQuery(query)
+  expect((await backLink()).getAttribute("href")).toBe("#/agents/s-1")
+})
+
+test("the chat page's log and card links carry the chat page as origin", async () => {
+  const detail = chat({
+    messages: [
+      {
+        id: "t1",
+        role: "agent",
+        kind: "tools",
+        text: "",
+        at: "2026-01-01T00:00:00Z",
+        tool_count: 1,
+        calls: ["Agent: Find auth"],
+        subagent_calls: [{ index: 0, call_id: "done-1", description: "Done", state: "finished" }],
+      },
+    ],
+    tasks: [
+      { kind: "subagent", label: "Live", call_id: "live-1", started_at: "2026-01-01T00:00:00Z" },
+    ],
+  })
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(detail))
+  for (const [name, call] of [
+    ["Done ↗", "done-1"],
+    ["Live ↗", "live-1"],
+  ]) {
+    const link = await screen.findByRole("link", { name })
+    expect(link.getAttribute("href")).toBe(`#/agents/s-1/subagents/${call}?from=%2Fagents%2Fs-1`)
+  }
+})
+
 test("Back returns to the page the subagent page was opened from", async () => {
   const { router } = render([session("s-1", "p")], "/agents/s-1", true, {
     ...chatOf(chat()),

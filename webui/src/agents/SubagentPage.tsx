@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react"
-import { Fragment, useEffect, useState, type ReactNode } from "react"
+import { Fragment, useContext, useEffect, useState, type ReactNode } from "react"
 import { ChatMessages } from "../design/ChatCore"
 import { WorkingRow } from "../design/WorkingRow"
 import { formatElapsed, tokenText } from "../design/taskRows"
@@ -14,7 +14,8 @@ import {
   type SessionChatResponse,
   type SessionInfo,
 } from "../generated/server"
-import { agentHref, subagentHref } from "../hrefs"
+import { agentHref, backHref, subagentHref } from "../hrefs"
+import { SubagentOriginContext } from "../subagentOrigin"
 
 type PillTone = "muted" | "running" | "done"
 
@@ -88,9 +89,14 @@ function GoneNote({ children }: { children?: ReactNode }) {
   )
 }
 
-function BackLink({ sessionId, href }: { sessionId: string; href?: string }) {
+/** To the parent subagent when there is one, else to the page the first link was followed from. */
+function BackLink({ sessionId, parentCallId }: { sessionId: string; parentCallId?: string }) {
+  const origin = useContext(SubagentOriginContext)
+  const href = parentCallId
+    ? subagentHref(sessionId, parentCallId, origin)
+    : backHref(sessionId, origin)
   return (
-    <Link href={href ?? agentHref(sessionId)} color="tone.running.fg" textDecoration="none">
+    <Link href={href} color="tone.running.fg" textDecoration="none">
       ← Back to parent chat
     </Link>
   )
@@ -137,6 +143,7 @@ export function SubagentPage({
   const sub = chat.subagent
   const running = sub?.status === SubagentStatusRunning
   const now = useNow(running)
+  const origin = useContext(SubagentOriginContext)
   if (!sub) return null
   // An archived parent shares the reason "compressed" with a compressed child; the server's
   // archived flag tells them apart. A plain gone parent has no title, a child's file holds one.
@@ -221,7 +228,7 @@ export function SubagentPage({
         {sub.chain?.map((level) => (
           <Fragment key={level.call_id}>
             {" › "}
-            <Link href={subagentHref(session.id, level.call_id)} color="inherit">
+            <Link href={subagentHref(session.id, level.call_id, origin)} color="inherit">
               {level.title || level.call_id}
             </Link>
           </Fragment>
@@ -257,10 +264,7 @@ export function SubagentPage({
           {sub.tool_calls !== undefined && (
             <Stat label="Tool calls" value={String(sub.tool_calls)} />
           )}
-          <BackLink
-            sessionId={session.id}
-            href={sub.parent_call_id ? subagentHref(session.id, sub.parent_call_id) : undefined}
-          />
+          <BackLink sessionId={session.id} parentCallId={sub.parent_call_id} />
         </Box>
       </Box>
       <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>

@@ -2,6 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react"
 import { useState } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { flowSession, liveFlowSessions } from "../design/view"
+import { routePath, triageHref } from "../hrefs"
 import { stateToken, type OpenFlow, type ResumeSession, type StopSession } from "../design/open"
 import { postAbandonTriage, postOpenTriage, type AbandonTriage, type TriageRowAction } from "./api"
 import { useDesignWrite } from "../design/SessionControls"
@@ -206,6 +207,7 @@ function TriageBody({
         }
         footer={<TriageHistory items={view.history} />}
         address={project}
+        origin={routePath(triageHref(project))}
         title={`Triage: ${project}`}
         icon={<PageIcon kind="triage" />}
         wide={wide}

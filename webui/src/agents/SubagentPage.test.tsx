@@ -1,6 +1,8 @@
 import { act, cleanup, screen } from "@testing-library/react"
+import type { ReactElement } from "react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { SessionChatResponse, SessionInfo, SessionSubagent } from "../generated/server"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { renderThemed } from "../ui/render"
 import { SubagentMissing, SubagentPage } from "./SubagentPage"
 
@@ -192,6 +194,52 @@ test("a nested subagent goes back to its parent subagent and the breadcrumb link
     "#/agents/s-a/subagents/call-1",
   )
   expect(screen.queryByRole("link", { name: "Inner" })).toBeNull()
+})
+
+const showFrom = (ui: ReactElement) =>
+  renderThemed(
+    <SubagentOriginContext.Provider value="/d/demo:x">{ui}</SubagentOriginContext.Provider>,
+  )
+const FROM = "?from=%2Fd%2Fdemo%3Ax"
+const hrefOf = (name: string | RegExp) => screen.getByRole("link", { name }).getAttribute("href")
+
+test("with an origin, a nested subagent's back link and breadcrumb levels keep it", () => {
+  showFrom(
+    <SubagentPage
+      session={session()}
+      chat={chat({
+        call_id: "call-2",
+        title: "Inner",
+        parent_call_id: "call-1",
+        chain: [{ call_id: "call-1", title: "Middle" }],
+        result: undefined,
+      })}
+    />,
+  )
+  expect(hrefOf(/Back to parent chat/)).toBe(`#/agents/s-a/subagents/call-1${FROM}`)
+  expect(hrefOf("Middle")).toBe(`#/agents/s-a/subagents/call-1${FROM}`)
+  expect(hrefOf("Main agent")).toBe("#/agents/s-a")
+})
+
+test("a first-level subagent's back link goes to the origin", () => {
+  showFrom(<SubagentPage session={session()} chat={chat({})} />)
+  expect(hrefOf(/Back to parent chat/)).toBe("#/d/demo:x")
+  expect(hrefOf("Main agent")).toBe("#/agents/s-a")
+})
+
+test("the unreadable-parent page follows the origin, its chat page link does not", () => {
+  const detail = chat(
+    { status: "not_available", unavailable: "compressed", title: undefined, prompt: undefined },
+    { messages: [], archived: true },
+  )
+  showFrom(<SubagentPage session={session()} chat={detail} />)
+  expect(hrefOf(/Back to parent chat/)).toBe("#/d/demo:x")
+  expect(hrefOf("chat page")).toBe("#/agents/s-a")
+})
+
+test("the missing-subagent page follows the origin", () => {
+  showFrom(<SubagentMissing sessionId="s-a" message="no such subagent" />)
+  expect(hrefOf(/Back to parent chat/)).toBe("#/d/demo:x")
 })
 
 test("the breadcrumb falls back to the session id", () => {

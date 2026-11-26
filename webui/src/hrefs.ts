@@ -62,9 +62,22 @@ export const SETTINGS_HREF = "#/settings"
 /** A session's label is its id. */
 export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`
 
-/** A subagent's page: the one place its URL is built. */
-export const subagentHref = (session: string, callId: string) =>
-  `${agentHref(encodeURIComponent(session))}/subagents/${encodeURIComponent(callId)}`
+/** A subagent's page: the one place its URL is built. `origin` is the router path its back link returns to. */
+export const subagentHref = (session: string, callId: string, origin?: string) => {
+  const href = `${agentHref(encodeURIComponent(session))}/subagents/${encodeURIComponent(callId)}`
+  return origin ? `${href}?from=${encodeURIComponent(origin)}` : href
+}
+
+/** The origin a subagent URL's query holds. */
+export const subagentOrigin = (search: string) =>
+  new URLSearchParams(search).get("from") ?? undefined
+
+// The exact paths of the chat, Design and Triage pages. The origin comes from the URL, so nothing else is followed.
+const ORIGIN_PATH = /^\/(agents|d|triage)\/[^/?#]+$/
+
+/** Where a first-level subagent's back link goes: the origin, else the session's chat page. */
+export const backHref = (session: string, origin?: string) =>
+  origin && ORIGIN_PATH.test(origin) ? `#${origin}` : agentHref(session)
 
 /** Splits the splat of `/agents/*` (already decoded by the router) into the session id and an optional subagent call id. */
 export const parseAgentSplat = (splat: string): { session: string; callId?: string } => {
@@ -74,5 +87,8 @@ export const parseAgentSplat = (splat: string): { session: string; callId?: stri
   return callId ? { session: splat.slice(0, at), callId } : { session: splat.slice(0, at) }
 }
 
+/** The router path of a hash href. */
+export const routePath = (href: string) => href.slice(1)
+
 /** The router path of an agent's page, for navigate(). */
-export const agentPath = (label: string) => agentHref(label).slice(1)
+export const agentPath = (label: string) => routePath(agentHref(label))

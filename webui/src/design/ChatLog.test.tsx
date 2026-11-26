@@ -631,7 +631,7 @@ test("on the Design chat a tools entry with a marked call shows only its link", 
     ),
   )
   const link = await screen.findByRole("link", { name: "Find auth ↗" })
-  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_9")
+  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_9?from=%2Fd%2Fgx%3Aa")
   expect(link.parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
   expect(screen.queryByText(/tool call|Read: /)).toBeNull()
   expect(screen.getAllByRole("link", { name: /↗/ })).toHaveLength(1)
@@ -659,7 +659,7 @@ const markedTools = (...states: (string | undefined)[]) =>
 test("a step page links a finished call, shows a no-record call as text and hides a running one", async () => {
   renderChat([session()], okChat(chatOf([markedTools("finished", "no_record", "running")])))
   const link = await screen.findByRole("link", { name: "finished ↗" })
-  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_0")
+  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_0?from=%2Fd%2Fgx%3Aa")
   expect(screen.getByText("Agent · Explore · no_record").querySelector("a")).toBeNull()
   expect(screen.queryByText(/Agent · Explore · running/)).toBeNull()
   expect(screen.getAllByRole("link", { name: /↗/ })).toHaveLength(1)

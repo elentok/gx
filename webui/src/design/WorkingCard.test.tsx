@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import type { ComponentProps, ReactElement } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { SessionTask } from "../generated/server"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { system } from "../ui/theme"
 import { elapsedText, formatElapsed, taskDetails, tokenText } from "./taskRows"
 import { WorkingCard as WorkingCardBase } from "./WorkingCard"
@@ -121,6 +122,17 @@ test("a running subagent row links to its page and shows its current call", () =
   expect(rows()[1]!.textContent).toBe("no call1m 05s")
   expect(rows()[1]!.querySelector("p")).toBeNull()
   expect(screen.queryByRole("button")).toBeNull()
+})
+
+test("a subagent row link carries the page's origin", () => {
+  renderThemed(
+    <SubagentOriginContext.Provider value="/triage/demo">
+      <WorkingCard tasks={[task({ kind: "subagent", label: "Explore", call_id: "c1" })]} />
+    </SubagentOriginContext.Provider>,
+  )
+  expect(screen.getByRole("link", { name: "Explore ↗" }).getAttribute("href")).toBe(
+    "#/agents/s%201/subagents/c1?from=%2Ftriage%2Fdemo",
+  )
 })
 
 test("a finished subagent row has no link, no second line and does not open", () => {

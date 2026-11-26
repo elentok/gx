@@ -1,7 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import type { SessionChatResponse, SessionTask } from "../generated/server"
 import { subagentHref } from "../hrefs"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { Card } from "../ui/card/Card"
 import { withKeys } from "../uniqueKeys"
 import { CallLabel } from "./CallLabel"
@@ -64,6 +65,7 @@ const ELLIPSIS = {
 } as const
 
 function SubagentName({ task, sessionId }: { task: SessionTask; sessionId: string }) {
+  const origin = useContext(SubagentOriginContext)
   if (!task.call_id) {
     return (
       <Text as="span" {...ELLIPSIS} color="tone.running.fg" title={task.label}>
@@ -73,7 +75,7 @@ function SubagentName({ task, sessionId }: { task: SessionTask; sessionId: strin
   }
   return (
     <chakra.a
-      href={subagentHref(sessionId, task.call_id)}
+      href={subagentHref(sessionId, task.call_id, origin)}
       {...ELLIPSIS}
       color="tone.running.fg"
       textDecoration="none"

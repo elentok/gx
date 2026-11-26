@@ -10,6 +10,7 @@ import type { PostAnswer, PostPrompt } from "../design/prompt"
 import type { FetchScreen } from "../design/screen"
 import { DesignActionsMenu, Failure, StartDesignButton } from "../design/SessionControls"
 import type { SessionInfo } from "../generated/server"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { PageHeader } from "../page/PageHeader"
 import { useKeyboardOpen } from "../page/useKeyboardOpen"
 import type { MenuEntry } from "../ui/menu/Menu"
@@ -40,6 +41,8 @@ export type DesignMenu = (ctx: {
 export interface SteppedPageProps {
   /** The flow's key: a Design's map address, a Triage's project. */
   address: string
+  /** This page's router path, which its subagent links lead back to. */
+  origin?: string
   title: string
   icon: ReactNode
   wide: boolean
@@ -112,6 +115,7 @@ function SessionStrip({
 /** The title row and the Chat and Progress columns every stepped flow shares. */
 export function SteppedPage({
   address,
+  origin,
   title,
   icon,
   wide,
@@ -287,27 +291,29 @@ export function SteppedPage({
           pr={progressColumn && sideColumn ? "4" : undefined}
         >
           {chatTop?.({ questions })}
-          <DesignChat
-            session={session}
-            chat={chat}
-            refetch={refetchChat}
-            post={actions.post}
-            answer={actions.answer}
-            done={model?.done}
-            nextTitle={model?.nextTitle}
-            working={working(session)}
-            logTop={compact ? undefined : logTop}
-            logTail={logTail}
-            tabsMenu={compact && hasRound ? menu(holdMenu) : undefined}
-            questions={questions}
-            onQuestions={(on) => setToggle({ key: viewKey, on })}
-            actions={{
-              address,
-              open: actions.open,
-              resume: actions.resume,
-              fetchScreen: actions.fetchScreen,
-            }}
-          />
+          <SubagentOriginContext.Provider value={origin}>
+            <DesignChat
+              session={session}
+              chat={chat}
+              refetch={refetchChat}
+              post={actions.post}
+              answer={actions.answer}
+              done={model?.done}
+              nextTitle={model?.nextTitle}
+              working={working(session)}
+              logTop={compact ? undefined : logTop}
+              logTail={logTail}
+              tabsMenu={compact && hasRound ? menu(holdMenu) : undefined}
+              questions={questions}
+              onQuestions={(on) => setToggle({ key: viewKey, on })}
+              actions={{
+                address,
+                open: actions.open,
+                resume: actions.resume,
+                fetchScreen: actions.fetchScreen,
+              }}
+            />
+          </SubagentOriginContext.Provider>
         </Box>
         {stepsInline && (
           <Box

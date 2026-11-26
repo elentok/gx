@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "../ui/button/Button"
 import { fetchArchive } from "./chat"
 import {
@@ -11,6 +11,7 @@ import {
   type SessionChatSubagentCall,
 } from "../generated/server"
 import { subagentHref } from "../hrefs"
+import { SubagentOriginContext } from "../subagentOrigin"
 import { ImageViewer } from "./ImageViewer"
 import { withKeys } from "../uniqueKeys"
 import { sessionImageUrl } from "./sessionImages"
@@ -238,13 +239,14 @@ function SubagentCallLine({
   sessionId: string
   linked: boolean
 }) {
+  const origin = useContext(SubagentOriginContext)
   const prefix = call.type ? `Agent · ${call.type} · ` : "Agent · "
   if (!linked) return <CallLine marked>{`${prefix}${call.description ?? ""}`}</CallLine>
   return (
     <CallLine marked>
       {prefix}
       <chakra.a
-        href={subagentHref(sessionId, call.call_id)}
+        href={subagentHref(sessionId, call.call_id, origin)}
         color="tone.running.fg"
         textDecoration="none"
         _hover={{ textDecoration: "underline" }}
