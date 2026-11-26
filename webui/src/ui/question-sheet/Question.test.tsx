@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { FileLinkProvider } from "../../files/FileLinkContext"
 import { stubResolver } from "../../files/stubResolver.testutil"
@@ -80,6 +80,14 @@ test("a picked text row shows its text field", () => {
   cleanup()
   show(options(), { answer: { choice: "a" } })
   expect(screen.queryByRole("textbox")).toBeNull()
+})
+
+test("a text row's large editor keeps the inline box's name, under the same dialog title", async () => {
+  show(options(), { answer: { choice: "other" } })
+  fireEvent.click(screen.getByRole("button", { name: "Open the note in a large editor" }))
+  const dialog = screen.getByRole("dialog", { name: "Other - Q1" })
+  const editor = await within(dialog).findByRole("textbox", { name: "Answer to question 1" })
+  expect(dialog.contains(editor)).toBe(true)
 })
 
 test("a fresh card has no pressed option and no recommended badge", () => {

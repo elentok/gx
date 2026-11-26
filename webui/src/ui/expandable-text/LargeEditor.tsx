@@ -37,6 +37,7 @@ export type EditorMenu = {
 /** The large editor of an PromptBox. It reads and writes the parent's text directly; Done only closes it. */
 export function LargeEditor({
   title,
+  textLabel = `${title} text`,
   value,
   onChange,
   placeholder,
@@ -46,6 +47,8 @@ export function LargeEditor({
   menu,
 }: {
   title: string
+  /** The editor's text box's accessible name. */
+  textLabel?: string
   value: string
   onChange: (text: string) => void
   placeholder?: string
@@ -106,7 +109,7 @@ export function LargeEditor({
         }
       >
         <CodeEditor
-          label={`${title} text`}
+          label={textLabel}
           value={value}
           onChange={onChange}
           placeholder={placeholder}

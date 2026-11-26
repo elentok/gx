@@ -230,6 +230,7 @@ export function Question({
               label={`Answer to question ${card.label}`}
               name="question-row-text"
               title={`${textRow.label} - ${nameOf(card)}`}
+              editorLabel={`Answer to question ${card.label}`}
               placeholder="Your answer"
               value={answer.text ?? ""}
               onChange={(t) => onChange({ ...answer, huh: false, text: t })}

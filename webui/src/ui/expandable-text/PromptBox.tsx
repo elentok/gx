@@ -32,8 +32,10 @@ interface FieldProps {
   label: string
   /** The textarea's name: stable and not card-like or contact-like, so the browser offers no AutoFill. */
   name: string
-  /** The large editor's title. Its accessible name is "<title> text". */
+  /** The large editor's title. */
   title: string
+  /** The accessible name of the large editor's text box (default: "<title> text"). */
+  editorLabel?: string
   placeholder?: string
   disabled?: boolean
   autoFocus?: boolean
@@ -148,6 +150,7 @@ function Field({
   label,
   name,
   title,
+  editorLabel,
   placeholder,
   disabled,
   autoFocus,
@@ -330,6 +333,7 @@ function Field({
       {selection && (
         <LargeEditor
           title={title}
+          textLabel={editorLabel}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
