@@ -7,6 +7,7 @@ import type { SessionInfo } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { BottomSheet } from "../ui/modal/BottomSheet"
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useWide } from "../useWide"
 import { refusalText, useWrite } from "../useWrite"
 import { realChatDrafts, type ChatDraftsClient } from "../design/chatDrafts"
@@ -102,34 +103,6 @@ function Alert({ children }: { children: ReactNode }) {
   )
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-}) {
-  const fieldRef = useFirstField()
-  return (
-    <chakra.input
-      aria-label={label}
-      autoComplete="off"
-      spellCheck={false}
-      ref={fieldRef}
-      fontSize="16px"
-      color="text"
-      bg="surface"
-      borderRadius="8px"
-      h="40px"
-      px="3"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  )
-}
-
 function DraftRenameForm({
   draft,
   saveFields = saveDraftFields,
@@ -142,6 +115,7 @@ function DraftRenameForm({
   // The page's slug field uses the same check; an empty slug is allowed and clears it.
   const problem = slugProblem(text)
   const [tried, setTried] = useState(false)
+  const fieldRef = useFirstField()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (pending) return
@@ -160,11 +134,16 @@ function DraftRenameForm({
   }
   return (
     <RenameSheet label="Rename draft" onSubmit={submit} disabled={pending}>
-      <Field
+      <TextBox
+        kind="line"
+        verbatim
         label="Slug"
+        hideLabel
+        name="draft-slug"
+        ref={fieldRef}
         value={text}
-        onChange={(v) => {
-          setText(v)
+        onChange={(e) => {
+          setText(e.currentTarget.value)
           setTried(false)
         }}
       />
@@ -187,6 +166,7 @@ function ChatDraftRenameForm({
   const [text, setText] = useState(draft.name)
   const { run, pending, refusal } = useWrite({ toastRefusal: false })
   const valid = nameOk(text)
+  const fieldRef = useFirstField()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!valid || pending) return
@@ -211,7 +191,16 @@ function ChatDraftRenameForm({
   }
   return (
     <RenameSheet label="Rename draft" onSubmit={submit} disabled={!valid || pending}>
-      <Field label="Name" value={text} onChange={setText} />
+      <TextBox
+        kind="line"
+        label="Title"
+        hideLabel
+        placeholder="Title"
+        name="draft-title"
+        ref={fieldRef}
+        value={text}
+        onChange={(e) => setText(e.currentTarget.value)}
+      />
       {refusal && <Alert>{refusalText(refusal)}</Alert>}
     </RenameSheet>
   )
@@ -227,6 +216,7 @@ function RenameForm({
   const [text, setText] = useState(session.name ?? "")
   const { run, pending, refusal } = useWrite({ toastRefusal: false })
   const valid = nameOk(text)
+  const fieldRef = useFirstField()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!valid || pending) return
@@ -234,7 +224,16 @@ function RenameForm({
   }
   return (
     <RenameSheet label="Rename chat" onSubmit={submit} disabled={!valid || pending}>
-      <Field label="Name" value={text} onChange={setText} />
+      <TextBox
+        kind="line"
+        label="Title"
+        hideLabel
+        placeholder="Title"
+        name="chat-title"
+        ref={fieldRef}
+        value={text}
+        onChange={(e) => setText(e.currentTarget.value)}
+      />
       {session.auto_name && (
         <Text fontSize="sm" color="text.dim">
           Automatic name from the terminal title

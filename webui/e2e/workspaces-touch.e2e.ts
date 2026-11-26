@@ -143,7 +143,7 @@ test("Workspaces touch", async ({ page, start }) => {
   await page.getByRole("button", nav("Show sidebar")).click()
   // Rename from the row's menu at 390px: the popup fits the screen, the page does not scroll sideways, and the rename shows in the row.
   const renameDialog = page.getByRole("dialog", nav("Rename chat"))
-  const renameField = renameDialog.getByRole("textbox", nav("Name"))
+  const renameField = renameDialog.getByRole("textbox", nav("Title"))
   const renameFromMenu = async (name: string) => {
     await chatMenu().click()
     await page.getByRole("menuitem", nav("Rename")).click()

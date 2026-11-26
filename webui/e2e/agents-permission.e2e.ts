@@ -420,7 +420,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await moreActions(page).click()
   await page.getByRole("menu", nav("More actions")).getByRole("menuitem", nav("Rename")).click()
   const renameDialog = page.getByRole("dialog", nav("Rename chat"))
-  await renameDialog.getByRole("textbox", nav("Name")).fill("held-name")
+  await renameDialog.getByRole("textbox", nav("Title")).fill("held-name")
   await page.keyboard.press("Enter")
   await expect(renameDialog).toHaveCount(0)
   await expect(row(page, held.s)).toContainText("held-name")

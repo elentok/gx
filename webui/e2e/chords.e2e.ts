@@ -253,7 +253,7 @@ test("Chords", async ({ page, start, context }) => {
   // Rename chat: Leader then r opens the popup on the open chat with its name selected, Enter renames it
   // everywhere without a reload and types /rename into the Claude chat, Esc and an empty name change nothing.
   const renameDialog = page.getByRole("dialog", { name: "Rename chat" })
-  const renameField = renameDialog.getByRole("textbox", nav("Name"))
+  const renameField = renameDialog.getByRole("textbox", nav("Title"))
   const renameButton = renameDialog.getByRole("button", nav("Rename"))
   const otherChat = (await sessions(fx)).find(
     (s) => s.id !== chordChat.id && !s.design && !s.queue && s.harness !== "codex" && s.name,

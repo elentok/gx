@@ -22,6 +22,8 @@ import { MascotToggle } from "../shell/MascotToggle"
 import { Button } from "../ui/button/Button"
 import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { textBoxLook } from "../ui/text-box/look"
+import { TextBox } from "../ui/text-box/TextBox"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { refusalText, useWrite } from "../useWrite"
@@ -70,16 +72,8 @@ const DAY_LABEL: Record<string, string> = {
   sun: "Sun",
 }
 
-const field = {
-  fontSize: "16px",
-  color: "text",
-  bg: "surface.raised",
-  borderWidth: "1px",
-  borderColor: "hairline",
-  borderRadius: "8px",
-  px: "3",
-  h: "40px",
-} as const
+/** The three selects wear the shared look at the size of the text boxes beside them. */
+const selectLook = { ...textBoxLook, px: "3", h: "40px" } as const
 
 function Row({
   part,
@@ -355,19 +349,16 @@ function Editor({
         borderColor="hairline"
       >
         <Box data-mock-part="name" flex="1" minW="0">
-          <chakra.input
-            aria-label="Name"
-            name="schedule-name"
-            autoComplete="off"
-            placeholder="Name"
+          <TextBox
+            kind="line"
+            look="bare"
+            size="title"
+            label="Title"
+            hideLabel
+            placeholder="Title"
+            name="schedule-title"
             value={form.name}
-            onChange={(e) => set({ name: e.target.value })}
-            w="100%"
-            bg="transparent"
-            fontSize="24px"
-            fontWeight="600"
-            color="text"
-            py="1"
+            onChange={(e) => set({ name: e.currentTarget.value })}
           />
           {inline("name") && (
             <Text role="alert" color="tone.error.fg" fontSize="13px" mt="1">
@@ -423,18 +414,18 @@ function Editor({
         <Box data-mock-part="times" display="flex" flexWrap="wrap" gap="2" alignItems="center">
           {form.times.map((t, i) => (
             <Box key={timeIds.current[i]} display="flex" alignItems="center" gap="1">
-              <chakra.input
-                {...field}
-                aria-label={`Time ${i + 1}`}
+              <TextBox
+                kind="line"
+                verbatim
+                label={`Time ${i + 1}`}
+                hideLabel
                 name={`schedule-time-${i}`}
-                autoComplete="off"
                 placeholder="HH:MM"
                 value={t}
-                onChange={(e) =>
-                  set({
-                    times: form.times.map((x, j) => (j === i ? e.target.value : x)),
-                  })
-                }
+                onChange={(e) => {
+                  const value = e.currentTarget.value
+                  set({ times: form.times.map((x, j) => (j === i ? value : x)) })
+                }}
                 w="88px"
               />
               <Button
@@ -466,7 +457,7 @@ function Editor({
           <Text pt="2">{form.project}</Text>
         ) : (
           <chakra.select
-            {...field}
+            {...selectLook}
             aria-label="Project"
             value={form.project}
             onChange={(e) => set({ project: e.target.value })}
@@ -482,7 +473,7 @@ function Editor({
 
       <Row part="row-harness" label="Harness">
         <chakra.select
-          {...field}
+          {...selectLook}
           aria-label="Harness"
           value={form.harness}
           onChange={(e) => set({ harness: e.target.value })}
@@ -497,7 +488,7 @@ function Editor({
 
       <Row part="row-tier" label="Tier">
         <chakra.select
-          {...field}
+          {...selectLook}
           aria-label="Tier"
           value={form.tier}
           onChange={(e) => set({ tier: e.target.value })}
@@ -516,14 +507,15 @@ function Editor({
         hint="hours · a missed run still starts within this"
         error={inline("lateLimit")}
       >
-        <chakra.input
-          {...field}
-          aria-label="Late limit"
+        <TextBox
+          kind="line"
+          verbatim
+          label="Late limit"
+          hideLabel
           name="schedule-late-limit"
-          autoComplete="off"
           inputMode="decimal"
           value={form.lateLimit}
-          onChange={(e) => set({ lateLimit: e.target.value })}
+          onChange={(e) => set({ lateLimit: e.currentTarget.value })}
           w="88px"
         />
       </Row>

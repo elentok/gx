@@ -76,7 +76,7 @@ test("203. Schedules journey", async ({ page, start }) => {
   await page.evaluate(() => (location.hash = "#/schedules"))
   await row("Weather check").click()
   await expect(page).toHaveURL(/#\/schedules\/demo:weather-check$/)
-  const name = page.getByLabel("Name", { exact: true })
+  const name = page.getByLabel("Title", { exact: true })
   const time = (n: number) => page.getByLabel(`Time ${n}`, { exact: true })
   const lateLimit = page.getByLabel("Late limit", { exact: true })
   const prompt = page.getByLabel("Prompt", { exact: true })

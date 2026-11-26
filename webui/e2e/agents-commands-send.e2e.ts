@@ -78,7 +78,7 @@ test("153. Send a command, typed once or nudged, and /clear", async ({ page, sta
   const renameDialog = page.getByRole("dialog", nav("Rename chat"))
   await moreActions(page).click()
   await page.getByRole("menuitem", nav("Rename")).click()
-  await renameDialog.getByRole("textbox", nav("Name")).fill("codex-renamed")
+  await renameDialog.getByRole("textbox", nav("Title")).fill("codex-renamed")
   await page.keyboard.press("Enter")
   await expect(renameDialog).toHaveCount(0)
   await expect.poll(() => fixture.cli("agents", "list")).toContain("codex-renamed")

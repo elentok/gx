@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 const chat = { ...session("s1", "gamma"), name: "talk" }
-const field = () => screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement
+const field = () => screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement
 const open = (rename = vi.fn(async () => ({})), s = chat) => {
   renderThemed(<RenameHost />)
   act(() => openRename({ session: s, rename }))
@@ -41,7 +41,7 @@ test("Enter renames with the trimmed name and closes", async () => {
   const rename = open()
   fireEvent.change(field(), { target: { value: "  new name  " } })
   fireEvent.submit(field().closest("form")!)
-  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull())
   expect(rename).toHaveBeenCalledExactlyOnceWith({ id: "s1", name: "new name" })
 })
 
@@ -79,10 +79,10 @@ test("the auto-name line shows only when auto_name is set", () => {
   expect(screen.queryByText("Automatic name from the terminal title")).toBeNull()
 })
 
-test("a session request still opens Rename chat with the Name field", () => {
+test("a session request still opens Rename chat with the Title field", () => {
   open()
   expect(screen.getByRole("dialog", { name: "Rename chat" })).toBeTruthy()
-  expect(field()).toBeTruthy()
+  expect(field().placeholder).toBe("Title")
 })
 
 describe("a chat draft request", () => {
@@ -105,9 +105,10 @@ describe("a chat draft request", () => {
     openChatDraft({ read: vi.fn(async () => ok()), save })
     expect(screen.getByRole("dialog", { name: "Rename draft" })).toBeTruthy()
     expect(field().value).toBe("old")
+    expect(field().placeholder).toBe("Title")
     fireEvent.change(field(), { target: { value: " fresh " } })
     fireEvent.submit(field().closest("form")!)
-    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull())
     expect(save).toHaveBeenCalledExactlyOnceWith({
       id: "c1",
       brief: "hi",
