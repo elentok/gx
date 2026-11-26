@@ -123,6 +123,7 @@ test("the right TOTP code finishes setup and goes to the app", async () => {
   fireEvent.change(screen.getByLabelText("Enter the code it shows"), {
     target: { value: "123456" },
   })
+  const entries = window.history.length
   fireEvent.click(screen.getByRole("button", { name: "Finish setup" }))
   await waitFor(() => expect(onDone).toHaveBeenCalled())
   const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
@@ -131,12 +132,14 @@ test("the right TOTP code finishes setup and goes to the app", async () => {
     totp_code: "123456",
   })
   expect(window.location.hash).toBe("#/")
+  expect(window.history.length).toBe(entries)
 })
 
 test("with TOTP off a good password finishes setup and goes to the app", async () => {
   const fetchMock = stubStart({})
   const onDone = vi.fn()
   await toPasswordStep(false, onDone)
+  const entries = window.history.length
   submitPasswords("correct horse battery", "correct horse battery", "Finish setup")
   await waitFor(() => expect(onDone).toHaveBeenCalled())
   const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
@@ -146,6 +149,7 @@ test("with TOTP off a good password finishes setup and goes to the app", async (
     password: "correct horse battery",
   })
   expect(window.location.hash).toBe("#/")
+  expect(window.history.length).toBe(entries)
 })
 
 test("a refusal from setup finish is shown", async () => {

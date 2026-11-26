@@ -95,15 +95,16 @@ function fakeConnection(connected: boolean, snapshot: Snapshot = emptySnapshot) 
   } as unknown as Connection & { emit: (address?: string) => void }
 }
 
+/** An array of paths is a history that opens on its last entry. */
 function renderAt(
-  path: string,
+  path: string | string[],
   fetchDetail: FetchDetail,
   conn: Connection = fakeConnection(true),
   fetchEpic?: FetchEpicDetail,
   extra: RouteFetchers = {},
 ) {
   const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, epic: fetchEpic, ...extra }), {
-    initialEntries: [path],
+    initialEntries: [path].flat(),
   })
   const rendered = renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -297,6 +298,15 @@ test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])(
     expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy()
   },
 )
+
+test("the catch-all redirect leaves no history entry for the unknown path", async () => {
+  const { router } = renderAt(["/agents", "/nope"], okFor)
+  await waitFor(() => expect(epicsFilter()).toBeTruthy())
+  await act(async () => {
+    await router.navigate(-1)
+  })
+  expect(router.state.location.pathname).toBe("/agents")
+})
 
 test.each([
   ["/agents", "No chats yet"],

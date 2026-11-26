@@ -4,7 +4,7 @@ import { lazy } from "react"
 import {
   createHashRouter,
   Navigate,
-  redirect,
+  replace,
   useLocation,
   useParams,
   type RouteObject,
@@ -314,7 +314,7 @@ export const catchAllRoute: RouteObject = {
   path: "*",
   loader: () => {
     noteCatchAll()
-    return redirect("/epics")
+    return replace("/epics")
   },
 }
 

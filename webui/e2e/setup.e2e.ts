@@ -14,6 +14,11 @@ const stepText = (page: Page, text: string) => page.getByText(text, { exact: fal
 const signedIn = (page: Page) =>
   expect(page.getByRole("heading", { name: "Epics" }).or(epicsButton(page)).first()).toBeVisible()
 
+async function onEpicsWithNothingBehind(page: Page) {
+  await expect(page).toHaveURL(/#\/epics$/)
+  expect(await page.evaluate(() => navigation.canGoBack)).toBe(false)
+}
+
 /** The setup starts with no secret, so the fixture takes the key step 3 shows. */
 async function adoptKey(page: Page, fixture: Fixture) {
   fixture.setTotpSecret(await renderedText(page.locator('[data-mock-part="totp-key"] code')))
@@ -63,6 +68,7 @@ test("99. First-run setup", async ({ page, start }) => {
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode())
   await page.getByRole("button", { name: "Finish setup" }).click()
   await signedIn(page)
+  await onEpicsWithNothingBehind(page)
 })
 
 test("100. Setup from the QR link", async ({ page, start }) => {
@@ -87,7 +93,7 @@ test("100. Setup from the QR link", async ({ page, start }) => {
   await opened.getByRole("button", { name: "Finish setup" }).click()
   await signedIn(opened)
   // `#/` redirects to the Epics page, so the URL no longer holds `#/setup`.
-  expect(opened.url()).toMatch(/#\/epics$/)
+  await onEpicsWithNothingBehind(opened)
 })
 
 test("101. Setup and login with TOTP off", async ({ page, start }) => {
@@ -99,6 +105,7 @@ test("101. Setup and login with TOTP off", async ({ page, start }) => {
   await passwords(page, GOOD_PASSWORD)
   await page.getByRole("button", { name: "Finish setup" }).click()
   await signedIn(page)
+  await onEpicsWithNothingBehind(page)
 
   await page.evaluate(() => (window.location.hash = "#/settings"))
   const account = page.getByRole("button", { name: /^Account/ })

@@ -229,7 +229,7 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
         return setError(reasonText(res))
       }
       saveSetup()
-      window.location.hash = "#/"
+      history.replaceState(null, "", "#/")
       onDone()
     } catch (err) {
       setError(String(err))
