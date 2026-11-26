@@ -1,11 +1,8 @@
 import { useCallback, useRef } from "react"
 import type { Connection } from "../connection"
-import { fetchSubagentChat } from "../design/chat"
+import { EventSessionSubagentChanged, fetchSubagentChat } from "../design/chat"
 import type { SessionChatResponse } from "../generated/server"
 import { useDetail } from "../ticket/detail"
-
-// wire.EventSessionSubagentChanged: addressed to the root session, `call` names the call id.
-const EventSessionSubagentChanged = "session-subagent-changed"
 
 export type FetchSubagentChat = typeof fetchSubagentChat
 

@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs"
 import type { Locator, Page } from "@playwright/test"
 import { card, expect, test } from "./fixture"
-import { chatOf, go, sessions, sidebar } from "./agentsKit"
+import { appendSubagentCall, chatOf, go, sessions, sidebar } from "./agentsKit"
 
 const list = (scope: Page | Locator) => scope.getByRole("list", { name: "Tasks" })
 const rows = (scope: Page | Locator) => list(scope).getByRole("listitem")
@@ -75,20 +75,13 @@ test("208. Task list", async ({ page, start }) => {
   const kept = rowOf(page, "python3").getByRole("button").first()
   await kept.click()
   await expect(kept).toHaveAttribute("aria-expanded", "true")
-  appendFileSync(
-    fixture.transcripts.claude,
-    `${JSON.stringify({
-      type: "assistant",
-      uuid: "bg-reload",
-      timestamp: new Date().toISOString(),
-      message: {
-        id: "msg_reload",
-        role: "assistant",
-        content: [{ type: "text", text: "Still watching the log." }],
-      },
-    })}\n`,
-  )
-  await expect(page.getByText("Still watching the log.")).toBeVisible()
+  // Only the running subagent's file grows (bgtx agentID); the card's new call shows that the chat reloaded.
+  // Twice: an event from the page's own load can carry the first call even with no watch.
+  const surveyor = fixture.transcripts.claude.replace(/\.jsonl$/, "/subagents/agent-a5c0de01.jsonl")
+  for (const command of ["echo still-surveying", "echo surveying-more"]) {
+    appendSubagentCall(surveyor, command)
+    await expect(rowOf(page, "Survey the sessions code")).toContainText(command)
+  }
   await expect(kept).toHaveAttribute("aria-expanded", "true")
 
   // The elapsed time of a running row moves with no request meanwhile.
@@ -297,13 +290,12 @@ test("217. Working card states", async ({ page, start }) => {
   const row = rowOf(one, TICKETS)
   await expect(row).toContainText(READ)
   await expect(row.locator(":scope > *")).toHaveCount(2)
-  const timestamp = new Date().toISOString()
   appendFileSync(
     fixture.taskFiles["subagent-card-tickets-file"],
     `${JSON.stringify({
       type: "user",
       isSidechain: true,
-      timestamp,
+      timestamp: new Date().toISOString(),
       message: {
         role: "user",
         content: [
@@ -312,21 +304,6 @@ test("217. Working card states", async ({ page, start }) => {
       },
     })}\n`,
   )
-  // A subagent file change does not reload the chat; a parent line does.
-  appendFileSync(
-    fixture.subagents!.parentPath,
-    `${JSON.stringify({
-      type: "assistant",
-      uuid: "card-reload",
-      timestamp,
-      message: {
-        id: "msg_card_reload",
-        role: "assistant",
-        content: [{ type: "text", text: "Still waiting on the explorer." }],
-      },
-    })}\n`,
-  )
-  await expect(page.getByText("Still waiting on the explorer.")).toBeVisible()
   await expect(row.locator(":scope > *")).toHaveCount(1)
   await expect(row).not.toContainText(READ)
 })

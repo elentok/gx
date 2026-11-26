@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs"
 import type { Page, Route } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
 import { expect, type Fixture } from "./fixture"
@@ -21,6 +22,22 @@ export const codexIdle = async (fixture: Fixture) =>
   )!
 
 export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agents/${s.id}"]`)
+
+/** Appends an open Bash call to a Claude subagent's file: the newest call with no result is its current call. */
+export const appendSubagentCall = (file: string, command: string) =>
+  appendFileSync(
+    file,
+    `${JSON.stringify({
+      type: "assistant",
+      isSidechain: true,
+      timestamp: new Date().toISOString(),
+      message: {
+        id: `msg_${command}`,
+        role: "assistant",
+        content: [{ type: "tool_use", id: `toolu_${command}`, name: "Bash", input: { command } }],
+      },
+    })}\n`,
+  )
 
 /** The shell sidebar every page shares; the Agents page has no list of its own. */
 export const sidebar = (page: Page) =>

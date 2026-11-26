@@ -29,7 +29,7 @@ export const session = (
   ...over,
 })
 
-export const focusPosts: { session: string }[] = []
+export const focusPosts: { session: string; card?: boolean }[] = []
 
 // Call once at the top of each AgentsPage test file: it registers the shared cleanup and fetch stub.
 export function installAgentsPageHooks() {

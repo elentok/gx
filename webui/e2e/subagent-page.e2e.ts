@@ -2,7 +2,7 @@ import { appendFileSync } from "node:fs"
 import type { Locator, Page } from "@playwright/test"
 import type { SessionChatResponse } from "../src/generated/server"
 import { expect, test } from "./fixture"
-import { go, sessions } from "./agentsKit"
+import { appendSubagentCall, go, sessions } from "./agentsKit"
 
 const DESIGN = "#/d/demo:design-epic"
 const FINISHED = "Check the wire types"
@@ -343,6 +343,74 @@ test("216. Subagent page", async ({ page, start }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0)
   await backLink(page).click()
   await expect(page).toHaveURL(ending(DESIGN))
+})
+
+// Why a flow: the page's focus report makes the real server watch the subagent file and send the event that reloads
+// the card over SSE, again after the tab is hidden and shown. focus.test.tsx and AgentsPage.subagent.test.tsx (vitest)
+// and the Go watch tests each see one half.
+test("222. Working card live updates", async ({ page, start }) => {
+  const card = page.locator("[data-mock-part='card']")
+  // Only the subagent's file grows in this flow: the parent writes nothing.
+  const two = await start("subagents", { shape: "card-two-running" })
+  const tickets = two.taskFiles["subagent-card-tickets-file"]
+  const shows = async (command: string) => {
+    appendSubagentCall(tickets, command)
+    await expect(card).toContainText(command)
+  }
+
+  const chat = `#/agents/${two.subagents!.sessionId}`
+  await go(page, chat)
+  await expect(page).toHaveURL(ending(chat))
+  await expect(cardLink(page, TICKETS)).toBeVisible()
+  // Twice: an event from the page's own load can carry the first call even with no watch.
+  await shows("echo on-the-chat-page")
+  await shows("echo again-on-the-chat-page")
+
+  await go(page, DESIGN)
+  await expect(page).toHaveURL(ending(DESIGN))
+  await expect(cardLink(page, TICKETS)).toBeVisible()
+  await shows("echo on-the-design-page")
+
+  // Hidden, then shown: the server hears both, and the card follows the file again.
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "visibilityState", {
+        value: h ? "hidden" : "visible",
+        configurable: true,
+      })
+      document.dispatchEvent(new Event("visibilitychange"))
+    }, hidden)
+  const unfocused = page.waitForResponse(
+    (r) => r.url().endsWith("/v1/sessions/focus") && r.request().postDataJSON().focused === false,
+  )
+  await setHidden(true)
+  await unfocused
+  appendSubagentCall(tickets, "echo while-hidden")
+  await setHidden(false)
+  await expect(card).toContainText("echo while-hidden")
+  await shows("echo after-showing")
+
+  const codex = await start("subagents", { shape: "codex-running-call" })
+  const codexChat = `#/agents/${codex.subagents!.sessionId}`
+  await go(page, codexChat)
+  await expect(page).toHaveURL(ending(codexChat))
+  await expect(card).toContainText("go vet ./...")
+  appendFileSync(
+    codex.taskFiles["subagent-codex-rollout"],
+    `${JSON.stringify({
+      // Past the child's history start, or the line reads as inherited from the parent.
+      ordinal: 100,
+      type: "response_item",
+      timestamp: new Date().toISOString(),
+      payload: {
+        type: "function_call",
+        name: "exec_command",
+        call_id: "cxk-live",
+        arguments: JSON.stringify({ cmd: "go test ./live" }),
+      },
+    })}\n`,
+  )
+  await expect(card).toContainText("go test ./live")
 })
 
 // Why a flow: an old Codex rollout reaches the chat read and two pages through the server, which decides that the call

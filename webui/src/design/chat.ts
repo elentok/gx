@@ -33,18 +33,39 @@ export const codexSkillHint = (harness: string | undefined, draft: string) =>
     ? "Codex skills start with $. Type $gx-... instead."
     : undefined
 
-/** The chat refetches on any event addressed to the session: its chat grew (session-chat-changed) or it changed (session-changed). */
+// wire.EventSessionSubagentChanged: addressed to the root session; `client` names the tab it is for.
+export const EventSessionSubagentChanged = "session-subagent-changed"
+
+/**
+ * The chat refetches on any event addressed to the session: its chat grew (session-chat-changed) or it
+ * changed (session-changed). A subagent event counts only for this tab: every stream gets every tab's.
+ */
 export const useSessionChat = (
   sessionId: string | undefined,
   conn: Connection,
   fetcher: FetchChat = fetchChat,
 ) => {
   // Stable, or useDetail refetches on every render. No session id (none, or a harness with no chat): nothing to fetch.
-  const fetchOrNone = useCallback<FetchChat>(
-    (id) => (id ? fetcher(id) : Promise.resolve({ kind: "not-found" })),
-    [fetcher],
+  const fetchOne = useCallback(
+    (): ReturnType<FetchChat> =>
+      sessionId ? fetcher(sessionId) : Promise.resolve({ kind: "not-found" }),
+    [fetcher, sessionId],
   )
-  return useDetail(sessionId ?? "", conn, fetchOrNone)
+  const accepts = useCallback(
+    (address: string | undefined, type: string, data: Record<string, unknown>) =>
+      address === sessionId &&
+      (type !== EventSessionSubagentChanged || data?.client === conn.clientId),
+    [sessionId, conn],
+  )
+  // The key is not the session id, or useDetail would refetch on the address match before it asks `accepts`.
+  return useDetail<SessionChatResponse>(
+    `chat\n${sessionId ?? ""}`,
+    conn,
+    fetchOne,
+    undefined,
+    undefined,
+    accepts,
+  )
 }
 
 const roundCardOf = (chat: SessionChatResponse | null | undefined) =>

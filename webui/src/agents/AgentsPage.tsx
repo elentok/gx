@@ -2,7 +2,7 @@ import { Box, Heading, Kbd, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
-import type { FetchChat } from "../design/chat"
+import { hasChat, type FetchChat } from "../design/chat"
 import { useFocusReport } from "../design/focus"
 import type { FetchScreen } from "../design/screen"
 import { DetailPage } from "../page/DetailPage"
@@ -103,7 +103,8 @@ export function AgentsPage({
   }, [justCreated, selected])
   const creating = justCreated && !listed && !graceOver
   const gone = !!selected && !!sessions && liveSnapshot && !listed && !creating
-  useFocusReport(conn, listed ? selected : undefined, streams)
+  // The subagent page shows no working card.
+  useFocusReport(conn, listed ? selected : undefined, streams, hasChat(session?.harness) && !callId)
   useReadyWhen(
     !!sessions,
     gone || (!selected && sessions?.length === 0) ? "empty" : "ready",

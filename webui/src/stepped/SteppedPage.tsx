@@ -188,7 +188,7 @@ export function SteppedPage({
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`
   const hasRound = chatty && roundOf(chat).length > 0
   const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true)
-  useFocusReport(conn, session?.id, connState.streams, actions.focus)
+  useFocusReport(conn, session?.id, connState.streams, !!session && chatty, actions.focus)
   const menu = (onOpenChange: (open: boolean) => void = () => {}) =>
     designMenu ? (
       designMenu({ shown: session, live, onSelect: setSelected, onOpenChange })

@@ -16,12 +16,17 @@ export const postFocus: PostFocus = async (report) => {
 
 const visible = () => document.visibilityState === "visible"
 
-// Reports the tab's focus (its visibility) and the session on screen, again on every change.
-// A new event stream also reports again: the server forgets a client when its stream closes.
+// The server drops a report older than the last one it applied for this client. Pages share the client, so
+// the count is the tab's, not one hook's: a leaving page's report must stay older than the next page's.
+let seq = 0
+
+// Reports the tab's focus (its visibility), the session on screen and whether its working card shows, again
+// on every change. A new event stream also reports again: the server forgets a client when its stream closes.
 export function useFocusReport(
   conn: Connection,
   session: string | undefined,
   streams: number,
+  card: boolean,
   post: PostFocus = postFocus,
 ) {
   const [focused, setFocused] = useState(visible)
@@ -32,12 +37,18 @@ export function useFocusReport(
   }, [])
   useEffect(() => {
     if (streams === 0) return
-    void post({ client: conn.clientId, focused, session: session ?? "" }).catch(() => {})
-  }, [conn, post, focused, session, streams])
+    void post({
+      client: conn.clientId,
+      focused,
+      session: session ?? "",
+      card: card || undefined,
+      seq: ++seq,
+    }).catch(() => {})
+  }, [conn, post, focused, session, card, streams])
   // Keyed on conn and post only: a stream or session change must not post a transient "left" that could land after the next report.
   useEffect(
     () => () => {
-      void post({ client: conn.clientId, focused: false, session: "" }).catch(() => {})
+      void post({ client: conn.clientId, focused: false, session: "", seq: ++seq }).catch(() => {})
     },
     [conn, post],
   )

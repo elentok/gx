@@ -122,7 +122,10 @@ import (
 //
 // Subagent call with no record flow (+1): an old Codex rollout through the server to the chat read and two pages; no
 // other flow starts that scenario shape, and the vitest and Go tests each see one half.
-const maxFlows = 178
+//
+// Working card live updates flow (+1): a focus report starts the server's file watch and its SSE event reloads the
+// card, also after a hide and show; focus.test.tsx, AgentsPage.subagent.test.tsx and the Go watch tests see one half.
+const maxFlows = 179
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

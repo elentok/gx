@@ -31,6 +31,41 @@ test("the subagent route shows the subagent page and the focus report names the 
   expect(subagentChat).toHaveBeenCalledWith("s-1", "call-1")
   await waitFor(() => expect(focusPosts.some((p) => p.session === "s-1")).toBe(true))
   expect(focusPosts.every((p) => !p.session.includes("subagents"))).toBe(true)
+  expect(focusPosts.filter((p) => p.card)).toEqual([])
+})
+
+test("moving from the chat page to its subagent page drops the card flag", async () => {
+  const { router } = render([session("s-1", "p")], "/agents/s-1", true, {
+    ...chatOf(chat()),
+    subagentChat: async () => ({ kind: "ok" as const, detail: subChat("call-1") }),
+    subagentWatch: noWatch,
+  })
+  await waitFor(() => expect(focusPosts.at(-1)).toMatchObject({ session: "s-1", card: true }))
+  await act(() => router.navigate("/agents/s-1/subagents/call-1"))
+  await screen.findByText("from the subagent")
+  await waitFor(() => expect(focusPosts.at(-1)?.card).toBeUndefined())
+  expect(focusPosts.at(-1)?.session).toBe("s-1")
+})
+
+test("the chat reloads on this tab's subagent event, not on one for another client", async () => {
+  let text = "v1"
+  const fetchChat = vi.fn(async () => ({
+    kind: "ok" as const,
+    detail: chat({
+      messages: [{ id: "m1", role: "agent", kind: "text", text, at: "2026-01-01T00:00:00Z" }],
+    }),
+  }))
+  const { emit } = render([session("s-1", "p")], "/agents/s-1", true, { chat: fetchChat })
+  await screen.findByText("v1")
+  const loads = fetchChat.mock.calls.length
+  text = "v2"
+  emit("s-1", "session-subagent-changed", { client: "c2" })
+  expect(fetchChat).toHaveBeenCalledTimes(loads)
+  emit("s-1", "session-subagent-changed", { client: "c1" })
+  await screen.findByText("v2")
+  text = "v3"
+  emit("s-1", "session-chat-changed")
+  await screen.findByText("v3")
 })
 
 test("an unknown session at a subagent URL shows the gone notice", async () => {
