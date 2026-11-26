@@ -348,7 +348,7 @@ export function AppShell({
         <RenameHost />
         <ModelPickerHost />
         <WorkspacePickerHost />
-        <ChordHost />
+        <ChordHost fetchEpicList={fetchEpicList} active={active} />
       </Box>
     </ShellContext.Provider>
   )

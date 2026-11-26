@@ -87,6 +87,36 @@ test("lists the real chord table: the entity group, a separator, then the app gr
   ])
 })
 
+test("lists Next item and Previous item after Back and Forward", () => {
+  const table = chordTable({
+    actions: [],
+    history: noop,
+    nav: { canBack: true, canForward: true, back: noop, forward: noop },
+    items: { next: noop, prev: noop },
+  })
+  renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={noop} />)
+  expect(
+    screen
+      .getAllByRole("menuitem")
+      .map((i) => i.textContent)
+      .slice(-4),
+  ).toEqual([",Back", ".Forward", "jNext item", "kPrevious item"])
+})
+
+test.each([
+  ["Next item", "next"],
+  ["Previous item", "prev"],
+])("a click on the %s row runs it, then closes", (name, move) => {
+  const calls: string[] = []
+  const items = { next: () => calls.push("next"), prev: () => calls.push("prev") }
+  const table = chordTable({ actions: [], history: noop, items })
+  renderThemed(
+    <ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={() => calls.push("close")} />,
+  )
+  fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(name) }))
+  expect(calls).toEqual([move, "close"])
+})
+
 test.each([
   ["Back", "back"],
   ["Forward", "forward"],

@@ -15,6 +15,7 @@ import { registerHistoryOpener } from "../history/historyOpener"
 import { registerChatDraftPage, registerDraftPage } from "./draftPageActions"
 import { WorkspacePickerHost } from "./WorkspacePickerHost"
 import { closeRename, useRenameRequest } from "./renameOpen"
+import type { FetchEpicList } from "../epics/list"
 
 beforeEach(() => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64")
@@ -33,6 +34,8 @@ const chord = (key: string, run: () => void): Chord => ({
   available: () => true,
 })
 
+const emptyList: FetchEpicList = async () => ({ epics: [], follow_ups: [] })
+
 function setup(chords: Chord[], leader = "ctrl+e", extra: React.ReactNode = null) {
   const state = { snapshot: { leader_key: leader }, connected: true } as unknown as ConnectionState
   const conn = {
@@ -48,7 +51,7 @@ function setup(chords: Chord[], leader = "ctrl+e", extra: React.ReactNode = null
           <>
             <input aria-label="field" />
             {extra}
-            <ChordHost chords={chords} />
+            <ChordHost chords={chords} fetchEpicList={emptyList} active="Default" />
           </>
         ),
       },
@@ -227,6 +230,7 @@ function setupChats(
   path: string,
   sessions = [session("s1", "gamma"), session("s2", "gamma")],
   snapshot: Record<string, unknown> = {},
+  extra: React.ReactNode = null,
 ) {
   const state = {
     snapshot: { leader_key: "ctrl+e", sessions, ...snapshot },
@@ -248,7 +252,8 @@ function setupChats(
             <PathProbe />
             <ConfirmHost />
             <WorkspacePickerHost />
-            <ChordHost />
+            {extra}
+            <ChordHost fetchEpicList={emptyList} active="Default" />
           </>
         ),
       },
@@ -592,6 +597,136 @@ describe("Leader then , and .", () => {
     press("Comma")
     expect(box()).toBeNull()
     expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
+describe("Leader then j and k", () => {
+  const scrollIntoView = Element.prototype.scrollIntoView
+  afterEach(() => {
+    Element.prototype.scrollIntoView = scrollIntoView
+  })
+
+  const ids = ["s1", "s2"]
+  const path = () => screen.getByTestId("path").textContent
+  const row = (name: string) => screen.queryByRole("menuitem", { name: new RegExp(name) })
+  const nextRow = () => screen.findByRole("menuitem", { name: /Next item/ })
+
+  const mount = (at: string) =>
+    setupChats(
+      at,
+      ids.map((id) => session(id, "gamma")),
+      { placements: ids.map((id) => ({ session: id, kind: "chat", workspace: "Default" })) },
+      <ul data-nav-list="">
+        {ids.map((id) => (
+          <li key={id}>
+            <a href={`#/agents/${id}`} data-nav={`row:${id}`}>
+              {id}
+            </a>
+          </li>
+        ))}
+      </ul>,
+    )
+
+  /** Opens the box and waits for the row, which needs the epic list. */
+  async function step(code: "KeyJ" | "KeyK", name: string) {
+    leaderKey()
+    await screen.findByRole("menuitem", { name: new RegExp(name) })
+    press(code)
+  }
+
+  test("opens the next and previous row as new entries, with no state and no focus move", async () => {
+    const router = mount("/agents/s1")
+    const field = screen.getByLabelText("Message")
+    field.focus()
+
+    await step("KeyJ", "Next item")
+    await waitFor(() => expect(path()).toBe("/agents/s2"))
+    expect([router.state.historyAction, router.state.location.state]).toEqual(["PUSH", null])
+    expect(document.activeElement).toBe(field)
+
+    await step("KeyK", "Previous item")
+    await waitFor(() => expect(path()).toBe("/agents/s1"))
+    expect([router.state.historyAction, router.state.location.state]).toEqual(["PUSH", null])
+  })
+
+  test.each(
+    ["KeyJ", "KeyK"].flatMap((code) =>
+      ["shiftKey", "metaKey", "ctrlKey", "altKey"].map((mod) => [mod, code]),
+    ),
+  )("%s with %s closes the box and stays", async (mod, code) => {
+    // From /settings both keys have a target.
+    const router = mount("/settings")
+    leaderKey()
+    await nextRow()
+    const navigate = vi.spyOn(router, "navigate")
+    press(code, { [mod]: true })
+    expect(box()).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test("a row with no target is hidden, its key stays, and the open box follows the sidebar", async () => {
+    const router = mount("/agents/s1")
+    leaderKey()
+    await nextRow()
+    expect(row("Previous item")).toBeNull()
+    const navigate = vi.spyOn(router, "navigate")
+    press("KeyK")
+    expect(box()).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+
+    leaderKey()
+    expect(row("Next item")).toBeTruthy()
+    act(() => screen.getByText("s2").remove())
+    await waitFor(() => expect(row("Next item")).toBeNull())
+  })
+
+  test("without the Navigation API j still opens a row and there is no Back or Forward", async () => {
+    mount("/settings")
+    leaderKey()
+    await nextRow()
+    expect([row("Back"), row("Forward")]).toEqual([null, null])
+    press("KeyJ")
+    await waitFor(() => expect(path()).toBe("/agents/s1"))
+  })
+
+  test("on a page with no row, j continues from the last row, also after a remount", async () => {
+    const router = mount("/agents/s1")
+    // Stored with no chord run.
+    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe("row:s1"))
+    await act(() => router.navigate("/settings"))
+    await step("KeyJ", "Next item")
+    await waitFor(() => expect(path()).toBe("/agents/s2"))
+
+    await act(() => router.navigate("/agents/s1"))
+    await waitFor(() => expect(sessionStorage.getItem("gx.sidebar.last-row")).toBe("row:s1"))
+    cleanup()
+    mount("/settings")
+    await step("KeyJ", "Next item")
+    await waitFor(() => expect(path()).toBe("/agents/s2"))
+  })
+
+  test("with blocked storage the last row still works", async () => {
+    const blocked = () => {
+      throw new Error("blocked")
+    }
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked)
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked)
+    const router = mount("/agents/s1")
+    leaderKey()
+    await nextRow()
+    press("Escape")
+    await act(() => router.navigate("/settings"))
+    await step("KeyJ", "Next item")
+    await waitFor(() => expect(path()).toBe("/agents/s2"))
+  })
+
+  test("a step scrolls the new row into view", async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    mount("/agents/s1")
+    await step("KeyJ", "Next item")
+    expect(scroll.mock.contexts).toEqual([screen.getByText("s2")])
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" })
   })
 })
 

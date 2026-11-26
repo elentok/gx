@@ -159,21 +159,42 @@ export type HistoryNav = {
   forward: () => void
 }
 
+/** The steps along the sidebar. A step is absent when it has no target. */
+export type ItemNav = {
+  next?: () => void
+  prev?: () => void
+}
+
 /**
  * The chord table: the open entity's registry chords, then the app-level ones. `history` opens the
  * History popup, handed in so this module does not depend on it. `nav` is absent in a browser that
- * cannot report its history, and then there are no Back and Forward chords.
+ * cannot report its history, and then there are no Back and Forward chords. Without `items` there
+ * are no Next item and Previous item chords.
  */
 export function chordTable({
   actions,
   history,
   nav,
+  items,
 }: {
   actions: EntityAction[]
   history: () => void
   nav?: HistoryNav
+  items?: ItemNav
 }): Chord[] {
-  return [...entityChords(actions), ...appChords(history), ...(nav ? navChords(nav) : [])]
+  return [
+    ...entityChords(actions),
+    ...appChords(history),
+    ...(nav ? navChords(nav) : []),
+    ...(items ? itemChords(items) : []),
+  ]
+}
+
+function itemChords({ next, prev }: ItemNav): Chord[] {
+  return [
+    { key: "j", label: () => "Next item", run: () => next?.(), available: () => !!next },
+    { key: "k", label: () => "Previous item", run: () => prev?.(), available: () => !!prev },
+  ]
 }
 
 function navChords(nav: HistoryNav): Chord[] {

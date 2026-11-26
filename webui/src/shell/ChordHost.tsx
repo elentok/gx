@@ -9,7 +9,9 @@ import { ChordBox } from "./ChordBox"
 import { openHistory } from "../history/historyOpener"
 import { chordKeyOf, chordTable, matchesKey, type Chord } from "./chords"
 import { useHistoryState } from "./useHistoryState"
+import { useNextPrev } from "./useNextPrev"
 import { useOpenEntityActions } from "./useOpenEntityActions"
+import type { FetchEpicList } from "../epics/list"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
@@ -19,7 +21,15 @@ const BOX = '[role="menu"][aria-label="Chords"]'
  * is open, takes every key so no field or other window listener sees it. There is no timer.
  * `chords` replaces the real table (tests pass their own).
  */
-export function ChordHost({ chords }: { chords?: Chord[] }) {
+export function ChordHost({
+  chords,
+  fetchEpicList,
+  active,
+}: {
+  chords?: Chord[]
+  fetchEpicList?: FetchEpicList
+  active: string
+}) {
   const { snapshot } = useConnectionState(useConnectionContext())
   const leader = leaderKeyOf(snapshot)
   const { path: pathname, session, actions } = useOpenEntityActions()
@@ -37,6 +47,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
 
   const navigate = useNavigate()
   const { supported, canGoBack, canGoForward } = useHistoryState()
+  const items = useNextPrev(fetchEpicList, active)
   const table =
     chords ??
     chordTable({
@@ -52,6 +63,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
             forward: () => void navigate(1),
           }
         : undefined,
+      items,
     })
   const tableRef = useLatest(table)
 
