@@ -3,9 +3,10 @@ import type { Locator, Page } from "@playwright/test"
 import { card, expect, test } from "./fixture"
 import { chatOf, go, sessions, sidebar } from "./agentsKit"
 
-const list = (page: Page) => page.getByRole("list", { name: "Tasks" })
-const rows = (page: Page) => list(page).getByRole("listitem")
-const rowOf = (page: Page, label: string) => rows(page).filter({ hasText: label }).first()
+const list = (scope: Page | Locator) => scope.getByRole("list", { name: "Tasks" })
+const rows = (scope: Page | Locator) => list(scope).getByRole("listitem")
+const rowOf = (scope: Page | Locator, label: string) =>
+  rows(scope).filter({ hasText: label }).first()
 /** The elapsed text is the last cell of a row's first line, a button or a plain box. */
 const elapsed = (page: Page, label: string) =>
   rowOf(page, label).locator(":scope > :first-child > span").last()
@@ -219,4 +220,88 @@ test("208. Task list", async ({ page, start }) => {
       return chat.current?.label
     })
     .toBe("make old")
+})
+
+const TICKETS = "Explore tickets package"
+const NAMES = "Find where task rows lose the name"
+const PROBE = "Probe Codex rollout format"
+const READ = "Read tickets/frontier.go"
+
+// Why a flow: the card's rows come from the fixture's subagent files through the server's chat read, and a result
+// appended to one of them must reach the page. WorkingCard.test.tsx (vitest) renders given props and cannot see that.
+test("217. Working card states", async ({ page, start }) => {
+  const open = async (shape: string) => {
+    const fixture = await start("subagents", { shape })
+    await go(page, `#/agents/${fixture.subagents!.sessionId}`)
+    const working = page.locator("[data-mock-part='card']")
+    await expect(working.getByRole("status")).toContainText("Working")
+    return { fixture, working }
+  }
+
+  // Two running subagents around a finished one.
+  const { working: two } = await open("card-two-running")
+  await expect(rows(two)).toHaveCount(3)
+  for (const [name, call] of [
+    [TICKETS, READ],
+    [PROBE, "rg -n spawn_agent codexsession"],
+  ]) {
+    await expect(two.getByRole("link", { name: `${name} ↗`, exact: true })).toBeVisible()
+    await expect(rowOf(two, name)).toContainText(call)
+  }
+  const done = rowOf(two, NAMES)
+  await expect(done.getByRole("img", { name: "done" })).toBeVisible()
+  await expect(done.getByRole("link")).toHaveCount(0)
+  const faint = await page.evaluate(() => {
+    const probe = document.body.appendChild(document.createElement("span"))
+    probe.style.color = "var(--chakra-colors-text-faint)"
+    const color = getComputedStyle(probe).color
+    probe.remove()
+    return color
+  })
+  await expect(done.getByText(NAMES)).toHaveCSS("color", faint)
+  // Scoped to the card: the log's tools entry names the calls too.
+  for (const name of [TICKETS, NAMES, PROBE]) await expect(two.getByText(name)).toHaveCount(1)
+
+  // No task: the header alone.
+  const { working: none } = await open("card-no-tasks")
+  await expect(list(none)).toHaveCount(0)
+
+  // One subagent: its row loses the call line once the call has a result.
+  const { fixture, working: one } = await open("card-one-subagent")
+  await expect(rows(one)).toHaveCount(1)
+  const row = rowOf(one, TICKETS)
+  await expect(row).toContainText(READ)
+  await expect(row.locator(":scope > *")).toHaveCount(2)
+  const timestamp = new Date().toISOString()
+  appendFileSync(
+    fixture.taskFiles["subagent-card-tickets-file"],
+    `${JSON.stringify({
+      type: "user",
+      isSidechain: true,
+      timestamp,
+      message: {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "toolu_card_read", content: "package tickets" },
+        ],
+      },
+    })}\n`,
+  )
+  // A subagent file change does not reload the chat; a parent line does.
+  appendFileSync(
+    fixture.subagents!.parentPath,
+    `${JSON.stringify({
+      type: "assistant",
+      uuid: "card-reload",
+      timestamp,
+      message: {
+        id: "msg_card_reload",
+        role: "assistant",
+        content: [{ type: "text", text: "Still waiting on the explorer." }],
+      },
+    })}\n`,
+  )
+  await expect(page.getByText("Still waiting on the explorer.")).toBeVisible()
+  await expect(row.locator(":scope > *")).toHaveCount(1)
+  await expect(row).not.toContainText(READ)
 })

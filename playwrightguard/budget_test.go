@@ -108,7 +108,10 @@ import (
 //
 // Nav current row flow (+1): the last row across a reload, new tabs and a workspace switch need a
 // real browser; nextPrev tests cover each rule alone.
-const maxFlows = 173
+//
+// Working card states flow (+1): fixture transcripts to server to page, including a result appended to a subagent file;
+// webui/src/design/WorkingCard.test.tsx renders given props and cannot see that.
+const maxFlows = 174
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
