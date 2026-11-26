@@ -483,30 +483,57 @@ func (s *subagentWatches) endClient(client string) {
 // cardWatches are the session watches of the clients whose page shows a working
 // card.
 type cardWatches struct {
-	mu sync.Mutex
-	by map[string]cardWatch // client
+	mu sync.Mutex            // guards by and users, never held over a watch's start or end
+	by map[string]*cardWatch // client
 }
 
 type cardWatch struct {
+	users int // holders and waiters of mu
+
+	mu      sync.Mutex // serializes one client's syncs; guards the fields below
 	session string
-	w       *chat.SubagentWatch
+	w       *chat.SubagentWatch // nil when the client has no watch
+}
+
+// lock returns the client's entry, locked. release unlocks it and drops an
+// entry with no watch that nobody else waits for.
+func (s *cardWatches) lock(client string) (c *cardWatch, release func()) {
+	s.mu.Lock()
+	if s.by == nil {
+		s.by = map[string]*cardWatch{}
+	}
+	c = s.by[client]
+	if c == nil {
+		c = &cardWatch{}
+		s.by[client] = c
+	}
+	c.users++
+	s.mu.Unlock()
+	c.mu.Lock()
+	return c, func() {
+		defer c.mu.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		c.users--
+		if c.users == 0 && c.w == nil {
+			delete(s.by, client)
+		}
+	}
 }
 
 // syncCardWatch starts or stops the client's session watch to match its latest
-// focus report. It reads the report under the lock, so two quick reports cannot
-// leave a stale watch.
+// focus report. It reads the report under the client's lock, so two quick
+// reports cannot leave a stale watch.
 func syncCardWatch(mg *Manager, client string) {
-	s := &mg.cardWatches
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	c, release := mg.cardWatches.lock(client)
+	defer release()
 	session, watching := mg.focus.watchedSession(client)
-	old, has := s.by[client]
-	if has && watching && old.session == session {
-		return
-	}
-	if has {
-		old.w.Close()
-		delete(s.by, client)
+	if c.w != nil {
+		if watching && c.session == session {
+			return
+		}
+		c.w.Close()
+		c.w = nil
 	}
 	if !watching {
 		return
@@ -515,12 +542,9 @@ func syncCardWatch(mg *Manager, client string) {
 	if res.Refused || err != nil {
 		return
 	}
-	if s.by == nil {
-		s.by = map[string]cardWatch{}
-	}
-	s.by[client] = cardWatch{session, chat.WatchSession(mg.chat, session, dir, func() {
+	c.session, c.w = session, chat.WatchSession(mg.chat, session, dir, func() {
 		mg.events.PublishEvent(wire.Event{Type: wire.EventSessionSubagentChanged, Address: session, Client: client})
-	})}
+	})
 }
 
 // subagentWatchWriteWeb opens or ends the watch of one subagent page. It is a

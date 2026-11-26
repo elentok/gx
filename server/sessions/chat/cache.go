@@ -25,16 +25,18 @@ const maxChatMessages = 300
 // must refresh Next, and the same path read as another harness builds a
 // different Next.
 type Cache struct {
-	mu      sync.Mutex
-	entries map[string]cacheEntry
+	mu      sync.Mutex // guards entries only, so one slow parse delays only its own file
+	entries map[string]*cacheEntry
 }
 
 type cacheEntry struct {
-	size  int64
-	mtime time.Time
-	kind  agentrunner.Kind
-	final bool
-	chat  Snapshot
+	mu     sync.Mutex // held over the load; guards the fields below
+	loaded bool
+	size   int64
+	mtime  time.Time
+	kind   agentrunner.Kind
+	final  bool
+	chat   Snapshot
 }
 
 // Snapshot is everything one read of a transcript yields.
@@ -63,20 +65,30 @@ func (c *Cache) Read(path string, kind agentrunner.Kind, final bool, load func(s
 	if err != nil {
 		return Snapshot{}, err
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.kind == kind && e.final == final {
+	e := c.entry(path)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.loaded && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.kind == kind && e.final == final {
 		return e.chat, nil
 	}
 	chat, err := load(path)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	if c.entries == nil {
-		c.entries = map[string]cacheEntry{}
-	}
-	c.entries[path] = cacheEntry{size: info.Size(), mtime: info.ModTime(), kind: kind, final: final, chat: chat}
+	e.loaded, e.size, e.mtime, e.kind, e.final, e.chat = true, info.Size(), info.ModTime(), kind, final, chat
 	return chat, nil
+}
+
+func (c *Cache) entry(path string) *cacheEntry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.entries == nil {
+		c.entries = map[string]*cacheEntry{}
+	}
+	if c.entries[path] == nil {
+		c.entries[path] = &cacheEntry{}
+	}
+	return c.entries[path]
 }
 
 // ImagesDir is the folder of a session's Prompt images, inside its state dir.

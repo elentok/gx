@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // report sends a web page's focus report and expects it to be accepted.
@@ -102,6 +105,75 @@ func TestSessionWatch_StartSendsOneEventAndRepeatedReportNone(t *testing.T) {
 	f.wantQuiet(t, "after the start event")
 	f.report(t, f.watching("page-1", 2))
 	f.wantQuiet(t, "repeated report")
+}
+
+// secondSession creates another Claude session of f's server with a running
+// subagent.
+func (f *subWatch) secondSession(t *testing.T) *subWatch {
+	t.Helper()
+	res, err := f.h.Client.Sessions.Create(t.Context(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	other := *f
+	other.id = res.Session.ID
+	conv, _ := readMeta(t, f.h, other.id)["conversation_id"].(string)
+	other.parent = filepath.Join(filepath.Dir(f.parent), conv+".jsonl")
+	servertest.WriteTranscript(t, other.parent, claudeCall(time.Now().UTC().Format(time.RFC3339Nano))...)
+	return &other
+}
+
+// blockTranscript turns the parent transcript into a pipe, so a read of it
+// hangs until the test ends. blocked returns once a reader is hanging.
+func (f *subWatch) blockTranscript(t *testing.T) (blocked func()) {
+	t.Helper()
+	if err := os.Remove(f.parent); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(f.parent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		t.Helper()
+		var w *os.File
+		// A non-blocking write open succeeds only once a reader has the pipe.
+		servertest.WaitFor(t, 5*time.Second, "a read of the blocked transcript", func() bool {
+			var err error
+			w, err = os.OpenFile(f.parent, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+			return err == nil
+		})
+		t.Cleanup(func() {
+			// Later opens must find a file, or they would hang on the pipe.
+			empty := f.parent + ".empty"
+			if err := os.WriteFile(empty, nil, 0o644); err != nil {
+				t.Error(err)
+			}
+			if err := os.Rename(empty, f.parent); err != nil {
+				t.Error(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestSessionWatch_BlockedStartDoesNotDelayAnotherClient(t *testing.T) {
+	t.Parallel()
+	slow := startSubWatch(t, false, claudeCall)
+	other := slow.secondSession(t)
+	slow.openTab(t, "page-1")
+	other.openTab(t, "page-2")
+	blocked := slow.blockTranscript(t)
+
+	var reports sync.WaitGroup
+	// Registered before the pipe's release, so it runs after it.
+	t.Cleanup(reports.Wait)
+	reports.Go(func() { slow.report(t, slow.watching("page-1", 1)) })
+	blocked()
+
+	reports.Go(func() { other.report(t, other.watching("page-2", 1)) })
+	other.wantEvent(t, "watch start while another client's start is blocked", "page-2")
 }
 
 func TestSessionWatch_StartWithNothingRunningSendsNothing(t *testing.T) {
