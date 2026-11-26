@@ -107,7 +107,17 @@ type SessionChatSubagentCall struct {
 	CallID      string `json:"call_id"`
 	Type        string `json:"type,omitempty"`
 	Description string `json:"description,omitempty"`
+	// State is a SubagentCall* value on a session's chat reads, and empty on a
+	// subagent page.
+	State string `json:"state,omitempty"`
 }
+
+// What the chat read knows about the subagent of a call.
+const (
+	SubagentCallRunning  = "running"
+	SubagentCallFinished = "finished"
+	SubagentCallNoRecord = "no_record"
+)
 
 // SessionChatImage is one image of a chat message. ID names the saved image
 // the serve route returns; Placeholder is set instead when the file is outside

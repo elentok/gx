@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -149,6 +151,39 @@ func TestRead_CodexSubagentRowTakesTheChildsCurrentCall(t *testing.T) {
 	writeLines(t, p.f.path, strings.TrimSuffix(string(parent), "\n"), completedEvent())
 	if got := row(); !got.Finished || got.CurrentCall != "" {
 		t.Errorf("ended row = %+v, want finished with no current call", got)
+	}
+}
+
+func spawnLine(call string) string {
+	return fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":%q,"arguments":"{\"task_name\":\"other\"}"}}`, nowStamp(), call)
+}
+
+func TestRead_CodexSubagentCallsCarryTheirState(t *testing.T) {
+	t.Parallel()
+	p := newCodexPage(t, time.Minute, spawnLine("c2"), completedEvent())
+	got := callStates(p.f.chat(t, "/v1/sessions/chat"))
+	want := map[string]string{"c1": wire.SubagentCallFinished, "c2": wire.SubagentCallRunning}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("states = %v, want %v", got, want)
+	}
+
+	old := newCodexFixture(t)
+	writeLines(t, old.path,
+		fmt.Sprintf(`{"timestamp":%q,"type":"session_meta","payload":{"cli_version":"0.140.0"}}`, nowStamp()),
+		spawnLine("c1"))
+	got = callStates(old.chat(t, "/v1/sessions/chat"))
+	if want := map[string]string{"c1": wire.SubagentCallNoRecord}; !reflect.DeepEqual(got, want) {
+		t.Errorf("old rollout states = %v, want %v", got, want)
+	}
+}
+
+func TestArchive_SubagentCallsHaveNoRecord(t *testing.T) {
+	t.Parallel()
+	f := newCodexFixture(t)
+	writeZstd(t, f.path, append(slices.Clone(archivedRollout), spawnLine("c1"))...)
+	got := callStates(f.chat(t, "/v1/sessions/chat/archive"))
+	if want := map[string]string{"c1": wire.SubagentCallNoRecord}; !reflect.DeepEqual(got, want) {
+		t.Errorf("states = %v, want %v", got, want)
 	}
 }
 

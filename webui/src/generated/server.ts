@@ -2735,7 +2735,19 @@ export interface SessionChatSubagentCall {
   call_id: string;
   type?: string;
   description?: string;
+  /**
+   * State is a SubagentCall* value on a session's chat reads, and empty on a
+   * subagent page.
+   */
+  state?: string;
 }
+export const SubagentCallRunning = "running";
+export const SubagentCallFinished = "finished";
+export const SubagentCallNoRecord = "no_record";
+/**
+ * What the chat read knows about the subagent of a call.
+ */
+export type SubagentCall = typeof SubagentCallRunning | typeof SubagentCallFinished | typeof SubagentCallNoRecord;
 /**
  * SessionChatImage is one image of a chat message. ID names the saved image
  * the serve route returns; Placeholder is set instead when the file is outside
