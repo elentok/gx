@@ -105,6 +105,12 @@ type Subagent struct {
 	Build func(b *Lines)
 	Calls map[string]string
 	Ready []string
+
+	// Of a Codex shape: the parent rollout's cli_version, the task rows its
+	// chat read ends with, and whether the session is linked to the Design.
+	Version string
+	Tasks   int
+	Linked  bool
 }
 
 var (
@@ -142,6 +148,16 @@ var SubagentShapes = map[string]Subagent{
 		Calls: map[string]string{"read": SubReadCall, "edit": SubEditCall},
 		Ready: []string{SubReadDesc, SubEditDesc},
 	},
+	"card-two-running": {
+		Build: cardTwoRunning,
+		Calls: map[string]string{"tickets": CardTicketsCall, "names": CardNamesCall, "probe": CardProbeCall},
+		Ready: []string{CardTicketsDesc, CardNamesDesc, CardProbeDesc},
+	},
+	"card-one-subagent": {Build: func(b *Lines) { b.cardTickets(cardTicketsAgo) }, Calls: map[string]string{"tickets": CardTicketsCall}, Ready: []string{CardTicketsDesc}},
+	// Calls is non-nil so the output names the session; a nil Ready waits for
+	// the session's task count, which is none.
+	"card-no-tasks": {Build: func(*Lines) {}, Calls: map[string]string{}},
+
 	"parent-gone": {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 	"exited":      {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 }

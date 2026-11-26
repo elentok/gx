@@ -181,6 +181,12 @@ running subagents, `read` ("Read the task rows") with an open `Read` of a file i
 `running` subagent of `foreground-running`, with the parent transcript deleted after seeding (no `tools` entry; the chat read still
 answers). `exited`: the same, with the session crashed (exit 1) so it is Exited. Data: `testutil/gxfixture/spec/subagents.go` and
 `bgtx/subagents.go`.
+The `card-*` shapes hold the working card's mock states. `card-two-running`: calls `tickets` ("Explore tickets package",
+running, open `Read` of `tickets/frontier.go`), `names` ("Find where task rows lose the name", finished after 4m51s) and
+`probe` ("Probe Codex rollout format", running, open `Bash` `rg -n spawn_agent codexsession`), with task-file keys
+`subagent-card-<name>-file` and `-meta`; the open call ids are `toolu_card_read` and `toolu_card_bash` (append a result to
+close one). `card-one-subagent`: only `tickets`. `card-no-tasks`: a Working session with no task, `subagents.calls` empty.
+Data: `bgtx/subagents_card.go`.
 The `codex-*` shapes make the parent a Codex session (rollout version 0.166.0) with one `spawn_agent` call "review".
 `subagents.calls.spawn` is the call id, `subagents.calls.thread` the child's thread id, `subagents.parentPath` the parent
 rollout (append a `SubAgentActivity` "completed" item_completed event to end the child). `taskFiles["subagent-codex-rollout"]`
@@ -190,6 +196,8 @@ and `subagent_history_start_ordinal`, then the parent's history ending in the ma
 lines (encrypted `agent_message`, `turn_context` model, tool calls, `token_count`, a last assistant message).
 `codex-null-role`: the same with `agent_role: null`. `codex-compressed`: only `rollout-...-<thread>.jsonl.zst` under
 `sessions/`, no `.jsonl`. `codex-nested`: the child's own lines hold a `spawn_agent` call (no link is expected). `codex-running-call`: the child's inherited history holds an open call (`git log --oneline`) and its own lines end in another (`go vet ./...`), the row's and the Working row's current call.
+`codex-old-call` differs: the parent rollout is 0.143.0, so its `spawn_agent` call (`spawn`, no `thread`, no child rollout)
+is marked with no record and there is no task row; the session is linked to `demo:design-epic`.
 Data: `bgtx/codex_subagents.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).

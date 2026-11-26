@@ -10,8 +10,8 @@ import (
 )
 
 // Names of the Codex shapes of the subagents scenario. Each parent session has
-// one spawn_agent call (Output.Subagents.Calls["spawn"]) whose child thread id
-// is Calls["thread"].
+// one spawn_agent call (Output.Subagents.Calls["spawn"]); where a task row is
+// expected, its child thread id is Calls["thread"].
 const (
 	CodexSubName      = "review"
 	CodexSubMarker    = "You are now a newly spawned child agent. The preceding conversation is inherited parent context."
@@ -52,7 +52,18 @@ var CodexSubagentShapes = map[string]Subagent{
 	"codex-nested":     codexShape("codex-nested", codexNestedChild),
 
 	"codex-running-call": codexShape("codex-running-call", codexRunningCall),
+
+	// A rollout too old for task records: its call is marked, with no task row.
+	"codex-old-call": {
+		Codex:   true,
+		Build:   func(b *Lines) { b.codexSpawn(3*minute, codexOldCall, CodexSubName, "", false) },
+		Calls:   map[string]string{"spawn": codexOldCall},
+		Version: CodexOldVersion,
+		Linked:  true,
+	},
 }
+
+const codexOldCall = "cxsp-codex-old-call"
 
 var codexThreads = map[string]string{"codex-starting": "e1", "codex-child": "e2", "codex-null-role": "e3", "codex-compressed": "e4", "codex-nested": "e5", "codex-running-call": "e6"}
 
@@ -64,9 +75,11 @@ func CodexSubThread(shape string) string {
 func codexShape(shape string, kind codexChildKind) Subagent {
 	thread, call := CodexSubThread(shape), "cxsp-"+shape
 	return Subagent{
-		Codex: true,
-		Build: func(b *Lines) { b.codexSubChild(3*minute, call, thread, kind) },
-		Calls: map[string]string{"spawn": call, "thread": thread},
+		Codex:   true,
+		Build:   func(b *Lines) { b.codexSubChild(3*minute, call, thread, kind) },
+		Calls:   map[string]string{"spawn": call, "thread": thread},
+		Version: CodexSubVersion,
+		Tasks:   1,
 	}
 }
 

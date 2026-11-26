@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/server/wire"
@@ -51,7 +53,8 @@ func TestSubagents_Shapes(t *testing.T) {
 	}
 	descs := map[string]string{"running": bgtx.SubRunningDesc, "finished": bgtx.SubFinishedDesc, "missing": bgtx.SubMissingDesc,
 		"stopped": bgtx.SubStoppedDesc, "background": bgtx.SubBackgroundDesc, "nested": bgtx.SubNestedDesc, "starting": bgtx.SubStartingDesc, "marked": bgtx.SubMarkedDesc,
-		"string": bgtx.SubStringDesc, "read": bgtx.SubReadDesc, "edit": bgtx.SubEditDesc}
+		"string": bgtx.SubStringDesc, "read": bgtx.SubReadDesc, "edit": bgtx.SubEditDesc,
+		"tickets": bgtx.CardTicketsDesc, "names": bgtx.CardNamesDesc, "probe": bgtx.CardProbeDesc}
 	checkRunning := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
 		var row *wire.SessionTask
 		for i := range chat.Tasks {
@@ -202,7 +205,113 @@ func TestSubagents_Shapes(t *testing.T) {
 			t.Errorf("current calls = %q, want %q", got, want)
 		}
 	}
+	// openCalls are the tool_use ids of a subagent file that have no result.
+	openCalls := func(t *testing.T, r *running, key string) []string {
+		t.Helper()
+		var uses []string
+		done := map[string]bool{}
+		for line := range strings.Lines(fileOf(t, r, key)) {
+			var l struct {
+				Message struct {
+					Content json.RawMessage `json:"content"`
+				} `json:"message"`
+			}
+			if err := json.Unmarshal([]byte(line), &l); err != nil {
+				t.Fatal(err)
+			}
+			var blocks []struct {
+				Type      string `json:"type"`
+				ID        string `json:"id"`
+				ToolUseID string `json:"tool_use_id"`
+			}
+			// A prompt line's content is a string.
+			if json.Unmarshal(l.Message.Content, &blocks) != nil {
+				continue
+			}
+			for _, b := range blocks {
+				switch b.Type {
+				case "tool_use":
+					uses = append(uses, b.ID)
+				case "tool_result":
+					done[b.ToolUseID] = true
+				}
+			}
+		}
+		return slices.DeleteFunc(uses, func(id string) bool { return done[id] })
+	}
+	// cardRows checks the chat read's rows are exactly the wanted subagents, in launch order.
+	cardRows := func(t *testing.T, chat wire.SessionChatResponse, labels ...string) map[string]wire.SessionTask {
+		t.Helper()
+		sorted := slices.SortedFunc(slices.Values(chat.Tasks), func(a, b wire.SessionTask) int { return strings.Compare(a.StartedAt, b.StartedAt) })
+		var got []string
+		rows := map[string]wire.SessionTask{}
+		for _, row := range sorted {
+			if row.Kind != "subagent" {
+				t.Errorf("row %q kind = %q, want subagent", row.Label, row.Kind)
+			}
+			got = append(got, row.Label)
+			rows[row.Label] = row
+		}
+		if !slices.Equal(got, labels) {
+			t.Fatalf("task rows by start = %q, want %q", got, labels)
+		}
+		return rows
+	}
+	runningCard := func(t *testing.T, r *running, row wire.SessionTask, call, fileKey, openID string) {
+		t.Helper()
+		if row.Finished || row.CurrentCall != call {
+			t.Errorf("row = %+v, want running %q", row, call)
+		}
+		if got := openCalls(t, r, fileKey); !slices.Equal(got, []string{openID}) {
+			t.Errorf("%s open calls = %q, want only %q", fileKey, got, openID)
+		}
+	}
+	cardTickets := func(t *testing.T, r *running, row wire.SessionTask) {
+		t.Helper()
+		metaOf(t, r, bgtx.CardTicketsMetaKey, "tickets", false)
+		runningCard(t, r, row, "Read tickets/frontier.go", bgtx.CardTicketsFileKey, bgtx.CardTicketsOpenCall)
+	}
+	cardTwo := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
+		rows := cardRows(t, chat, bgtx.CardTicketsDesc, bgtx.CardNamesDesc, bgtx.CardProbeDesc)
+		cardTickets(t, r, rows[bgtx.CardTicketsDesc])
+		metaOf(t, r, bgtx.CardProbeMetaKey, "probe", false)
+		runningCard(t, r, rows[bgtx.CardProbeDesc], "rg -n spawn_agent codexsession", bgtx.CardProbeFileKey, bgtx.CardProbeOpenCall)
+		metaOf(t, r, bgtx.CardNamesMetaKey, "names", true)
+		done := rows[bgtx.CardNamesDesc]
+		if !done.Finished || done.Outcome != "success" {
+			t.Errorf("row = %+v, want finished with success", done)
+		}
+		start, err := time.Parse(time.RFC3339Nano, done.StartedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		end, err := time.Parse(time.RFC3339Nano, done.FinishedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := end.Sub(start), 4*time.Minute+51*time.Second; got != want {
+			t.Errorf("duration = %s, want %s", got, want)
+		}
+	}
+	cardOne := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
+		cardTickets(t, r, cardRows(t, chat, bgtx.CardTicketsDesc)[bgtx.CardTicketsDesc])
+	}
+	cardNone := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
+		if len(chat.Tasks) != 0 {
+			t.Errorf("task rows = %+v, want none", chat.Tasks)
+		}
+		if r.Subagents.SessionID == "" || r.Subagents.ParentPath == "" {
+			t.Errorf("output subagents = %+v, want the session id and parent path", r.Subagents)
+		}
+		list := r.sessions(t)
+		if len(list) != 1 || list[0].Status.State != wire.SessionWorking {
+			t.Errorf("sessions = %+v, want one Working session", list)
+		}
+	}
 	cases := []shape{
+		{"card-two-running", []string{"tickets", "names", "probe"}, cardTwo},
+		{"card-one-subagent", []string{"tickets"}, cardOne},
+		{"card-no-tasks", nil, cardNone},
 		{"file-call", []string{"read", "edit"}, fileCall},
 		{"claude", []string{"running", "finished", "missing"}, func(t *testing.T, r *running, c wire.SessionChatResponse) {
 			checkRunning(t, r, c)
@@ -348,6 +457,40 @@ func TestSubagents_CodexShapes(t *testing.T) {
 			}
 			tc.check(t, r, row)
 		})
+	}
+}
+
+// An old rollout's spawn_agent call is marked, but has no record and no task row.
+func TestSubagents_OldCodexCall(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "subagents", nil, "--shape", "codex-old-call")
+	chat := r.subChat(t)
+	call := r.Subagents.Calls["spawn"]
+	if call == "" {
+		t.Fatalf("output calls = %v, want spawn", r.Subagents.Calls)
+	}
+	var marks []wire.SessionChatSubagentCall
+	for _, m := range chat.Messages {
+		if m.Kind == "tools" {
+			marks = append(marks, m.SubagentCalls...)
+		}
+	}
+	if len(marks) != 1 || marks[0].CallID != call || marks[0].State != wire.SubagentCallNoRecord {
+		t.Errorf("subagent marks = %+v, want %s with no record", marks, call)
+	}
+	if len(chat.Tasks) != 0 {
+		t.Errorf("task rows = %+v, want none", chat.Tasks)
+	}
+	raw, err := os.ReadFile(r.Subagents.ParentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first, _, _ := strings.Cut(string(raw), "\n"); !strings.Contains(first, `"cli_version":"`+bgtx.CodexOldVersion+`"`) {
+		t.Errorf("parent session_meta = %s, want cli_version %s", first, bgtx.CodexOldVersion)
+	}
+	list := r.sessions(t)
+	if len(list) != 1 || list[0].Harness != "codex" || list[0].FlowKey != "demo:design-epic" {
+		t.Errorf("sessions = %+v, want one Codex session linked to demo:design-epic", list)
 	}
 }
 
