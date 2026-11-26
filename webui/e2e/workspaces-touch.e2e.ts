@@ -319,15 +319,14 @@ test("Workspaces touch", async ({ page, start }) => {
     await expect(locator).toBeVisible()
     return (await locator.boundingBox())!
   }
-  // `wrapped`: with every indicator shown off desktop the row wraps and the menu drops to a second line, so only the sizes must agree.
-  const checkBoxes = async (wrapped = false, row = boxes) => {
+  const checkBoxes = async (row = boxes) => {
     const sizes = []
     for (const box of row) {
       const b = await measure(box)
       const i = await measure(box.locator("svg"))
       expect(i.x + i.width / 2).toBeCloseTo(b.x + b.width / 2, 0)
       expect(i.y + i.height / 2).toBeCloseTo(b.y + b.height / 2, 0)
-      sizes.push(wrapped ? [b.width, b.height] : [b.width, b.height, b.y])
+      sizes.push([b.width, b.height, b.y])
     }
     for (const s of sizes) expect(s).toEqual(sizes[0])
     return sizes[0][0]
@@ -351,24 +350,19 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(gearBox.locator("svg circle")).toHaveCount(3)
   await expect(gearBox.locator("svg path")).toHaveCount(0)
 
-  // With the health warning, paused and offline indicators all shown, no box shrinks and nothing overflows the sidebar.
+  // With the paused and offline states shown, no box shrinks and nothing overflows the sidebar.
   const width = await checkBoxes()
-  await fx.setHealth("cpu=75 mem=85")
   await fx.cli("server", "queue", "pause")
-  // The three states share one status button; its label lists every active one.
+  // The two states share one status button; its label lists every active one.
   const status = footer.locator('[data-part="status"]')
-  await expect(status).toHaveAccessibleName(
-    "Server queue is paused; System health is high or critical",
-  )
+  await expect(status).toHaveAccessibleName("Server queue is paused")
   await fx.stopServer()
-  await expect(status).toHaveAccessibleName(
-    "Disconnected from the server; Server queue is paused; System health is high or critical",
-  )
+  await expect(status).toHaveAccessibleName("Disconnected from the server; Server queue is paused")
   const sidebarBox = (await measure(sidebar))!
   expect(sidebarBox.width).toBeLessThanOrEqual(280)
-  // On desktop the status button takes the Stats link's place.
+  // The status button takes the Stats link's place.
   await expect(statsBox).toHaveCount(0)
-  expect(await checkBoxes(false, [epicsBox, followUpsBox, status, gearBox])).toBe(width)
+  expect(await checkBoxes([epicsBox, followUpsBox, status, gearBox])).toBe(width)
   const statusBox = await measure(status)
   expect(statusBox.x + statusBox.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width)
   await expect(footer).toBeVisible()
@@ -378,7 +372,8 @@ test("Workspaces touch", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(sidebar).toBeVisible()
   await expect(epicsBox).toHaveCSS("width", "34px")
-  expect(await checkBoxes(true)).toBe(34)
-  // The touch footer keeps its boxes at 34px with the status button shown; only the 280px sidebar is held to fit.
-  expect((await measure(status)).width).toBe(34)
+  // The touch footer stays on one row: the boxes share one y.
+  await expect(statsBox).toHaveCount(0)
+  expect(await checkBoxes([epicsBox, followUpsBox, status, gearBox])).toBe(34)
+  expect(await footer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
 })

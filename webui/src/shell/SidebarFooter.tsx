@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList } from "../epics/list"
-import type { Snapshot, Workspace } from "../generated/server"
+import type { Workspace } from "../generated/server"
 import { STATS_HREF } from "../hrefs"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
 import { Tray } from "../ui/tray/Tray"
@@ -15,7 +15,6 @@ import {
   badgeWaiting,
   inWorkspace,
 } from "../workspaces/followUpsBadge"
-import { METERS } from "../ui/tray/meters"
 import { useDevice } from "../useWide"
 import { FooterButton, footerHover, interactiveStyle } from "./FooterButton"
 import { GearMenu } from "./GearMenu"
@@ -41,7 +40,6 @@ const icon = (children: ReactNode) => (
 const EpicsIcon = () =>
   icon(<path d="M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z" />)
 const StatsIcon = () => icon(<path d="M4 16V9M10 16V4M16 16v-5" />)
-const WarningIcon = () => icon(<path d="M10 3 18 17H2L10 3ZM10 8v4M10 14.5v.01" />)
 const PausedIcon = () => icon(<path d="M7 5v10M13 5v10" />)
 const OfflineIcon = () =>
   icon(
@@ -121,26 +119,18 @@ interface Problem {
   key: string
   title: string
   detail: string
-  tone: "waiting" | "paused" | "muted"
+  tone: "paused" | "muted"
   icon: ReactNode
-  href?: string
 }
 
-/** The one footer button for the warning, paused and offline states. Its menu says why each one appeared. */
-const highMeters = (health: NonNullable<Snapshot["health"]>) => {
-  const names = METERS.filter(({ key }) => ["high", "critical"].includes(health[key].state)).map(
-    ({ key, name }) => `${name} is ${health[key].state}.`,
-  )
-  return names.join(" ")
-}
-
+/** The one footer button for the paused and offline states. Its menu says why each one appeared, and links to the Stats page it replaces. */
 function StatusMenu({ problems }: { problems: Problem[] }) {
   const navigate = useNavigate()
   const shell = useShell()
   if (problems.length === 0) return null
   const top = problems[0]
   const label = problems.map((p) => p.title).join("; ")
-  const items: MenuEntry[] = problems.map((p) => ({
+  const reasons: MenuEntry[] = problems.map((p) => ({
     value: p.key,
     label: (
       <Box as="span" display="flex" alignItems="center" gap="3" minW="240px" maxW="300px">
@@ -155,12 +145,20 @@ function StatusMenu({ problems }: { problems: Problem[] }) {
         </Box>
       </Box>
     ),
-    onSelect: () => {
-      if (!p.href) return
-      navigate(p.href)
-      shell?.closeSliding()
-    },
+    onSelect: () => {},
   }))
+  const items: MenuEntry[] = [
+    ...reasons,
+    { kind: "separator" },
+    {
+      value: "stats",
+      label: "Stats and health",
+      onSelect: () => {
+        navigate(STATS_HREF)
+        shell?.closeSliding()
+      },
+    },
+  ]
   return (
     <GxMenu
       placement="top-end"
@@ -311,11 +309,6 @@ export function SidebarFooter({
   const conn = useConnectionContext()
   const { snapshot, connected } = useConnectionState(conn)
   const health = snapshot?.health
-  const unhealthy =
-    !!health &&
-    [health.cpu, health.memory, health.disk].some(
-      (m) => m.state === "high" || m.state === "critical",
-    )
   const needsYou = snapshot?.needs_you_total ?? 0
   const desktop = useDevice() === "desktop"
   const candidates: (Problem | false)[] = [
@@ -332,14 +325,6 @@ export function SidebarFooter({
       detail: "No new tickets start until the queue resumes.",
       tone: "paused" as const,
       icon: <PausedIcon />,
-    },
-    unhealthy && {
-      key: "health",
-      title: "System health is high or critical",
-      detail: `${highMeters(health)} Open Stats and health for details.`,
-      tone: "waiting" as const,
-      icon: <WarningIcon />,
-      href: STATS_HREF,
     },
   ]
   const problems = candidates.filter((p): p is Problem => !!p)
@@ -391,8 +376,8 @@ export function SidebarFooter({
         <Box flex="1" />
         <EpicsMenu needsYou={needsYou} />
         <FollowUpsButton workspace={activeWorkspace?.name} />
-        {/* At the 280px sidebar only four boxes fit, so the status button takes the Stats link's place while it shows. */}
-        {!(desktop && problems.length > 0) && (
+        {/* The row has no room for one more box, so the status button takes the Stats link's place while it shows. */}
+        {problems.length === 0 && (
           <FooterLink href={STATS_HREF} label="Stats and health">
             <StatsIcon />
           </FooterLink>

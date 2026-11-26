@@ -145,7 +145,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(needs.getByRole("link", { name: "paused-epic", exact: true })).toHaveCount(0)
 
   // 28: AFK flips over SSE, Vi mode in the browser; the footer's paused state follows `queue pause`.
-  // Regex: the status button's name also lists health when health is high.
+  // Regex: the status button's name lists every active state.
   const paused = page.getByRole("button", { name: /Server queue is paused/ })
   await expect(paused).toHaveCount(0)
   await menuButton(page).click()

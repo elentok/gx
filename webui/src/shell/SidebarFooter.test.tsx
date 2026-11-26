@@ -36,29 +36,30 @@ function setup(
 
 const status = () => document.querySelector<HTMLElement>('[data-part="status"]')
 
-test("the status button hides when nothing is wrong", () => {
+test("the status button hides while connected and running, even with bad health", () => {
   setup({
     mode: "running",
-    health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") },
+    health: { cpu: meter("high"), memory: meter("critical"), disk: meter("critical") },
   })
   expect(status()).toBeNull()
+  expect(screen.getByRole("link", { name: "Stats and health" })).toBeTruthy()
 })
 
 test("the status button lists every problem and opens a menu saying why", async () => {
   setup(
     {
       mode: "paused",
-      health: { cpu: meter("normal"), memory: meter("critical"), disk: meter("normal") },
+      health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") },
     },
     false,
   )
   const button = status()!
-  expect(button.getAttribute("title")).toContain("System health is high or critical")
+  expect(screen.queryByRole("link", { name: "Stats and health" })).toBeNull()
   expect(button.getAttribute("title")).toContain("Server queue is paused")
   expect(button.getAttribute("title")).toContain("Disconnected from the server")
   fireEvent.click(button)
-  expect(await screen.findByText("memory is critical.", { exact: false })).toBeTruthy()
-  expect(screen.getByText(/No new tickets start/)).toBeTruthy()
+  expect(await screen.findByText(/No new tickets start/)).toBeTruthy()
+  expect(screen.getByRole("menuitem", { name: "Stats and health" })).toBeTruthy()
 })
 
 test("Dev mode alone adds no indicator to the footer", () => {
