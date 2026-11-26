@@ -1,4 +1,5 @@
 import { type BrowserContext, type Page, webkit } from "@playwright/test"
+import { sessions } from "./agentsKit"
 import { chordKit } from "./chordKit"
 import { expect, nav, test } from "./fixture"
 import { goto, sidebarKit, stillMotion } from "./sidebarKit"
@@ -56,6 +57,17 @@ async function step(page: Page, key: "j" | "k", target: string) {
   )
 }
 
+/** The page at `here` has no row that way: the box has no item row and the key keeps the address. */
+async function noStep(page: Page, key: "j" | "k", here: string) {
+  const chords = chordKit(page)
+  // A one-row sidebar has neither item row, so the history row says the box is up.
+  await chords.open(chords.back)
+  await expect(key === "j" ? chords.next : chords.prev).toHaveCount(0)
+  await page.keyboard.press(key)
+  await expect(chords.box).toHaveCount(0)
+  await atHash(page, here)
+}
+
 /**
  * Presses `key` from the page at `from` until no row is left that way, checking each page against
  * the sidebar's order at that moment. Then checks that the end offers no step. Returns the hashes
@@ -75,13 +87,7 @@ async function walk(page: Page, key: "j" | "k", from: string) {
     visited.push(target)
     here = target
   }
-  const chords = chordKit(page)
-  // A one-row sidebar has neither item row, so the history row says the box is up.
-  await chords.open(chords.back)
-  await expect(key === "j" ? chords.next : chords.prev).toHaveCount(0)
-  await page.keyboard.press(key)
-  await expect(chords.box).toHaveCount(0)
-  await atHash(page, here)
+  await noStep(page, key, here)
   return visited
 }
 
@@ -213,6 +219,112 @@ test("Nav keys", async ({ page, start }) => {
   expect(bugs).toEqual(await rowOrder(page))
   await expect(onHold).toHaveAttribute("aria-expanded", "false")
   await expect(row("held-design")).toHaveCount(0)
+})
+
+/** Opens `hash` and waits for the heading that only its page shows. */
+async function visit(page: Page, hash: string, heading: string) {
+  await goto(page, hash)
+  await expect(page).toHaveURL((url) => url.hash.startsWith(hash))
+  // The first one: a ticket's description can repeat its title as an <h1>.
+  await expect(page.getByRole("heading", { level: 1, name: heading }).first()).toBeVisible()
+}
+
+/** The sidebar shows its rows, the late ones too. */
+async function knownRows(page: Page) {
+  const { sidebar, row } = sidebarKit(page)
+  for (const title of ["ready-epic", "ws-draft"]) await expect(row(title)).toBeVisible()
+  await expect(sidebar.locator("a[data-chat]")).toHaveCount(2)
+}
+
+/** The rows just before and after `row` in the sidebar's order at this moment. */
+async function neighbours(page: Page, row: string) {
+  const order = await rowOrder(page)
+  const at = order.indexOf(row)
+  expect(at).toBeGreaterThanOrEqual(0)
+  return { j: order[at + 1], k: order[at - 1] }
+}
+
+// How the next and previous chords find the current row, over the `workspaces` scenario.
+test("Nav current row", async ({ page, start }) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  const fixture = await start("workspaces", { reloads: 1 })
+  await stillMotion(page)
+  const { sidebar, row, nestedLinks, pick } = sidebarKit(page)
+  const link = (hash: string) => sidebar.locator(`a[data-nav][href="${hash}"]`)
+  const current = (hash: string) => expect(link(hash)).toHaveAttribute("aria-current", "page")
+  const settings = () => visit(page, "#/settings", "Agents")
+  const paused = "#/e/demo:paused-epic"
+
+  await expect(page).toHaveURL(/#\/epics$/)
+  await knownRows(page)
+
+  // A ticket page counts as its epic's row, here the top one: `k` has nowhere to go, where a page no
+  // row owns would open the last row.
+  const ticket = "#/t/demo:paused-epic/01"
+  await visit(page, ticket, "repair")
+  expect((await rowOrder(page))[0]).toBe(paused)
+  await noStep(page, "k", ticket)
+  await step(page, "j", (await neighbours(page, paused)).j)
+
+  // A chat's Diff page counts as that chat's row.
+  const chat = (await sidebar.locator("a[data-chat]").first().getAttribute("href"))!
+  const session = (await sessions(fixture)).find((s) => chat.endsWith(`/${s.id}`))!
+  for (const key of ["j", "k"] as const) {
+    await visit(page, `#/diff?project=${session.project}&worktree=chat:${session.id}`, "Diff")
+    await step(page, key, (await neighbours(page, chat))[key])
+  }
+
+  // A nested agent's row, hidden again: the step starts from the place it was in.
+  await sidebar.getByRole("button", nav("Expand paused-epic")).click()
+  await expect(nestedLinks("paused-epic")).toHaveCount(2)
+  const agent = (await nestedLinks("paused-epic").first().getAttribute("href"))!
+  await link(agent).click()
+  await current(agent)
+  await sidebar.getByRole("button", nav("Collapse paused-epic")).click()
+  await expect(nestedLinks("paused-epic")).toHaveCount(0)
+  await step(page, "k", paused)
+  await goto(page, agent)
+  await atHash(page, agent)
+  await expect(link(paused)).not.toHaveAttribute("aria-current", "page")
+  await expect(page.getByRole("form", nav("Composer"))).toBeVisible()
+  await step(page, "j", (await neighbours(page, paused)).j)
+
+  // A page no row owns continues from the last row, also after a reload.
+  const [first] = await rowOrder(page)
+  await link(first).click()
+  await current(first)
+  await settings()
+  await step(page, "j", (await rowOrder(page))[1])
+  await settings()
+  await page.reload()
+  await expect(page.getByRole("heading", { level: 1, name: "Agents" })).toBeVisible()
+  await stillMotion(page)
+  await knownRows(page)
+  await step(page, "j", (await rowOrder(page))[2])
+
+  // A new tab has no last row: `j` starts at the top and `k` at the bottom.
+  const origin = new URL(page.url()).origin
+  for (const [key, end] of [
+    ["j", 0],
+    ["k", -1],
+  ] as const) {
+    const tab = await page.context().newPage()
+    await tab.goto(`${origin}/#/settings`, { waitUntil: "domcontentloaded" })
+    await expect(tab.getByRole("heading", { level: 1, name: "Agents" })).toBeVisible()
+    await knownRows(tab)
+    await step(tab, key, (await rowOrder(tab)).at(end)!)
+    await tab.close()
+  }
+
+  // A workspace switch removes the last row, so `j` starts at the top again.
+  await row("ready-epic").click()
+  await current("#/e/demo:ready-epic")
+  await settings()
+  await pick("research")
+  await expect(row("ws-impl-epic")).toBeVisible()
+  await expect(row("ready-epic")).toHaveCount(0)
+  await step(page, "j", (await rowOrder(page))[0])
 })
 
 // The sidebar header's Back and Forward buttons against real session history, over the `workspaces` scenario.

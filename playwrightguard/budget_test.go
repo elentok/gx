@@ -105,7 +105,10 @@ import (
 //
 // Nav keys flow (+1): real chord keys through history, focus, sidebar scroll, new tabs and a reload need a real
 // browser; ChordHost and nextPrev tests cover each rule alone; split from Nav buttons for the time limit.
-const maxFlows = 172
+//
+// Nav current row flow (+1): the last row across a reload, new tabs and a workspace switch need a
+// real browser; nextPrev tests cover each rule alone.
+const maxFlows = 173
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
