@@ -6,6 +6,13 @@
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": { "formatter": { "semicolons": "asNeeded", "quoteStyle": "double" } },
+  "plugins": [
+    {
+      "path": "./biome-plugins/raw-text-box.grit",
+      // Only `TextBox` itself and tests may draw a raw text box.
+      "includes": ["**", "!**/src/ui/text-box/**", "!**/*.test.ts", "!**/*.test.tsx"]
+    }
+  ],
   "linter": {
     "enabled": true,
     "domains": { "react": "recommended", "test": "recommended" },

@@ -1,0 +1,35 @@
+language js(jsx)
+
+// Only `TextBox` may draw a text box. See docs/text-boxes.md.
+or {
+  or {
+    `<$tag $props />`,
+    `<$tag $props>$children</$tag>`
+  } as $el where {
+    or {
+      // Grit anchors each end of the regex, not each branch, so the group is needed.
+      $tag <: r"(?:textarea|chakra\.textarea|Textarea)",
+      and {
+        $tag <: r"(?:input|chakra\.input|Input)",
+        not $props <: contains or {
+          `type="file"`, `type="hidden"`, `type="checkbox"`, `type="radio"`, `type="range"`,
+          `type="button"`, `type="submit"`
+        }
+      },
+      $props <: contains or { `as="input"`, `as="textarea"`, `as={"input"}`, `as={"textarea"}` }
+    }
+  },
+  `chakra($args)` as $el where {
+    $args <: r"^\s*[\"'`](?:input|textarea)[\"'`][\s\S]*"
+  },
+  // The node kind keeps this off JSX tag names, where an allowed input type may follow.
+  JsStaticMemberExpression() as $el where {
+    $el <: r"chakra\.(?:input|textarea)"
+  }
+} where {
+  register_diagnostic(
+    span=$el,
+    message="Raw text box. Use TextBox from ui/text-box. See docs/text-boxes.md.",
+    severity="error"
+  )
+}

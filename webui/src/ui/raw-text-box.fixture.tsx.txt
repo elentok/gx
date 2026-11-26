@@ -1,0 +1,52 @@
+const bad1 = <input />
+const bad2 = <input type="text" />
+const bad3 = <input type="search"></input>
+const bad4 = <input type={kind} />
+const bad5 = <textarea />
+const bad6 = <textarea rows={2}>hi</textarea>
+const bad7 = <chakra.input />
+const bad8 = <chakra.input px="2"></chakra.input>
+const bad9 = <chakra.textarea />
+const bad10 = <chakra.textarea rows={2}></chakra.textarea>
+const bad11 = <Input />
+const bad12 = <Input size="sm"></Input>
+const bad13 = <Textarea />
+const bad14 = <Textarea size="sm"></Textarea>
+const bad15 = chakra("input")
+const bad16 = chakra("textarea")
+const bad17 = chakra("input", { base: {} })
+const bad18 = chakra("textarea", { base: {} })
+const bad19 = <Box as="input" />
+const bad20 = <Box as="textarea">x</Box>
+const bad21 = <Box as={chakra.input} />
+const bad22 = <Box as={chakra.textarea} />
+const bad23 = chakra.input
+const bad24 = chakra.textarea
+const bad25 = (
+  <input
+    value={value}
+    onChange={onChange}
+  />
+)
+
+const ok1 = <input type="file" />
+const ok2 = <input type="hidden" />
+const ok3 = <input type="checkbox" checked={on} onChange={toggle} />
+const ok4 = <input name="a" type="radio" />
+const ok5 = <input type="range"></input>
+const ok6 = <input type="button" />
+const ok7 = <input type="submit" />
+const ok8 = <chakra.input type="checkbox" />
+const ok9 = <Input type="file" />
+const ok10 = <TextBox kind="text" label="Name" />
+const ok11 = chakra("div", { base: {} })
+const ok12 = chakra.div
+const ok13 = <Box as="button">input</Box>
+const ok14 = <chakra.label>textarea</chakra.label>
+const ok15 = <InputGroup />
+const ok16 = document.createElement("textarea")
+const ok17 = <chakra.input type="radio" aria-label={label} data-select-box></chakra.input>
+const ok18 = <RefInput value={ref} />
+const ok19 = <PromptTextarea></PromptTextarea>
+const ok20 = <inputs />
+const ok21 = mychakra.input
