@@ -47,7 +47,7 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 20. As a person typing slugs, commands, refs, paths or terminal input, I want typing help off, so that the keyboard does not change my exact text.
 21. As a person searching, I want typing help off and a search key on the keyboard, so that autocorrect does not break my query.
 22. As an iPhone user, I want free-text boxes to keep AutoFill off, so that Safari does not offer saved cards.
-23. As a person signing in or setting up, I want password managers and authenticator code AutoFill to work, with AutoFill off on the setup code box, so that I do not type secrets by hand and my phone does not offer an authenticator code as the setup code.
+23. As a person signing in or setting up, I want password managers and authenticator code AutoFill to work, and the setup code box to be a literal single-line box with `autocomplete="off"` and autocorrect, autocapitalize and spellcheck off, so that I do not type secrets by hand and the keyboard does not change the setup code.
 24. As a person entering a setting secret, I want the text hidden, with `autocomplete="off"` and autocorrect, autocapitalize and spellcheck off, so that the secret is not shown on screen and the keyboard does not change it.
 25. As a person using a project or worktree picker, search box or command palette, I want its keys and list behaviour to work as before, so that the move to `TextBox` costs me nothing.
 26. As a person writing in a prompt box, I want the expand button, vi editor, completion menu and send keys to work as before, so that the shared component changes nothing there.
@@ -189,6 +189,7 @@ A standing doc, `docs/text-boxes.md`, records each rule and the iOS reason for i
 - `docs/text-boxes.md` is a deliverable, linked from `.ai/index.md` so that an agent reads it before adding a text box. It is written once, from the final standard.
 - It lists each rule, how to pick a kind, look and size, and the iOS reason behind each rule.
 - It says that blocking saved-password offers on a setting secret is not proven, because a browser can ignore `autocomplete="off"` on a password input.
+- It says that it is not proven that browsers and password managers leave the setup code box alone on the login and setup pages, because they can ignore `autocomplete="off"` there.
 - It records what the device checks showed and what they did not: no iPad variant showed AutoFill Contact, "username" and a textarea with only `aria-label` outside a form were not tested, the iPad was not tested around a "Title" box, and no attribute is known to change the word strip.
 
 ## Testing Decisions
