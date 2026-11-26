@@ -1,4 +1,5 @@
 import { ChakraProvider } from "@chakra-ui/react"
+import { setViMode } from "../../vimode"
 import { EditorView } from "@codemirror/view"
 import { getCM, Vim } from "@replit/codemirror-vim"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
@@ -173,8 +174,9 @@ describe("Modal", () => {
 
   describe("with an inline vi box", () => {
     async function mountVi() {
+      setViMode(true)
       const state = {
-        snapshot: { sessions: [], vi_mode: true },
+        snapshot: { sessions: [] },
         connected: true,
         loadedOnce: true,
         tick: 0,

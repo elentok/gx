@@ -1,3 +1,4 @@
+import { setViMode } from "../vimode"
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { CertContext, type CertContextValue } from "../auth/cert"
@@ -116,11 +117,10 @@ test("one divider separates AFK, Vi mode and Sort from Restart server and More s
   ).toBeTruthy()
 })
 
-test("the AFK and Vi mode items post the opposite of the snapshot", async () => {
+test("the AFK item posts the opposite of the snapshot", async () => {
   const postAfk = vi.fn(async () => new Response(null, { status: 200 }))
   vi.stubGlobal("fetch", postAfk)
-  const postViMode = vi.fn(async () => {})
-  setup({ afk: true, vi_mode: false }, { postViMode })
+  setup({ afk: true })
   const afk = await screen.findByRole("menuitemcheckbox", { name: "AFK" })
   expect(afk.getAttribute("aria-checked")).toBe("true")
   fireEvent.click(afk)
@@ -130,8 +130,15 @@ test("the AFK and Vi mode items post the opposite of the snapshot", async () => 
       expect.objectContaining({ body: '{"on":false}' }),
     ),
   )
-  fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Vi mode" }))
-  await waitFor(() => expect(postViMode).toHaveBeenCalledWith(true))
+})
+
+test("the Vi mode item flips this browser's setting", async () => {
+  setup({})
+  const item = await screen.findByRole("menuitemcheckbox", { name: "Vi mode" })
+  expect(item.getAttribute("aria-checked")).toBe("false")
+  fireEvent.click(item)
+  await waitFor(() => expect(item.getAttribute("aria-checked")).toBe("true"))
+  expect(localStorage.getItem("gx.vi-mode")).toBe("on")
 })
 
 const menuItems = () =>
@@ -150,14 +157,8 @@ test("with a Dev checkout the Dev mode row sits under Vi mode, follows the Dev s
 })
 
 test("on a phone the Dev mode row keeps its place and the same drawn switch as Vi mode", async () => {
-  setup(
-    { vi_mode: true, dev: { state: "running", has_checkout: true } },
-    {},
-    () => {},
-    true,
-    {},
-    "phone",
-  )
+  setViMode(true)
+  setup({ dev: { state: "running", has_checkout: true } }, {}, () => {}, true, {}, "phone")
   const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" })
   expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode", "Dev mode"])
   const drawn = (el: Element) => [...el.querySelectorAll("[aria-hidden]")].map((n) => n.outerHTML)

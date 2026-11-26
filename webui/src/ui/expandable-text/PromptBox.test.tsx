@@ -1,3 +1,4 @@
+import { setViMode } from "../../vimode"
 import { EditorView } from "@codemirror/view"
 import { getCM, Vim } from "@replit/codemirror-vim"
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
@@ -220,8 +221,9 @@ test("Escape does not close the editor", () => {
 
 // The existing tests mean the textarea, so the pointer is coarse unless a test says otherwise.
 function withVi(on: boolean, ui: ReactNode, coarse = true, viEscape = "") {
+  setViMode(on)
   const state = {
-    snapshot: { sessions: [], vi_mode: on, vi_escape: viEscape },
+    snapshot: { sessions: [], vi_escape: viEscape },
     connected: true,
     loadedOnce: true,
     tick: 0,

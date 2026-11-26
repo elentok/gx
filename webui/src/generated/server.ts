@@ -2013,11 +2013,6 @@ export interface Snapshot {
    */
   rest?: RestStatus;
   /**
-   * ViMode is set while the web UI's vi mode is on; filled in by the handler.
-   * Missing means off.
-   */
-  vi_mode?: boolean;
-  /**
    * ViEscape is config server.web.vi-escape, the key sequence that leaves
    * insert mode in vi editors; filled in by the handler. Empty means off.
    */

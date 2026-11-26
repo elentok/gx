@@ -1,12 +1,14 @@
+import { setViMode } from "../../vimode"
 import { EditorView } from "@codemirror/view"
 import { act, screen, waitFor } from "@testing-library/react"
 import { expect } from "vitest"
 import type { Connection, ConnectionState } from "../../connection"
 
-/** A connection whose snapshot has vi mode on, for a test that renders a PromptBox call site. */
+/** Turns vi mode on and returns a connection, for a test that renders a PromptBox call site. */
 export function viConnection(extra: Record<string, unknown> = {}): Connection {
+  setViMode(true)
   const state = {
-    snapshot: { sessions: [], tickets: [], epics: [], vi_mode: true, vi_escape: "", ...extra },
+    snapshot: { sessions: [], tickets: [], epics: [], vi_escape: "", ...extra },
     connected: true,
     loadedOnce: true,
     tick: 0,

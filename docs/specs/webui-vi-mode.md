@@ -10,7 +10,7 @@ Some people think in vi. They want to move and edit with vi keys in these fields
 
 Every multi-line text field gets an expand button that opens one large editor. The editor uses variable-width text, because the fields hold prose.
 
-A global vi mode switch sits next to AFK in the top-right menu. The server stores it, so all browsers share it. It is off by default.
+A global vi mode switch sits next to AFK in the top-right menu. Each browser stores its own setting in `localStorage` (`gx.vi-mode`). It is off by default. The server-side setting, `/v1/vimode` and `gx vimode` described below were removed.
 
 - Vi mode off: the large editor takes plain typing. Cmd-G and Ctrl-G stay with the browser.
 - Vi mode on: Cmd-G (Ctrl-G on a non-Mac) opens the editor from a focused, enabled multi-line field. The editor has normal, insert and visual modes and shows the current mode as text.

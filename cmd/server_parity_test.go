@@ -60,7 +60,6 @@ var routeVerbs = map[string]string{
 	"GET /v1/rest":                              "rest",
 	"POST /v1/rest/active":                      "rest active",
 	"POST /v1/rest/unlock":                      "rest unlock",
-	"POST /v1/vimode":                           "vimode",
 	"GET /v1/workspaces":                        "server workspaces list",
 	"POST /v1/workspaces/create":                "server workspaces create",
 	"POST /v1/workspaces/rename":                "server workspaces rename",

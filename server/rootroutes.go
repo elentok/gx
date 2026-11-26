@@ -106,7 +106,6 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.AFK = s.afk.IsOn()
 	rest := s.rest.Status()
 	snap.Rest = &rest
-	snap.ViMode = s.viMode.IsOn()
 	web := s.settings.Load()
 	snap.ViEscape = web.WebViEscape
 	snap.LeaderKeyMac = web.WebLeaderKeyMac

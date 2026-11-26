@@ -1,3 +1,4 @@
+import { setViMode } from "../vimode"
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { ConfirmHost } from "../shell/ConfirmHost"
 import { afterEach, describe, expect, test, vi } from "vitest"
@@ -93,7 +94,8 @@ async function mount(
   workspaces: { name: string; order: number }[] = [],
 ) {
   const listeners = new Set<(address: string, type: string) => void>()
-  const connState = { snapshot: { sessions: [], vi_mode: viMode, workspaces } }
+  setViMode(viMode)
+  const connState = { snapshot: { sessions: [], workspaces } }
   const connection = {
     refresh: () => {},
     getState: () => connState,

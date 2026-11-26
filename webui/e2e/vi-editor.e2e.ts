@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import { composer, go, messageBox, sessions } from "./agentsKit"
-import { card, expect, type Fixture, menu, menuButton, nav, openMenu, test, touch } from "./fixture"
+import { card, expect, menu, menuButton, nav, openMenu, test, touch } from "./fixture"
 
 // Most vi-editor behaviour (open keys, closers, Done, backdrop, mode text, bar, vim motions and
 // edits) is covered in vitest under src/ui/expandable-text. These flows keep what needs a real
@@ -8,9 +8,19 @@ import { card, expect, type Fixture, menu, menuButton, nav, openMenu, test, touc
 
 const TOLERANCE = 1
 
-// `gx vimode` changes the server; the page follows, which the menu switch shows.
-const setViMode = async (fixture: Fixture, page: Page, on: boolean) => {
-  await fixture.cli("vimode", on ? "on" : "off")
+// Changes this browser's setting as another tab would; the open page follows at once.
+const flipViMode = (page: Page, on: boolean) =>
+  page.evaluate(
+    (value) => {
+      localStorage.setItem("gx.vi-mode", value)
+      window.dispatchEvent(new StorageEvent("storage", { key: "gx.vi-mode" }))
+    },
+    on ? "on" : "off",
+  )
+
+// Flips the setting and waits for the menu switch to show it.
+const setViMode = async (page: Page, on: boolean) => {
+  await flipViMode(page, on)
   await openMenu(page)
   await expect(menuSwitch(page)).toHaveAttribute("aria-checked", String(on))
   // The menu's dim covers the button, so Escape closes it once focus is inside the menu.
@@ -86,7 +96,7 @@ test.describe("124. Vi editor: open, close and submit", () => {
   }) => {
     const fixture = await start("agents")
     const idle = (await sessions(fixture))[0]
-    await setViMode(fixture, page, true)
+    await setViMode(page, true)
     await go(page, `#/agents/${idle.id}`)
     await messageBox(page).fill("sent from the editor")
     await composer(page).getByRole("button", nav("Open the note in a large editor")).click()
@@ -124,8 +134,8 @@ test.describe("123. Vi editor: layouts and touch bar", () => {
     page,
     start,
   }) => {
-    const fixture = await start("design-working")
-    await setViMode(fixture, page, true)
+    await start("design-working")
+    await setViMode(page, true)
     const dialog = await openEditor(page, 1280, 900)
     const box = (await dialog.boundingBox())!
     expect(Math.abs(box.width - 860)).toBeLessThanOrEqual(TOLERANCE)
@@ -205,9 +215,9 @@ test.describe("125. Vi editor: commands", () => {
     page,
     start,
   }) => {
-    const fixture = await start("design-working")
+    await start("design-working")
     await page.setViewportSize({ width: 390, height: 800 })
-    await setViMode(fixture, page, true)
+    await setViMode(page, true)
     const paragraph = "word ".repeat(100).trim()
     const text = `${paragraph}\naaaaaaaaaa\nbbbbbbbbbb\ncccccccccc\ndddddddddd`
     const { dialog } = await openWith(page, text, 0)
@@ -288,8 +298,8 @@ test.describe("126. Vi editor: layers and focus", () => {
   test("Escape in the editor over the question sheet closes neither", async ({ page, start }) => {
     // Kept as e2e: the Escape routing between the editor and the page's Questions view needs the
     // whole design page, which a component test would only imitate.
-    const fixture = await start("design", { autoAdvanceDelay: "1h" })
-    await setViMode(fixture, page, true)
+    await start("design", { autoAdvanceDelay: "1h" })
+    await setViMode(page, true)
     await expect(card(page, "design-epic")).toBeVisible()
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
     await page.getByRole("button", nav("Start design session")).click()
@@ -316,8 +326,8 @@ test.describe("126. Vi editor: layers and focus", () => {
     page,
     start,
   }) => {
-    const fixture = await start("design-working")
-    await setViMode(fixture, page, true)
+    await start("design-working")
+    await setViMode(page, true)
     const dialog = await openEditor(page, 1280, 900)
     const editable = dialog.getByRole("textbox", nav(`${MESSAGE} text`))
     await expect(editable).toBeFocused()
@@ -376,8 +386,8 @@ test.describe("126. Vi editor: layers and focus", () => {
     page,
     start,
   }) => {
-    const fixture = await start("paused")
-    await setViMode(fixture, page, true)
+    await start("paused")
+    await setViMode(page, true)
     const first = await openStartOver(page)
     await page.keyboard.press("Escape")
     await expect(first.dialog).toHaveCount(0)
@@ -408,7 +418,7 @@ test.describe("127. Vi editor: setting", () => {
     page,
     start,
   }) => {
-    const fixture = await start("design-working")
+    await start("design-working")
     await expect(card(page, "design-epic")).toBeVisible()
     await menuButton(page).click()
     const item = menuSwitch(page)
@@ -434,7 +444,7 @@ test.describe("127. Vi editor: setting", () => {
     await expect(mode).toHaveText("INSERT")
     await same()
 
-    await fixture.cli("vimode", "off")
+    await flipViMode(page, false)
     await expect(mode).toHaveCount(0)
     await expect(editable).toBeFocused()
     await same()
@@ -446,7 +456,7 @@ test.describe("127. Vi editor: setting", () => {
     await page.keyboard.press("Backspace")
     await same()
 
-    await fixture.cli("vimode", "on")
+    await flipViMode(page, true)
     await expect(mode).toHaveText("INSERT")
     await same()
     await page.keyboard.press("Escape")
@@ -465,8 +475,8 @@ test.describe("206. Inline vi box and big prompt box", () => {
     start,
   }) => {
     test.setTimeout(120_000)
-    const fixture = await start("workspaces")
-    await setViMode(fixture, page, true)
+    await start("workspaces")
+    await flipViMode(page, true)
     const sidebar = page.getByRole("complementary", nav("Sidebar"))
     const chatRow = sidebar.locator("a[data-chat]").first()
     await expect(chatRow).toBeVisible()
@@ -689,7 +699,7 @@ test.describe("206. Inline vi box and big prompt box", () => {
     await page.setViewportSize({ width: 1280, height: 900 })
 
     // Vi off turns the box back into a textarea with the same text.
-    await fixture.cli("vimode", "off")
+    await flipViMode(page, false)
     const plain = composer(page).locator("textarea")
     await expect(plain).toHaveValue("keep this text")
     await expect(pill).toHaveCount(0)
@@ -710,8 +720,8 @@ test.describe("207. Inline vi box in the Questions view", () => {
       page.getByRole("group", nav("View")).getByRole("button", { name })
 
     // Part 1: the note box of Q8b.
-    const fixture = await start("design", { autoAdvanceDelay: "1h" })
-    await setViMode(fixture, page, true)
+    await start("design", { autoAdvanceDelay: "1h" })
+    await flipViMode(page, true)
     await expect(card(page, "design-epic")).toBeVisible()
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
     await page.getByRole("button", nav("Start design session")).click()
@@ -740,8 +750,8 @@ test.describe("207. Inline vi box in the Questions view", () => {
     await expect(viewButton(/^Questions/)).toHaveAttribute("aria-pressed", "true")
 
     // Part 2: a text question on a second fixture.
-    const second = await start("design-text", { autoAdvanceDelay: "1h" })
-    await setViMode(second, page, true)
+    await start("design-text", { autoAdvanceDelay: "1h" })
+    await flipViMode(page, true)
     await expect(card(page, "design-epic")).toBeVisible()
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
     await page.getByRole("button", nav("Start design session")).click()

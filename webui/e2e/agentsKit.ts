@@ -1,6 +1,6 @@
 import type { Page, Route } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
-import { expect, menu, menuButton, type Fixture } from "./fixture"
+import { expect, type Fixture } from "./fixture"
 
 export const sessions = async (fixture: Fixture) =>
   JSON.parse(await fixture.cli("agents", "list", "--json")) as SessionInfo[]
@@ -194,17 +194,6 @@ export const commandNames = async (page: Page) => {
       return name.textContent!.trim()
     }),
   )
-}
-
-/** Turns the Vi mode setting on or off and checks the Menu shows it. */
-export async function setViMode(fixture: Fixture, page: Page, on: boolean) {
-  await fixture.cli("vimode", on ? "on" : "off")
-  await menuButton(page).click()
-  await expect(
-    menu(page).getByRole("menuitemcheckbox", { name: "Vi mode", exact: true }),
-  ).toHaveAttribute("aria-checked", String(on))
-  await menuButton(page).click()
-  await expect(menu(page)).toHaveCount(0)
 }
 
 /** The session header's "..." button; the sidebar rows carry their own "More actions" buttons. */

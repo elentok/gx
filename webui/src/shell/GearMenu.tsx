@@ -22,14 +22,13 @@ import { guarded } from "../ui/reportWriteFailure"
 import { postDevFrontend as defaultPostDevFrontend, useDev } from "../dev"
 import { DevDetails } from "../dev/DevPopover"
 import { DEV_LOOK } from "../dev/DevPill"
-import { postViMode as defaultPostViMode } from "../vimode"
+import { setViMode, useViMode } from "../vimode"
 import { postWorkspace } from "../workspaces/postWorkspace"
 import { FooterButton, interactiveStyle } from "./FooterButton"
 import { InstallSheet } from "./InstallSheet"
 import { useShell } from "./ShellContext"
 
 interface Props {
-  postViMode?: (on: boolean) => Promise<void>
   postDevFrontend?: (on: boolean) => Promise<void>
   postSort?: (workspace: string, sort: string) => Promise<unknown>
   /** The active workspace once it resolves; Sort stays disabled until then. */
@@ -59,7 +58,6 @@ function DotsIcon() {
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
 export function GearMenu({
-  postViMode = defaultPostViMode,
   postDevFrontend = defaultPostDevFrontend,
   postSort = defaultPostSort,
   activeWorkspace,
@@ -73,7 +71,7 @@ export function GearMenu({
   const registration = useWorkerRegistration()
   const { cert } = useCert()
   const afk = snapshot?.afk ?? false
-  const viMode = snapshot?.vi_mode ?? false
+  const viMode = useViMode()
   const devOn = dev.state !== "off"
   const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
     kind: "checkbox",
@@ -154,7 +152,7 @@ export function GearMenu({
         }
         items={[
           toggle("AFK", "afk", afk, () => toggleAfk(afk)),
-          toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
+          toggle("Vi mode", "vimode", viMode, () => setViMode(!viMode)),
           ...(dev.has_checkout
             ? [toggle("Dev mode", "devmode", devOn, () => guarded(postDevFrontend(!devOn)))]
             : []),

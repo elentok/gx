@@ -29,8 +29,8 @@ var notGenerated = map[string]bool{
 	"ProjectResult": true, "QueueEntry": true, "QueueItem": true, "QueueRequest": true,
 	"QueueResult": true, "ReloadRecord": true, "ReloadResult": true, "RepairRequest": true,
 	"RepairResult": true, "Route": true, "SaveChecksRequest": true, "SaveChecksResult": true,
-	"SetDefaultHarnessRequest": true, "SetDefaultHarnessResult": true, "ViModeRequest": true,
-	"ViModeResult": true, "WebInfo": true, "WebLogin": true, "WebLoginsResult": true, "WebMode": true,
+	"SetDefaultHarnessRequest": true, "SetDefaultHarnessResult": true,
+	"WebInfo": true, "WebLogin": true, "WebLoginsResult": true, "WebMode": true,
 }
 
 const wirePath = "github.com/elentok/gx/server/wire"

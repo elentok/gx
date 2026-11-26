@@ -107,9 +107,6 @@ type Snapshot struct {
 	// Rest is the Rest engine's status; filled in by the handler. A pointer so
 	// a client built before it, or a canned snapshot, may leave it out.
 	Rest *RestStatus `json:"rest,omitempty"`
-	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
-	// Missing means off.
-	ViMode bool `json:"vi_mode,omitempty"`
 	// ViEscape is config server.web.vi-escape, the key sequence that leaves
 	// insert mode in vi editors; filled in by the handler. Empty means off.
 	ViEscape string `json:"vi_escape,omitempty"`

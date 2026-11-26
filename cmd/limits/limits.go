@@ -1,5 +1,5 @@
 // Package limits is the verbs that read or flip a server-side limit or mode
-// through the API: `gx budget`, `gx usage`, `gx afk` and `gx vimode`.
+// through the API: `gx budget`, `gx usage` and `gx afk`.
 package limits
 
 import "github.com/elentok/gx/cmd/cmdbase"

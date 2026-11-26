@@ -6,9 +6,9 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// Routes lists the queue, one-off, AFK and vi-mode endpoints. The getters are
+// Routes lists the queue, one-off, and AFK endpoints. The getters are
 // called per request, so a route can be listed before its Server is built.
-func Routes(queue func() *Queue, oneOffs func() *OneOffs, afk func() *AFK, viMode func() *ViMode) []wire.Route {
+func Routes(queue func() *Queue, oneOffs func() *OneOffs, afk func() *AFK) []wire.Route {
 	write := func(pattern string, do func(*Queue) func(wire.QueueRequest) (wire.QueueResult, error)) wire.Route {
 		return wire.Route{Pattern: pattern, Handler: func(w http.ResponseWriter, r *http.Request) { Handler(do(queue()))(w, r) }}
 	}
@@ -29,6 +29,5 @@ func Routes(queue func() *Queue, oneOffs func() *OneOffs, afk func() *AFK, viMod
 		mode("POST /v1/queue/drain", func(q *Queue) func() (wire.QueueResult, error) { return q.Flush }),
 		{Pattern: "POST /v1/oneoff", Handler: func(w http.ResponseWriter, r *http.Request) { oneOffs().handle(w, r) }},
 		{Pattern: "POST /v1/afk", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { afk().write(w, r) }},
-		{Pattern: "POST /v1/vimode", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { viMode().write(w, r) }},
 	}
 }

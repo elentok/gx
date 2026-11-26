@@ -144,7 +144,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length - 1)
   await expect(needs.getByRole("link", { name: "paused-epic", exact: true })).toHaveCount(0)
 
-  // 28: AFK and Vi mode flip over SSE; the footer's paused state follows `queue pause`.
+  // 28: AFK flips over SSE, Vi mode in the browser; the footer's paused state follows `queue pause`.
   // Regex: the status button's name also lists health when health is high.
   const paused = page.getByRole("button", { name: /Server queue is paused/ })
   await expect(paused).toHaveCount(0)
@@ -159,7 +159,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(viModeItem(page)).toHaveAttribute("aria-checked", "false")
   await viModeItem(page).click()
   await expect(viModeItem(page)).toHaveAttribute("aria-checked", "true")
-  expect(await fixture.cli("vimode")).toContain("vimode off")
+  await viModeItem(page).click()
   await expect(viModeItem(page)).toHaveAttribute("aria-checked", "false")
   await page.keyboard.press("Escape")
   await expect(menu(page)).toHaveCount(0)

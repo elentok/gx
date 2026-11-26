@@ -63,7 +63,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		settings.Routes(func() *settings.Holder { return s.Settings() }),
 		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.Done() }),
 		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),
-		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
+		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }),
 		rest.Routes(func() *rest.Runner { return s.rest }),
 		workspaces.Routes(func() *workspaces.Store { return s.workspaces }, func() []wire.Workspace { ws, _ := s.workspacesWithNeedsYou(); return ws }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),

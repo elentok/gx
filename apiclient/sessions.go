@@ -368,10 +368,3 @@ func (s *Sessions) SetAFK(ctx context.Context, on *bool) (wire.AFKResult, error)
 	err := s.t.post(ctx, "/v1/afk", wire.AFKRequest{On: on}, &res)
 	return res, err
 }
-
-// SetViMode sets the web UI's vi mode; a nil on toggles it.
-func (s *Sessions) SetViMode(ctx context.Context, on *bool) (wire.ViModeResult, error) {
-	var res wire.ViModeResult
-	err := s.t.post(ctx, "/v1/vimode", wire.ViModeRequest{On: on}, &res)
-	return res, err
-}

@@ -1,3 +1,4 @@
+import { setViMode } from "../vimode"
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
@@ -108,10 +109,10 @@ function render(opts: {
   wide?: boolean
   vi?: boolean
 }) {
+  setViMode(opts.vi ?? false)
   const state = {
     snapshot: {
       sessions: [session(opts.state, opts.background, opts.auto)],
-      vi_mode: opts.vi ?? false,
       vi_escape: "",
     },
     connected: opts.connected ?? true,

@@ -139,7 +139,6 @@ type Server struct {
 	queue      *queue.Queue
 	afk        *queue.AFK
 	rest       *rest.Runner
-	viMode     *queue.ViMode
 	workspaces *workspaces.Store
 	oneOffs    *queue.OneOffs
 	budget     *budget.Budget
@@ -311,11 +310,6 @@ func New(cfg Config) (*Server, error) {
 	cfg.Chat.Push = pushChannel
 	webToast := &webToastAdapter{}
 	cfg.Chat.WebToast = webToast
-	viMode, err := queue.OpenViMode(cfg.StateDir, events)
-	if err != nil {
-		lock.Release()
-		return nil, fmt.Errorf("load vi mode: %w", err)
-	}
 	wsStore, err := workspaces.Open(cfg.StateDir, events, func() workspaces.Directory { return workspacesDirectory{s} })
 	if err != nil {
 		lock.Release()
@@ -384,10 +378,9 @@ func New(cfg Config) (*Server, error) {
 		chat:     notify.NewServerChat(cfg.Chat),
 		registry: registry,
 
-		queue:  q,
-		afk:    afk,
-		rest:   restRunner,
-		viMode: viMode,
+		queue: q,
+		afk:   afk,
+		rest:  restRunner,
 
 		workspaces: wsStore,
 		tokens:     tokens,
