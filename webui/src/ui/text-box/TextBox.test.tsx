@@ -204,6 +204,72 @@ describe("TextBox pass-through", () => {
   })
 })
 
+describe("TextBox looks and sizes", () => {
+  const looks: [string, TextBoxProps][] = [
+    ["boxed sm", { ...base, kind: "line", size: "sm" }],
+    ["boxed md", { ...base, kind: "line", size: "md" }],
+    ["boxed lg", { ...base, kind: "line", size: "lg", mono: true }],
+    ["bare line", { ...base, kind: "line", look: "bare" }],
+    ["bare title", { ...base, kind: "line", look: "bare", size: "title" }],
+    ["bare search", { ...base, kind: "search", look: "bare" }],
+    ["boxed prose", { ...base, kind: "prose", size: "sm" }],
+    ["bare prose", { ...base, kind: "prose", look: "bare" }],
+    ["page prose", { ...base, kind: "prose", look: "bare", page: true }],
+  ]
+
+  it.each(looks)("%s is a labelled box with the global ring off", (_, props) => {
+    renderThemed(<TextBox {...props} />)
+    const box = screen.getByLabelText("Note")
+    expect(box.getAttribute("data-focus-ring")).toBe("none")
+    // None of the component's own props may leak onto the element.
+    for (const attr of ["look", "size", "page", "mono"]) expect(box.hasAttribute(attr)).toBe(false)
+  })
+
+  it.each(looks)("%s asks for the inset ring unless it styles focus itself", (name, props) => {
+    renderThemed(<TextBox {...props} />)
+    const own = ["bare title", "bare prose", "page prose"].includes(name)
+    expect(element().hasAttribute("data-text-box-ring")).toBe(!own)
+    expect(element().hasAttribute("data-text-box-title")).toBe(name === "bare title")
+  })
+})
+
+describe("TextBox layout", () => {
+  it("places the whole component, and gives heights to the textarea", () => {
+    renderThemed(<TextBox {...base} kind="prose" maxW="400px" maxH="200px" resize="none" />)
+    const root = element().parentElement?.parentElement as HTMLElement
+    expect(cssOf(root)).toContain("max-width:400px")
+    expect(cssOf(root)).not.toContain("max-height")
+    expect(cssOf(element())).toContain("max-height:200px")
+    expect(cssOf(element())).toContain("resize:none")
+    expect(element().hasAttribute("resize")).toBe(false)
+  })
+})
+
+describe("TextBox end element", () => {
+  it.each(["line", "prose"] as const)("draws a button beside a %s box that works", (kind) => {
+    const onClick = vi.fn()
+    const endElement = (
+      <button type="button" onClick={onClick}>
+        Expand
+      </button>
+    )
+    renderThemed(<TextBox {...({ ...base, kind, endElement } as TextBoxProps)} />)
+    const button = screen.getByRole("button", { name: "Expand" })
+    expect(button.closest("label")).toBeNull()
+    expect(element().parentElement?.contains(button)).toBe(true)
+    fireEvent.click(button)
+    expect(onClick).toHaveBeenCalled()
+  })
+
+  it("lets clicks through to the box, except on a button", () => {
+    renderThemed(<TextBox {...base} kind="line" endElement={<span>caret</span>} />)
+    const slot = screen.getByText("caret").parentElement as HTMLElement
+    expect(cssOf(slot)).toContain("pointer-events:none")
+    const rules = [...document.querySelectorAll("style")].map((s) => s.textContent).join("\n")
+    expect(rules).toMatch(/ button\{pointer-events:auto/)
+  })
+})
+
 describe("TextBox Escape", () => {
   it("prevents the default on a search box after the caller's handler", () => {
     const seen: boolean[] = []

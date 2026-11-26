@@ -78,7 +78,67 @@ test("the prop types refuse what TextBox sets itself", () => {
       <TextBox {...line} style={{}} />
       {/* @ts-expect-error the ref follows the kind */}
       <TextBox {...prose} ref={(_: HTMLInputElement | null) => {}} />
+      {/* @ts-expect-error a title is a bare line box */}
+      <TextBox {...line} size="title" />
+      {/* @ts-expect-error a title is a bare line box */}
+      <TextBox {...line} look="boxed" size="title" />
+      {/* @ts-expect-error a title is a bare line box */}
+      <TextBox {...search} look="bare" size="title" />
+      {/* @ts-expect-error a title is a bare line box */}
+      <TextBox {...prose} look="bare" size="title" />
+      {/* @ts-expect-error a title is a bare line box */}
+      <TextBox {...credential} look="bare" size="title" />
+      {/* @ts-expect-error page spacing is for bare prose */}
+      <TextBox {...prose} page />
+      {/* @ts-expect-error page spacing is for bare prose */}
+      <TextBox {...line} look="bare" page />
+      {/* @ts-expect-error page spacing is size md */}
+      <TextBox {...prose} look="bare" page size="lg" />
+      {/* @ts-expect-error textarea heights are for prose */}
+      <TextBox {...line} minH="0" />
+      {/* @ts-expect-error textarea heights are for prose */}
+      <TextBox {...search} maxH="40px" />
+      {/* @ts-expect-error textarea heights are for prose */}
+      <TextBox {...credential} maxHeight="40px" />
+      {/* @ts-expect-error resize is for prose */}
+      <TextBox {...line} resize="none" />
+      {/* @ts-expect-error no style props */}
+      <TextBox {...prose} h="40px" />
+      {/* @ts-expect-error no style props */}
+      <TextBox {...line} borderRadius="0" />
+      {/* @ts-expect-error mono is the only font choice */}
+      <TextBox {...line} fontFamily="mono" />
+    </>
+  )
+  const accepted = (
+    <>
+      <TextBox
+        {...line}
+        w={{ base: "100%", md: "88px" }}
+        minW="0"
+        maxW="400px"
+        m="0"
+        my="3"
+        marginTop="1"
+        flex="1"
+        flexGrow={1}
+        flexShrink={0}
+        flexBasis="auto"
+        gridArea="a"
+        gridColumn="1 / 3"
+        gridRow="1"
+        alignSelf="start"
+        justifySelf="end"
+        order={2}
+        mono
+        endElement="▾"
+      />
+      <TextBox {...line} look="bare" size="title" />
+      <TextBox {...prose} flex="1" minH="0" maxH="300px" resize="none" />
+      <TextBox {...prose} look="bare" page minHeight="0" maxHeight="9" />
+      <TextBox {...prose} look="bare" page size="md" />
     </>
   )
   expect(refused).toBeTruthy()
+  expect(accepted).toBeTruthy()
 })

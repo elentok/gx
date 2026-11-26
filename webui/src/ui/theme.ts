@@ -44,8 +44,9 @@ export const themeConfig = defineConfig({
       fontFamily: "text",
     },
     // iOS Safari zooms into a focused field whose font is under 16px. Chakra's recipe layer sits
-    // above globalCss, hence !important; desktop keeps the small fields.
-    "input, textarea, select": {
+    // above globalCss, hence !important; desktop keeps the small fields. A title box is larger
+    // than 16px and must stay so.
+    "input:not([data-text-box-title]), textarea, select": {
       "@media (pointer: coarse)": { fontSize: "16px !important" },
     },
     // The one keyboard focus ring: a 2px gap in the surrounding surface, then a 2px blue ring.
@@ -63,6 +64,11 @@ export const themeConfig = defineConfig({
     },
     // A field inside a box that draws the ring itself (PromptBox): the field shows none.
     "[data-focus-ring='none']:focus-visible": { boxShadow: "none !important" },
+    // A TextBox turns the global ring off and draws this one inside itself, so nothing clips it.
+    // Here and not on the component, whose !important loses to the rule above.
+    "[data-focus-ring='none'][data-text-box-ring]:focus-visible": {
+      boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
+    },
     "[data-focus-ring='inset']:focus-visible": {
       borderRadius: "8px",
       boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",

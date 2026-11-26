@@ -66,6 +66,30 @@ it("shows the Menu on each device type, closed and open", () => {
   ])
 })
 
+it("shows the TextBox in each kind, look and size", () => {
+  const labels = galleryEntries.find((e) => e.name === "TextBox")?.cases.map((c) => c.label) ?? []
+  expect(labels).toEqual([
+    "prose boxed",
+    "prose bare",
+    "prose bare, page",
+    "line, optional",
+    "line verbatim",
+    "line secret",
+    "search, hidden label",
+    "search bare",
+    "credential with hint",
+    "size sm",
+    "size md",
+    "size lg",
+    "size title",
+    "invalid",
+    "disabled",
+    "monospace",
+    "end element, caret",
+    "end element, button",
+  ])
+})
+
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
     const labels = galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? []

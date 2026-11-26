@@ -26,6 +26,18 @@ describe("theme", () => {
     expect(css["[data-focus-ring='inset']:focus-visible"].boxShadow).toContain("inset 0 0 0 2px")
   })
 
+  it("lets a title box keep 20px on a coarse pointer", () => {
+    const css = untyped(themeConfig.globalCss)
+    const forced = Object.keys(css).filter((k) => css[k]["@media (pointer: coarse)"]?.fontSize)
+    expect(forced).toEqual(["input:not([data-text-box-title]), textarea, select"])
+  })
+
+  it("draws a text box's inset ring over the rule that turns the global ring off", () => {
+    const css = untyped(themeConfig.globalCss)
+    const rule = css["[data-focus-ring='none'][data-text-box-ring]:focus-visible"]
+    expect(rule.boxShadow).toBe("inset 0 0 0 2px {colors.tone.running.fg} !important")
+  })
+
   it.each(KINDS)("has fg and bg tokens for kind %s", (kind) => {
     expect(system.token(`colors.kind.${kind}.fg`)).toBeTruthy()
     expect(system.token(`colors.kind.${kind}.bg`)).toBeTruthy()
