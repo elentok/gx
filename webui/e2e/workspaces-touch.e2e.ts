@@ -59,7 +59,8 @@ test("Workspaces touch", async ({ page, start }) => {
   await pick("Default workspace")
   // The header's search button opens the jump menu above the sliding sidebar; its tooltip names the key.
   const search = sidebar.getByRole("button", nav("Search"))
-  await expect(search).toHaveAttribute("title", /^Search \((⌘K|Ctrl\+K)\)$/)
+  await search.hover()
+  await expect(page.getByRole("tooltip")).toHaveText(/^Search \((⌘K|Ctrl\+K)\)$/)
   await search.click()
   await expect(jump).toBeVisible()
   await page.keyboard.press("Escape")

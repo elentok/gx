@@ -591,12 +591,66 @@ describe("swipe", () => {
   })
 })
 
-test.each([
-  ["MacIntel", "Search (⌘K)"],
-  ["Linux x86_64", "Search (Ctrl+K)"],
-])("the search button's tooltip names the platform key (%s)", (platform, title) => {
-  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
-  setup("desktop")
-  expect(screen.getByRole("button", { name: "Search" }).getAttribute("title")).toBe(title)
-  vi.restoreAllMocks()
+describe("header tooltips", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const button = (name: string) => screen.getByRole("button", { name })
+  const snapshotWith = (leader: string, leaderMac: string) => ({
+    snapshot: {
+      needs_you_total: 0,
+      build: "v1.2.3",
+      leader_key: leader,
+      leader_key_mac: leaderMac,
+    } as ConnectionState["snapshot"],
+  })
+
+  function hover(name: string) {
+    fireEvent.pointerEnter(button(name))
+    fireEvent.pointerMove(button(name))
+  }
+
+  async function expectTooltip(name: string, text: string) {
+    hover(name)
+    await waitFor(() => expect(screen.getByRole("tooltip").textContent).toBe(text))
+    fireEvent.pointerLeave(button(name))
+  }
+
+  test.each([
+    ["MacIntel", "Search (⌘K)", "Back (⌘E ,)", "Forward (⌘E .)"],
+    ["Linux x86_64", "Search (Ctrl+K)", "Back (Ctrl+G ,)", "Forward (Ctrl+G .)"],
+  ])("name the platform's keys, with no native title (%s)", async (platform, search, back, fwd) => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
+    installFakeNavigation({ canGoBack: true, canGoForward: true })
+    setup("desktop", 0, snapshotWith("ctrl+g", "cmd+e"))
+    await expectTooltip("Search", search)
+    await expectTooltip("Hide sidebar", "Hide sidebar")
+    await expectTooltip("Back", back)
+    await expectTooltip("Forward", fwd)
+    for (const name of ["Search", "Hide sidebar", "Back", "Forward"]) {
+      expect(button(name).hasAttribute("title"), name).toBe(false)
+    }
+  })
+
+  test.each(["", "nonsense"])(
+    "Back and Forward name no chord for the Leader key %j, greyed out too",
+    async (leader) => {
+      installFakeNavigation()
+      setup("desktop", 0, snapshotWith(leader, leader))
+      expect(button("Back").getAttribute("aria-disabled")).toBe("true")
+      await expectTooltip("Back", "Back")
+      await expectTooltip("Forward", "Forward")
+    },
+  )
+
+  test("closing the sidebar with the keyboard removes an open tooltip", async () => {
+    setup("desktop")
+    hover("Search")
+    await screen.findByRole("tooltip")
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true })
+    expect(isOpen()).toBe(false)
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
+  })
 })
