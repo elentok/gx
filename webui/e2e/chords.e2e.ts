@@ -440,21 +440,26 @@ test("Chords", async ({ page, start, context }) => {
   const chords = chordKit(tab)
   const epics = /#\/epics$/
   const ready = /#\/e\/demo:ready-epic$/
+  // The address changes before the new page renders, and that render closes an open box.
+  const landed = async (url: RegExp, title: string) => {
+    await expect(tab).toHaveURL(url)
+    await expect(tab.getByRole("heading", { level: 1, name: title })).toBeVisible()
+  }
   await expect(tabRow("ready-epic")).toBeVisible()
   await chords.open(chords.next)
   await expect(chords.back).toHaveCount(0)
   await expect(chords.forward).toHaveCount(0)
   await tab.keyboard.press("Escape")
   await tabRow("ready-epic").click()
-  await expect(tab).toHaveURL(ready)
+  await landed(ready, "ready-epic")
   await chords.open(chords.back)
   await expect(chords.forward).toHaveCount(0)
   await tab.keyboard.press("Comma")
-  await expect(tab).toHaveURL(epics)
+  await landed(epics, "Epics")
   await chords.open(chords.forward)
   await expect(chords.back).toHaveCount(0)
   await tab.keyboard.press("Period")
-  await expect(tab).toHaveURL(ready)
+  await landed(ready, "ready-epic")
   // Leader then Shift+, is no chord: the box closes and the page stays.
   await chords.open(chords.back)
   await tab.keyboard.press("Shift+Comma")
@@ -464,10 +469,10 @@ test("Chords", async ({ page, start, context }) => {
   await expect(tabSidebar).toBeHidden()
   await chords.open(chords.back)
   await tab.keyboard.press("Comma")
-  await expect(tab).toHaveURL(epics)
+  await landed(epics, "Epics")
   await chords.open(chords.forward)
   await tab.keyboard.press("Period")
-  await expect(tab).toHaveURL(ready)
+  await landed(ready, "ready-epic")
   await expect(tabSidebar).toBeHidden()
   await tab.getByRole("button", nav("Show sidebar")).click()
   // A step back to a chat opened with Enter focuses its prompt again.
@@ -478,7 +483,7 @@ test("Chords", async ({ page, start, context }) => {
   const enteredChat = tab.url()
   await expect(tabPrompt).toBeFocused()
   await tabRow("ready-epic").click()
-  await expect(tab).toHaveURL(ready)
+  await landed(ready, "ready-epic")
   await expect(tabPrompt).toHaveCount(0)
   await chords.open(chords.back)
   await tab.keyboard.press("Comma")
