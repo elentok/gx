@@ -20,7 +20,7 @@ One card below the chat, the working card, replaces the Working row and the task
 
 The log shows a subagent's link only after the subagent finishes. While it runs, the link is only in the card.
 
-"Back to parent chat" returns to the page the link came from. The current call updates while a page of the session is open. Subagent rows have their names again.
+"Back to parent chat" returns to the page the link came from. The current call updates while a page of the session is visible. Subagent rows have their names again.
 
 ## User Stories
 
@@ -63,8 +63,8 @@ Current call
 26. As a person, I want a file tool's current call to show the tool and the file path, so that I know which file it touches.
 27. As a person, I want a long file path cut at its start, so that I still see the tool and the file name.
 28. As a person, I want the same call text in the card, the Working line and the subagent page, so that one call reads one way.
-29. As a person with a chat or step page open, I want a subagent's current call to update while the parent is quiet, so that the card is not stale.
-30. As a person who runs gx on a laptop, I want gx to check subagent files only while a page of the session is open, so that gx does no work nobody sees.
+29. As a person with a chat or step page visible, I want a subagent's current call to update while the parent is quiet, so that the card is not stale.
+30. As a person who runs gx on a laptop, I want gx to check subagent files only while a page of the session is visible, so that gx does no work nobody sees.
 
 Back link
 
@@ -79,7 +79,8 @@ Back link
 
 ### Working card
 
-- One card component replaces the bottom block of the shared chat view and of the Questions view. The old task list and its summary are removed.
+- One card component replaces the bottom block on the chat page, on the step pages and in the Questions view. The old task list and its summary are removed.
+- The subagent page also uses the shared chat view, but shows no card. It keeps its Working row, with the new current-call text.
 - The card is the app's existing card with the muted tone. It has the moving border only while it shows the Working header.
 - The header shows under the same condition as today's Working row. It reads "Working", then the step and title when the page has them, then the newest other tool in flight with today's "(+N more)" popover. It never reads "waiting for sub-agent".
 - Rows follow the task group as the server sends it. Running rows come first and finished rows follow, each in launch order. The elapsed time ticks in the browser.
@@ -118,17 +119,19 @@ Back link
 - The chat read fills the current call of each running Codex subagent from its child rollout. It reads only the child's own lines, from the child's history start ordinal, and applies the same open-call rules as the parent's rollout, by the child's Codex version. The inherited parent history never counts.
 - It follows the existing file cache, so an unchanged child rollout is not parsed again.
 
-### Live updates while a page is open
+### Live updates while a page is visible
 
-- The existing subagent watch gets a second scope, a session. The chat page and the step pages open it for the chat session they show. A subagent page keeps its watch on one call.
-- The watch uses today's write route, client stream id, refusal for an unknown client and chat poll interval. An unknown session is refused. A session watch needs no call id.
-- On each tick the server finds the session's running subagents with the task rows' end rules, finds their files, and compares size and change time. It does not parse those files.
-- When at least one file grew, or a missing file appeared, the server sends one existing subagent-changed event to that client for the session. The page reloads the chat. One tick sends at most one event.
-- A file that exists when the watch first sees the subagent at opening is the baseline. A file that appears later counts as growth.
-- The watch stays open while nothing runs, so a later subagent is picked up with no new request.
-- The watch ends when the page closes or leaves the session, on the page-hide event, and when the client's last event stream closes. A new stream opens it again. A browser tab that is open but hidden counts as open.
-- Closing one page's watch never ends the watch of another page, even when two requests for the same client and session arrive out of order. Moving from a Design page to the chat page of the same session keeps a watch running. The way a watch is told apart is the implementer's choice.
-- With no page open, gx checks no subagent file. The existing poll of the parent transcript does not change.
+- The server learns which pages are visible from the web's existing focus report. There is no new request. The chat page and the step pages, Questions view included, already send it on each change and on each new event stream.
+- The report gets a new field that says the page shows the working card. A subagent page does not set it. The field name is the implementer's choice.
+- A client watches a session while it has an open event stream and its latest report is from the web, is focused, names that session and says the page shows the card. The server checks the session's subagent files while at least one client watches it.
+- Each web report carries a number that grows within one client. The server ignores a report with an older number than the last one it applied for that client, with all its effects. So a late "left" or "hidden" report never ends the checks of a visible page. A TUI report works as today.
+- On each tick of the chat poll interval, the server finds the session's running subagents with the task rows' end rules, finds their files, and compares size and change time. It does not parse those files.
+- When a client starts to watch a session that has a running subagent, the server records the file state first and then sends that client one existing subagent-changed event. So the page always reads the chat after the baseline: at page load, after a reconnect that dropped the report, and when the tab shows again. The page has no reload of its own for these cases. With no running subagent, a start sends no event.
+- Later, when at least one file grew, or a missing file appeared, the server sends one subagent-changed event to each watching client. The page reloads the chat. One tick sends at most one event per client.
+- A file that appears after the baseline counts as growth.
+- The checks continue while nothing runs, so a later subagent is picked up with no new report.
+- With no watching client, gx checks no file for the session. The existing poll of the parent transcript does not change.
+- The subagent page's own watch on one call keeps today's behaviour.
 
 ### Back link
 
@@ -143,8 +146,8 @@ Back link
 
 - A good test checks what the chat read returns, what the watch sends and what the page shows. It does not check cache shapes or timing.
 - Server seam: the chat read over fixture transcripts, sidecar files and rollouts. It covers the three subagent call states, the labels, the Codex current call and the string form of `run_in_background`. Prior art: the chat internal tests for subagent marks, details and Codex children, and the transcript task record tests.
-- Watch seam: the subagent watch with a temporary server. Prior art: the existing subagent watch tests. It covers growth, a late file, no event for a quiet or finished subagent, stream close, and two overlapping watches of one client.
-- Web seam: the shared chat view with fixture chat responses, and the subagent page. Prior art: the task list, chat log, working row and subagent page tests. It covers card states, log links per state, links with an origin and the watch requests.
+- Watch seam: focus reports and event streams on a temporary server. Prior art: the existing subagent watch and focus report tests. It covers the start event, growth, a late file, no event for a quiet or finished subagent, stream close, an older report and two watching clients.
+- Web seam: the shared chat view with fixture chat responses, and the subagent page. Prior art: the task list, chat log, working row and subagent page tests. It covers card states, log links per state, links with an origin and the focus report: the card field, the growing number, tab hide and show, and a new stream in a hidden tab, which reports not focused. It also covers that the subagent page shows no card.
 - E2E: update flows 208 "Task list" and 216 "Subagent page", and the Working row steps of flows 14 and 75. Add the new flows named below. The repo's e2e skill and flow budget rules apply. Run Go tests with `scripts/proc-cap`.
 
 ## Verification
@@ -154,7 +157,8 @@ Entries refer to Mock states by state name and do not repeat the look check. "Ch
 Card content (stories 1 to 12)
 
 - Mock states "two-running-one-done-wide", "no-subagents-wide" and "one-subagent-wide".
-- Flow 208 "Task list", rewritten for the card, on `bg-progress` shape `claude` on a Design page and on the chat page: all rows show with no click and no summary line, running rows come first, a shell row opens its details and command, a subagent row has a linked name and no details, and the header has no "waiting for sub-agent" and no "running shell:".
+- Flow 208 "Task list", rewritten for the card, on `bg-progress` shape `claude` on a Design page and on the chat page: all rows show with no click and no summary line, running rows come first, a shell row opens its details and command, a subagent row has a linked name and no details, and the header has no "waiting for sub-agent" and no "running shell:". With the shell row open, append to a running subagent's file: the row is still open after the chat reloads.
+- Flow 14, updated: its Working row steps check the card header.
 - New flow on `subagents` shape `card-two-running`: both names are links, each has a current call, the finished row is grey with no link, and no subagent shows twice on the page.
 - Same flow, shape `card-no-tasks`: only the header. Shape `card-one-subagent`: the header and one row. After a result for the open call is appended to one subagent's file, its row shows one line.
 - Flow 208, shape `subagent-with-inner-task`: after the turn ends while the subagent runs, the rows show with no Working header and no moving border. After the last task ends, the card is gone.
@@ -163,7 +167,7 @@ Card size and pages (stories 13 to 15)
 
 - Mock states "two-running-one-done-phone", "no-subagents-phone" and "one-subagent-phone".
 - New flow on `bg-progress` shape `many` at 390px: the card is at most 40% of the viewport height, its rows scroll, the header stays in view, the log is visible and the page has no sideways scroll.
-- New flow: the card shows on a Design page, an Initiative page, a Triage page and the chat page, and in a step page's Questions view. New scenario to write: sessions with a running subagent on an Initiative and a Triage page, and one with an open question round.
+- New flow: the card shows on a Design page, an Initiative page, a Triage page and the chat page, and in a step page's Questions view. New scenario to write: sessions on an Initiative and a Triage page, each with one running and one finished subagent, and one with an open question round.
 
 Codex card (stories 16 to 17)
 
@@ -173,6 +177,7 @@ Codex card (stories 16 to 17)
 Links in the log (stories 18 to 22)
 
 - Flow 216 "Subagent page", updated, on `subagents` shapes `card-two-running` and `finished-handback`, on a Design page and on the chat page: a running call has no link in the log, a finished call has one below the folded group, an open group shows it once, and a running call in it is plain text.
+- Same flow, shape `card-two-running`: the page of a running subagent shows its Working row with the new call text and no working card.
 - Same flow: end a running subagent through the fixture files. With no reload, its row turns grey or leaves the card and its log link appears.
 - CLI: the chat read names the state of each subagent call.
 
@@ -191,12 +196,12 @@ Current-call text (stories 26 to 28)
 
 Live updates (stories 29 to 30)
 
-- New flow on `subagents`, with a chat page and then a Design page open: append a new open call to a running subagent's file while the parent writes nothing. The card shows it with no reload. Repeat on a Codex child.
-- Go server tests: with no watch, growth of a subagent file sends no event. With a session watch it sends one. After a close request or a closed stream it sends none. A late close of an old watch leaves the new one running. An unknown client and an unknown session are refused.
+- New flow on `subagents`, with a chat page and then a Design page open: append a new open call to a running subagent's file while the parent writes nothing. The card shows it with no reload. Repeat on a Codex child. Then hide the tab with the `visibilityState` override (prior art `stats.e2e.ts`) and wait for the report that says not focused. Append another open call and show the tab: the card shows it with no page reload. Then append a third open call while the parent writes nothing: the card shows it with no page reload.
+- Go server tests: with no watching client, growth of a subagent file sends no event. A start with a running subagent sends one event, and with none it sends no event. Growth then sends one event to each watching client. After a not-focused report, a report without the card field or a closed stream, it sends none. A report with an older number changes nothing. An unknown client and an unknown session are refused, as today.
 
 Back link (stories 31 to 36)
 
-- Flow 216, updated: from the card and from a log link on a Design, an Initiative and a Triage page, the back link returns to that page. From the chat page it returns there. A URL with no origin, and one with an outside address as origin, go back to the chat page. A reload keeps the target (declare the reload).
+- Flow 216, updated, on `subagents` and on the new scenario with a running subagent on an Initiative and a Triage page, whose sessions each hold one running and one finished subagent: from the card and from a log link on a Design, an Initiative and a Triage page, the back link returns to that page. From the chat page it returns there. A URL with no origin, and one with an outside address as origin, go back to the chat page. A reload keeps the target (declare the reload).
 - Same flow, shape `nested`: from a Design page open the nested subagent and its grandchild. Back goes to the parent subagent, then again, then to the Design page. The breadcrumb levels keep the origin.
 - Same flow, shapes `file-gone` and `parent-gone`: the back link follows the origin.
 
@@ -229,18 +234,15 @@ New flows and scenarios to write are those named above: the `subagents` shapes `
 
 ## Self-decided design questions
 
-1. **How does the page-scoped check start and stop?** Choice: a session scope on the existing subagent watch. Reason: it already has the client stream lifecycle, the page-hide close and the poll interval. One request per page avoids the browser tracking each subagent.
-2. **Do overlapping page changes end each other's watch?** Choice: no, each page's watch is told apart. Reason: a late close request must not stop the next page's updates.
-3. **Is a hidden tab "open"?** Choice: yes. Reason: the subagent watch works this way, and the card is current when the person returns.
-4. **Which event reloads the page?** Choice: the existing subagent-changed event, sent only to the watching client, at most once per tick. Reason: the chat already reloads on events for its session.
-5. **What decides "finished" for a log link?** Choice: the task rows' end rules, not the sidecar's finished marker. Reason: the card and the log must switch together.
-6. **Which tools are file tools?** Choice: Read, Edit and Write. Reason: these are the ones the person was asked about. Other tools stay as today.
-7. **How is a long file label cut on a narrow screen?** Choice: also at the start of the path. Reason: an end cut by the browser would hide the file name.
-8. **What do calls with no task record show on the chat page?** Choice: plain text in the open group, nothing below the folded group. On step pages, a plain line. Reason: only links were added below the folded group.
-9. **What about a decoded archived Codex conversation?** Choice: plain text. Reason: it has no task records, and the subagent page could show nothing.
-10. **What do non-subagent rows look like?** Choice: dot or mark, label, time, no kind word. Reason: this is the card row in the mock.
-11. **What is the height cap exactly?** Choice: 40% of the viewport height, header included. Reason: it is the agreed "about 40%" as one number that a test can check.
-12. **Which origin values count?** Choice: only chat, Design, Initiative and Triage pages of this app, else the chat page. Reason: a URL parameter must not send the person elsewhere.
-13. **Do breadcrumb links keep the origin?** Choice: subagent levels do, the session name still opens the chat page. Reason: back links from an upper level must still end at the origin, and the session name already means the chat.
-14. **Is a step page's picked session restored on return?** Choice: no, the page opens in its normal state. Reason: the browser Back button behaves the same way today.
-15. **How far does the lost-name fix go?** Choice: all three parts from the research: tolerant boolean, per-block decoding and the description fallback. Reason: each removes a way to lose a name.
+1. **Which event reloads the page?** Choice: the existing subagent-changed event, sent only to watching clients, at most once per tick. Reason: the chat already reloads on events for its session.
+2. **What decides "finished" for a log link?** Choice: the task rows' end rules, not the sidecar's finished marker. Reason: the card and the log must switch together.
+3. **Which tools are file tools?** Choice: Read, Edit and Write. Reason: these are the ones the person was asked about. Other tools stay as today.
+4. **How is a long file label cut on a narrow screen?** Choice: also at the start of the path. Reason: an end cut by the browser would hide the file name.
+5. **What do calls with no task record show on the chat page?** Choice: plain text in the open group, nothing below the folded group. On step pages, a plain line. Reason: only links were added below the folded group.
+6. **What about a decoded archived Codex conversation?** Choice: plain text. Reason: it has no task records, and the subagent page could show nothing.
+7. **What do non-subagent rows look like?** Choice: dot or mark, label, time, no kind word. Reason: this is the card row in the mock.
+8. **What is the height cap exactly?** Choice: 40% of the viewport height, header included. Reason: it is the agreed "about 40%" as one number that a test can check.
+9. **Which origin values count?** Choice: only chat, Design, Initiative and Triage pages of this app, else the chat page. Reason: a URL parameter must not send the person elsewhere.
+10. **Do breadcrumb links keep the origin?** Choice: subagent levels do, the session name still opens the chat page. Reason: back links from an upper level must still end at the origin, and the session name already means the chat.
+11. **Is a step page's picked session restored on return?** Choice: no, the page opens in its normal state. Reason: the browser Back button behaves the same way today.
+12. **How far does the lost-name fix go?** Choice: all three parts from the research: tolerant boolean, per-block decoding and the description fallback. Reason: each removes a way to lose a name.
