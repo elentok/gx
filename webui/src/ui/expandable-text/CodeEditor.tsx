@@ -45,9 +45,10 @@ function mapOnce() {
     // Screen lines, not paragraphs.
     Vim.map("j", "gj", ctx)
     Vim.map("k", "gk", ctx)
-    Vim.map("gs", "0", ctx)
+    Vim.map("gh", "0", ctx)
+    Vim.map("gl", "$", ctx)
     // Replaces vim's "end of previous word".
-    Vim.map("ge", "$", ctx)
+    Vim.map("ge", "G", ctx)
   }
   Vim.defineAction("closeEditor", (cm: object) => closers.get(cm)?.())
   Vim.mapCommand("ZZ", "action", "closeEditor", {}, { context: "normal" })

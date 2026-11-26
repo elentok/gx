@@ -47,7 +47,7 @@ Known limits:
 17. As a vi user, I want `j` and `k` to forget the old column after I click or tap, so that the next move starts from the new spot.
 18. As a vi user, I want the edit keys `x d c y p u` and Ctrl-R, so that I can change and undo text.
 19. As a vi user, I want `i a o` and `.`, so that I can insert and repeat edits.
-20. As a phone vi user, I want `gs` and `ge` to go to the line start and end, so that I do not need `0` or `$` on a phone keyboard.
+20. As a phone vi user, I want `gh` and `gl` to go to the line start and end, and `ge` to the end of the text, so that I do not need `0`, `$` or `G` on a phone keyboard.
 21. As a vi user, I want `ZZ` to close the editor, so that I can leave with the keyboard.
 22. As a vi user, I want Cmd-G (Ctrl-G) in the editor to close it, so that the same key opens and closes it.
 23. As a person on a wide screen, I want a press on the backdrop to close the editor, so that I can leave with the mouse.
@@ -96,8 +96,8 @@ Engine and loading
 - The editor uses variable-width text and overrides the engine's default monospace font. The vi block cursor takes the glyph width.
 - `ZZ` is host code on the engine's documented action API, because the default keymap has no `ZZ`.
 - `j` and `k` map to `gj` and `gk`. The stored column (`vim.lastMotion`) is reset after a click or tap.
-- `gs` and `ge` map to the line start and end, in normal and visual mode. `ge` replaces vim's "end of previous word".
-- Commands in scope: modes normal, insert and visual; `h j k l w e 0 f gg G`; `gs ge`; `x d c y p u`; Ctrl-R; `i a o`; `.`; `ZZ`.
+- `gh` and `gl` map to the line start and end, and `ge` maps to `G`, in normal and visual mode. `ge` replaces vim's "end of previous word".
+- Commands in scope: modes normal, insert and visual; `h j k l w e 0 f gg G`; `gh gl ge`; `x d c y p u`; Ctrl-R; `i a o`; `.`; `ZZ`.
 
 The setting
 
@@ -207,7 +207,7 @@ Existing flows are named by file and name or number.
 17. Flow 118: move with `j`, click elsewhere, press `j`; the caret moves from the clicked column.
 18. Flow 118: press Escape, then `x`, `dw`, `yy`, `p`, `u`, Ctrl-R, `iXY` Escape, `.`, and `v` with `d`; read the field text back after each step.
 19. Flow 118: `i`, `a`, `o` and `.` change the text and mode as in vim.
-20. Flow 118 with touch emulation at 390 px: `gs` and `ge` in normal and visual mode move to the line start and end.
+20. Flow 118 with touch emulation at 390 px: `gh` and `gl` in normal and visual mode move to the line start and end, and `ge` to the last line.
 21. Flow 117: press `ZZ` in normal mode; the editor closes, the text is kept in the field.
 22. Flow 117: press Cmd-G (Ctrl-G) inside the editor; the editor closes.
 23. Flow 117 at desktop width: press the backdrop; the editor closes. At 390 px (narrow) a backdrop press does not close it. Vitest (seam 3): the shared layer's narrow-screen backdrop option, on and off.

@@ -99,16 +99,23 @@ describe("vi on", () => {
     expect(text()).toBe(DOC)
   })
 
-  test.each(["", "v"])("gs and ge go to line start and end (prefix %j)", (prefix) => {
+  test.each(["", "v"])("gh and gl go to line start and end (prefix %j)", (prefix) => {
     const { keys, caret, view } = mount(true, { start: 11, end: 11 })
     keys("<Esc>")
     if (prefix) keys(prefix)
-    keys("gs")
-    expect(view.state.doc.lineAt(caret()).from).toBe(8)
+    keys("gh")
     expect(caret()).toBe(8)
-    keys("ge")
+    keys("gl")
     expect(caret()).toBeGreaterThanOrEqual(view.state.doc.lineAt(caret()).to - 1)
     expect(view.state.doc.lineAt(caret()).number).toBe(2)
+  })
+
+  test.each(["", "v"])("ge goes to the last line (prefix %j)", (prefix) => {
+    const { keys, caret, view } = mount(true)
+    keys("<Esc>")
+    if (prefix) keys(prefix)
+    keys("ge")
+    expect(view.state.doc.lineAt(caret()).number).toBe(3)
   })
 
   test("x, dw, yy p, u and Ctrl-R edit as in vim", () => {
