@@ -1,4 +1,4 @@
-import { Box, chakra, Image, Portal } from "@chakra-ui/react"
+import { Box, Image, Portal } from "@chakra-ui/react"
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Outlet } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
@@ -17,9 +17,11 @@ import { useDevice, type Device } from "../useWide"
 import { isMac } from "../platform"
 import { ChordHost } from "./ChordHost"
 import { CommandPalette } from "./CommandPalette"
+import { HeaderButton } from "./HeaderButton"
 import { JumpPalette } from "./JumpPalette"
 import { setJumpOpen } from "./jumpOpen"
 import { MascotToggle } from "./MascotToggle"
+import { NavButtons } from "./NavButtons"
 import { NewItemHost } from "./NewItemHost"
 import { ConfirmHost } from "./ConfirmHost"
 import { ModelPickerHost } from "./ModelPickerHost"
@@ -255,37 +257,22 @@ export function AppShell({
               <Box display="flex" alignItems="center" gap="2" pt="10px" pr="2" pb="6px" pl="3">
                 <Image src="/gx-logo-wide.png" alt="gx" h="26px" w="auto" draggable={false} />
                 <Box flex="1" />
-                <chakra.button
-                  type="button"
+                <HeaderButton
                   aria-label="Search"
                   title={isMac() ? "Search (⌘K)" : "Search (Ctrl+K)"}
                   onClick={() => setJumpOpen(true)}
-                  boxSize="34px"
-                  borderRadius="8px"
-                  display="grid"
-                  placeItems="center"
-                  color="text.dim"
-                  cursor="pointer"
-                  _hover={{ bg: "surface.raised" }}
                 >
                   <SearchIcon />
-                </chakra.button>
-                <chakra.button
-                  type="button"
+                </HeaderButton>
+                <HeaderButton
                   ref={hideButton}
                   aria-label="Hide sidebar"
                   title="Hide sidebar"
                   onClick={shell.close}
-                  boxSize="34px"
-                  borderRadius="8px"
-                  display="grid"
-                  placeItems="center"
-                  color="text.dim"
-                  cursor="pointer"
-                  _hover={{ bg: "surface.raised" }}
                 >
                   <PanelIcon />
-                </chakra.button>
+                </HeaderButton>
+                <NavButtons />
               </Box>
               <HeadSlot>
                 <WorkspaceSwitcher

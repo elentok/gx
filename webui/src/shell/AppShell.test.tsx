@@ -7,6 +7,7 @@ import { PageHeader } from "../page/PageHeader"
 import { renderThemed } from "../ui/render"
 import { DeviceContext, type Device } from "../useWide"
 import { AppShell } from "./AppShell"
+import { installFakeNavigation } from "./fakeNavigation.testutil"
 import { closeNewItem, openNewAgent } from "./newItemOpen"
 import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe"
 
@@ -73,6 +74,7 @@ function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> 
               </>
             ),
           },
+          { path: "/other", element: <p>other page</p> },
         ],
       },
     ],
@@ -85,6 +87,7 @@ function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> 
       </ConnectionContext.Provider>
     </DeviceContext.Provider>,
   )
+  return router
 }
 
 // A hidden aside has no accessible name in the testing library, so find it by its label.
@@ -134,6 +137,76 @@ test("desktop: hiding the sidebar shows the mascot, which brings it back", () =>
   fireEvent.click(mascot()!)
   expect(isOpen()).toBe(true)
   expect(mascot()).toBeNull()
+})
+
+describe("header buttons", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const button = (name: string) => screen.getByRole("button", { name })
+  const headerButtons = () => [...button("Search").parentElement!.querySelectorAll("button")]
+  const headerNames = () => headerButtons().map((b) => b.getAttribute("aria-label"))
+
+  function openSidebar(device: Device) {
+    if (device !== "desktop") fireEvent.click(mascot()!)
+  }
+
+  test.each(["desktop", "tablet", "phone"] as const)(
+    "%s: Search, Hide sidebar, Back and Forward, none of which shrinks",
+    (device) => {
+      installFakeNavigation()
+      setup(device)
+      openSidebar(device)
+      expect(headerNames()).toEqual(["Search", "Hide sidebar", "Back", "Forward"])
+      for (const b of headerButtons()) {
+        const style = getComputedStyle(b)
+        expect([style.width, style.height, style.flex]).toEqual(["34px", "34px", "0 0 auto"])
+      }
+    },
+  )
+
+  test("a browser without window.navigation gets Search and Hide sidebar only", () => {
+    setup("desktop")
+    expect(headerNames()).toEqual(["Search", "Hide sidebar"])
+  })
+
+  test.each(["desktop", "tablet", "phone"] as const)(
+    "%s: Back and Forward move one page and leave the sidebar open",
+    async (device) => {
+      installFakeNavigation({ canGoBack: true, canGoForward: true })
+      const router = setup(device)
+      await act(() => router.navigate("/other"))
+      openSidebar(device)
+      fireEvent.click(button("Back"))
+      expect(await screen.findByText("item")).toBeTruthy()
+      expect(isOpen()).toBe(true)
+      fireEvent.click(button("Forward"))
+      expect(await screen.findByText("other page")).toBeTruthy()
+      expect(isOpen()).toBe(true)
+    },
+  )
+
+  test("with no entry in a direction the button is greyed out and ignores clicks", async () => {
+    const history = installFakeNavigation()
+    const router = setup("desktop")
+    await act(() => router.navigate("/other"))
+    await act(() => router.navigate("/"))
+    await act(() => router.navigate(-1))
+    const navigate = vi.spyOn(router, "navigate")
+    for (const name of ["Back", "Forward"]) {
+      expect(button(name).getAttribute("aria-disabled")).toBe("true")
+      expect(button(name).hasAttribute("disabled")).toBe(false)
+      fireEvent.click(button(name))
+    }
+    expect(navigate).not.toHaveBeenCalled()
+
+    act(() => history.set({ canGoBack: true }))
+    expect(button("Back").hasAttribute("aria-disabled")).toBe(false)
+    expect(button("Forward").getAttribute("aria-disabled")).toBe("true")
+
+    act(() => history.set({ canGoBack: false, canGoForward: true }))
+    expect(button("Back").getAttribute("aria-disabled")).toBe("true")
+    expect(button("Forward").hasAttribute("aria-disabled")).toBe(false)
+  })
 })
 
 test.each(["tablet", "phone"] as const)(
