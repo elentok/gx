@@ -9,8 +9,11 @@ const MISSING = "Read the old notes"
 const NESTED = "Map the server packages"
 const GRANDCHILD = "Read the wire package"
 
+/** The chat entry's link; the working card links a running subagent by the same name. */
 const callLink = (page: Page, description: string) =>
-  page.getByRole("link", { name: `${description} ↗`, exact: true })
+  page
+    .getByRole("link", { name: `${description} ↗`, exact: true })
+    .and(page.locator(":not([data-mock-part='card'] *)"))
 const backLink = (page: Page) => page.getByRole("link", { name: "← Back to parent chat" })
 const title = (page: Page, text: string) =>
   expect(page.getByRole("heading", { level: 1, name: text })).toBeVisible()
@@ -28,7 +31,7 @@ const openTools = async (page: Page) => {
 // Why a flow: a real server round trip from the fixture's transcripts, meta.json files and rollouts to the chat read to
 // the page, a page-to-page journey across the Agents, Design and subagent pages with the browser Back button and a
 // reload, a live file growth seen with no reload, and real layout at 390px. SubagentPage.test.tsx,
-// AgentsPage.sessionView.test.tsx, TaskList.test.tsx and ChatLog.test.tsx and the Go server tests cover each rule
+// AgentsPage.sessionView.test.tsx, WorkingCard.test.tsx and ChatLog.test.tsx and the Go server tests cover each rule
 // alone and cannot see these together. The scenario seeds no Initiative or Triage session, so the third page of the
 // link step is not covered here.
 test("216. Subagent page", async ({ page, start }) => {

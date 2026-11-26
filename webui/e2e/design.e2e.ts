@@ -263,7 +263,9 @@ test.describe("14. Working row", () => {
     await expect(ring(page)).toHaveAttribute("data-tone", "muted")
     await page.getByRole("button", nav("Start design session")).click()
 
-    const row = page.getByRole("status").filter({ hasText: "Working:" })
+    // The Working row is the header of the working card.
+    const header = page.locator("[data-mock-part='card']").getByRole("status")
+    const row = header.filter({ hasText: "Working:" })
     await expect(row).toHaveText(/Working: Resolve tickets · first/)
     // A busy turn with no round has no View group and no sheet; the ring runs with the comet.
     await expect(page.getByRole("group", nav("View"))).toHaveCount(0)
@@ -284,11 +286,11 @@ test.describe("14. Working row", () => {
       await expect(confirmInterrupt).toBeFocused()
       await page.keyboard.press("Escape")
       await expect(confirm).toHaveCount(0)
-      await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
+      await expect(header.filter({ hasText: /^Working/ })).toBeVisible()
     }
     await escOpensAndCloses()
     await page.evaluate((sid) => (location.hash = `#/agents/${sid}`), id)
-    await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
+    await expect(header.filter({ hasText: /^Working/ })).toBeVisible()
     // gx drives this session, so Interrupt is off until the composer is turned on.
     // The first click opens a confirm modal; the last button is the modal's confirm.
     await page.getByRole("button", { name: "Turn on composer" }).click()
@@ -310,9 +312,7 @@ test.describe("14. Working row", () => {
     await start("agents-tools")
     await expect(card(page, "design-epic")).toBeVisible()
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
-    await expect(page.getByRole("status").filter({ hasText: "Working" })).not.toContainText(
-      "running shell",
-    )
+    await expect(header.filter({ hasText: "Working" })).not.toContainText("running shell")
     await expect(page.getByRole("list", nav("Tasks"))).toContainText("make test")
   })
 })

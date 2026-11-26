@@ -3,68 +3,61 @@ import type { Locator, Page } from "@playwright/test"
 import { card, expect, test } from "./fixture"
 import { chatOf, go, sessions, sidebar } from "./agentsKit"
 
-const summary = (page: Page, text: string) =>
-  page.getByRole("button", { name: new RegExp(`^.?\\s*${text}`) })
 const list = (page: Page) => page.getByRole("list", { name: "Tasks" })
-const rowOf = (page: Page, label: string) =>
-  list(page).getByRole("listitem").filter({ hasText: label }).first()
-/** The elapsed text is the last cell of a row's header. */
-const elapsed = (page: Page, label: string) => rowOf(page, label).locator("button > span").last()
-
-/** The kind and label of every row, in order; the ticking elapsed cell (the last span) is left out. */
-const rowsOf = (page: Page) =>
-  list(page)
-    .getByRole("listitem")
-    .evaluateAll((els) =>
-      els.map((e) => {
-        const spans = [...(e.querySelector("button")?.querySelectorAll(":scope > span") ?? [])]
-        return spans
-          .slice(0, -1)
-          .map((s) => s.textContent)
-          .join("|")
-      }),
-    )
+const rows = (page: Page) => list(page).getByRole("listitem")
+const rowOf = (page: Page, label: string) => rows(page).filter({ hasText: label }).first()
+/** The elapsed text is the last cell of a row's first line, a button or a plain box. */
+const elapsed = (page: Page, label: string) =>
+  rowOf(page, label).locator(":scope > :first-child > span").last()
 const noSideScroll = (page: Page) =>
   expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
     .toBe(false)
 
 // Why a flow: a real server round trip from the fixture's transcripts and rollouts to the chat read to the page,
-// the same rows on two pages, a real clock ticking and real layout at 390px. TaskList.test.tsx (vitest) covers
-// summary, order, marks, formats, tick, details and command alone and cannot see those. The group lifecycle is a
-// server rule, asserted by the Go tests of the assembler and readers.
+// the same rows on two pages, a real clock ticking and real layout at 390px. WorkingCard.test.tsx (vitest) covers
+// order, marks, formats, tick, details and command alone and cannot see those. The group lifecycle is a server
+// rule, asserted by the Go tests of the assembler and readers.
 test("208. Task list", async ({ page, start }) => {
   // Claude shape: the same list on the Design page and the Agents page.
   const fixture = await start("bg-progress", { shape: "claude" })
   const claude = (await sessions(fixture)).find((s) => s.harness !== "codex")!
   const pages = [`#/d/demo:design-epic`, `#/agents/${claude.id}`]
-  let first: string[] = []
+  let first: (string | null | undefined)[] = []
   for (const hash of pages) {
     await go(page, hash)
-    const sum = summary(page, "3 of 7 tasks done")
-    await expect(sum).toBeVisible()
-    await expect(sum).toHaveAttribute("aria-expanded", "false")
-    await sum.click()
-    await expect(sum).toHaveAttribute("aria-expanded", "true")
-    await expect(list(page)).toBeVisible()
-    await expect(list(page).getByRole("listitem")).toHaveCount(7)
-    const rows = await rowsOf(page)
-    if (first.length === 0) first = rows
-    else expect(rows).toEqual(first)
-    // The subagent row links to its page beside the row button; a click on the row still opens its details.
+    // Every row shows with no click and no summary button, the 4 running ones first.
+    const items = rows(page)
+    await expect(items).toHaveCount(7)
+    await expect(page.getByRole("button", { name: /tasks done/ })).toHaveCount(0)
+    const marks = list(page).getByRole("img")
+    await expect(marks).toHaveCount(7)
+    for (let i = 0; i < 4; i++) await expect(marks.nth(i)).toHaveAccessibleName("running")
+    await expect(list(page).getByRole("img", { name: "running" })).toHaveCount(4)
+    const labels = await items.evaluateAll((els) =>
+      els.map((e) => e.querySelector("[title]")?.getAttribute("title")),
+    )
+    if (first.length === 0) first = labels
+    else expect(labels).toEqual(first)
+    // The subagent name links to its page and its row has no details button.
     const sub = rowOf(page, "Survey the sessions code")
-    await expect(sub.getByRole("link", { name: "Open ↗" })).toHaveAttribute(
+    await expect(sub.getByRole("link", { name: "Survey the sessions code ↗" })).toHaveAttribute(
       "href",
       new RegExp(`^#/agents/${claude.id}/subagents/.+`),
     )
-    const subButton = sub.getByRole("button")
-    await subButton.click()
-    await expect(subButton).toHaveAttribute("aria-expanded", "true")
-    await subButton.click()
-    await expect(subButton).toHaveAttribute("aria-expanded", "false")
+    await expect(sub.getByRole("button")).toHaveCount(0)
+    // A shell row opens its details and command.
+    const shell = rowOf(page, "python3")
+    const shellButton = shell.getByRole("button").first()
+    await shellButton.click()
+    await expect(shellButton).toHaveAttribute("aria-expanded", "true")
+    await expect(shell.getByTestId("task-details")).toBeVisible()
+    await expect(shell).toContainText("time.sleep(5)")
+    await shellButton.click()
+    await expect(shellButton).toHaveAttribute("aria-expanded", "false")
     const working = page.getByRole("status").filter({ hasText: /^Working/ })
     await expect(working).toBeVisible()
-    await expect(working).not.toContainText("waiting on")
+    await expect(working).not.toContainText("waiting for sub-agent")
     await expect(working).not.toContainText("running shell:")
   }
 
@@ -86,13 +79,10 @@ test("208. Task list", async ({ page, start }) => {
   await expect.poll(() => cell.textContent()).not.toBe(t1)
   expect(requests).toBe(0)
 
-  // 390px, list open and the long command open, on both pages.
+  // 390px, the long command open, on both pages.
   await page.setViewportSize({ width: 390, height: 844 })
   for (const hash of pages) {
     await go(page, hash)
-    const sum = summary(page, "3 of 7 tasks done")
-    await expect(sum).toBeVisible()
-    if ((await sum.getAttribute("aria-expanded")) === "false") await sum.click()
     const script = rowOf(page, "bash").locator("button").first()
     await expect(script).toBeVisible()
     await script.click()
@@ -180,22 +170,18 @@ test("208. Task list", async ({ page, start }) => {
   await go(page, "#/epics")
   await purple(cardRing)
 
-  // One task: the row alone, no summary button.
+  // One task: one row.
   await page.setViewportSize({ width: 1280, height: 800 })
   const single = await start("bg-progress", { shape: "single-task" })
   const one = (await sessions(single)).find((s) => s.harness !== "codex")!
   await go(page, `#/agents/${one.id}`)
-  await expect(list(page).getByRole("listitem")).toHaveCount(1)
-  await expect(summary(page, "tasks done")).toHaveCount(0)
+  await expect(rows(page)).toHaveCount(1)
 
-  // Codex: a summary and rows with label and time.
+  // Codex: rows with label and time.
   const codex = await start("bg-progress", { shape: "codex" })
   const cx = (await sessions(codex)).filter((s) => s.harness === "codex")
   await go(page, `#/agents/${cx[0].id}`)
-  const csum = summary(page, "1 of 3 tasks done")
-  await expect(csum).toBeVisible()
-  await csum.click()
-  await expect(list(page).getByRole("listitem")).toHaveCount(3)
+  await expect(rows(page)).toHaveCount(3)
   await expect(rowOf(page, "make build")).toBeVisible()
   await expect(elapsed(page, "make build")).toBeVisible()
   await expect(elapsed(page, "make build")).toHaveText(/\S/)

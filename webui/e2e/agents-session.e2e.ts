@@ -173,9 +173,7 @@ test("75. Tools in flight and Interrupt", async ({ page, start }) => {
     .toContain("make test")
   await go(page, `#/agents/${tools[0].id}`)
   await expect(row).toHaveText("Working")
-  await expect(page.getByRole("list", nav("Tasks")).getByRole("listitem")).toHaveText([
-    /shell\s*make test/,
-  ])
+  await expect(page.getByRole("list", nav("Tasks")).getByRole("listitem")).toHaveText([/make test/])
   await expect(row.getByRole("button")).toHaveCount(0)
   // A Working chat renames too: /rename reaches its input while the turn runs, and the session stays Working.
   const toolsConv = (await chatOf(toolsFixture, tools[0].id)).conversation_id
