@@ -143,6 +143,11 @@ func outputText(label string, n, width int) string {
 // launch result lands a second later and names the file.
 func (b *Lines) shell(ago time.Duration, useID, taskID, command, output string, mtime time.Duration) {
 	b.use(ago, useID, "Bash", map[string]any{"command": command, "run_in_background": true})
+	b.shellLaunched(ago, useID, taskID, output, mtime)
+}
+
+// shellLaunched is the launch result and output file of a shell started at ago.
+func (b *Lines) shellLaunched(ago time.Duration, useID, taskID, output string, mtime time.Duration) {
 	path := b.outputPath(taskID)
 	b.result(ago-time.Second, useID, "Command running in background with ID: "+taskID+". Output is being written to: "+path,
 		map[string]any{"backgroundTaskId": taskID})

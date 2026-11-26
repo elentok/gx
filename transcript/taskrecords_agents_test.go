@@ -134,6 +134,60 @@ func TestReadTaskRecords_LaunchResultWithoutToolUseHasNoCallID(t *testing.T) {
 	}
 }
 
+func twoUseLine(first, second string) string {
+	return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":"m-two","content":[%s,%s]}}`, t0, first, second)
+}
+
+func useBlock(name, id, input string) string {
+	return fmt.Sprintf(`{"type":"tool_use","id":%q,"name":%q,"input":%s}`, id, name, input)
+}
+
+func recordsByLabel(recs []TaskRecord) map[string]TaskRecord {
+	out := map[string]TaskRecord{}
+	for _, r := range recs {
+		out[r.Label] = r
+	}
+	return out
+}
+
+func TestReadTaskRecords_StringRunInBackground(t *testing.T) {
+	t.Parallel()
+	recs := readRecords(t,
+		twoUseLine(
+			useBlock("Agent", "a1", `{"description":"explore","run_in_background":"true"}`),
+			useBlock("Bash", "b1", `{"command":"make","description":"build","run_in_background":"true"}`)),
+		plainResultLine("a1", t1, false, "launched", `{"status":"async_launched","agentId":"ag1","description":"explore"}`),
+		namedUseLine("Bash", "b2", t1, `{"command":"ls","description":"list","run_in_background":"false"}`),
+	)
+	got := recordsByLabel(recs)
+	if r := got["explore"]; len(recs) != 3 || r.Kind != TaskKindSubagent || r.CallID != "a1" || r.ID != "ag1" {
+		t.Errorf("records = %+v, want the Agent call with its label and CallID", recs)
+	}
+	if got["build"].Kind != TaskKindShell || got["list"].Kind != TaskKindCall {
+		t.Errorf("build %q list %q, want shell and call", got["build"].Kind, got["list"].Kind)
+	}
+}
+
+func TestReadTaskRecords_UndecodableBlockKeepsSiblings(t *testing.T) {
+	t.Parallel()
+	recs := readRecords(t, twoUseLine(
+		useBlock("Agent", "a1", `{"description":5}`),
+		useBlock("Bash", "b1", `{"command":"ls","description":"list"}`)))
+	if len(recs) != 1 || recs[0].Label != "list" {
+		t.Errorf("records = %+v, want only the sibling", recs)
+	}
+}
+
+func TestReadTaskRecords_LaunchResultWithoutToolUseTakesItsDescription(t *testing.T) {
+	t.Parallel()
+	r := readRecords(t,
+		plainResultLine("a1", t1, false, "launched", `{"status":"async_launched","agentId":"ag1","description":"explore"}`),
+	)[0]
+	if r.Label != "explore" || r.CallID != "" {
+		t.Errorf("rec = %+v, want label explore and no CallID", r)
+	}
+}
+
 func TestReadTaskRecords_ShellAndMonitorHaveNoCallID(t *testing.T) {
 	t.Parallel()
 	for _, r := range readRecords(t,

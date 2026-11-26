@@ -173,7 +173,9 @@ has no `finished`. `background-returned` ("Watch the build in the background"): 
 the grandchild's file sits flat in the same `subagents/` folder with meta `parentAgentId` (the nested agent) and `toolUseId` (that
 call), `spawnDepth` 2. `starting` ("Warm up the new worker"): the call runs and `subagent-starting-file` and `subagent-starting-meta`
 name paths that do not exist yet (their folder does); a flow writes them. `finished-no-handback` ("Summarise the config files",
-call `marked`): meta `finished: true`, the file has no `SubagentHandback` and ends with an assistant text. `parent-gone`: the
+call `marked`): meta `finished: true`, the file has no `SubagentHandback` and ends with an assistant text. `string-background`
+(call `string`, "Audit the string flags"): one assistant line launches that background subagent and the background shell
+"Lint in the background", both with `run_in_background: "true"`, so the chat read has two task rows. `parent-gone`: the
 `running` subagent of `foreground-running`, with the parent transcript deleted after seeding (no `tools` entry; the chat read still
 answers). `exited`: the same, with the session crashed (exit 1) so it is Exited. Data: `testutil/gxfixture/spec/subagents.go` and
 `bgtx/subagents.go`.

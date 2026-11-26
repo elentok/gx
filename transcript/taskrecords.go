@@ -3,6 +3,7 @@ package transcript
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -44,6 +45,7 @@ type taskRecordResult struct {
 	Status           string `json:"status"`
 	ResolvedModel    string `json:"resolvedModel"`
 	OutputFile       string `json:"outputFile"`
+	Description      string `json:"description"`
 	// A TaskOutput result: {retrieval_status, task: {task_id, ...}}.
 	RetrievalStatus string `json:"retrieval_status"`
 	Task            struct {
@@ -217,7 +219,7 @@ func scanTaskRecords(path string, keepSidechain bool) (taskScan, error) {
 		// A launch result with no tool_use of its own in the transcript, on a
 		// line of any type, still starts a background task.
 		if id, kind := res.launch(); id != "" && byTask[id] == nil {
-			r := &TaskRecord{Kind: kind, TaskID: id, StartedAt: ts}
+			r := &TaskRecord{Kind: kind, TaskID: id, Label: res.Description, StartedAt: ts}
 			if kind == TaskKindSubagent {
 				r.ID = id
 			}
@@ -310,25 +312,45 @@ type taskUse struct {
 	Prompt          string `json:"prompt"`
 	SubagentType    string `json:"subagent_type"`
 	name            string
-	RunInBackground bool `json:"run_in_background"`
+	RunInBackground boolOrString `json:"run_in_background"`
+}
+
+// boolOrString is a flag Claude Code often writes as "true" or "false".
+type boolOrString bool
+
+func (b *boolOrString) UnmarshalJSON(raw []byte) error {
+	switch string(raw) {
+	case `true`, `"true"`:
+		*b = true
+	case `false`, `"false"`, `null`:
+		*b = false
+	default:
+		return fmt.Errorf("not a boolean: %s", raw)
+	}
+	return nil
 }
 
 // taskToolUses reads the Bash, Monitor and Agent (or legacy Task) launches of
 // an assistant message by tool_use id.
 func taskToolUses(message json.RawMessage) map[string]taskUse {
 	var m struct {
-		Content []struct {
-			Type  string  `json:"type"`
-			ID    string  `json:"id"`
-			Name  string  `json:"name"`
-			Input taskUse `json:"input"`
-		} `json:"content"`
+		Content []json.RawMessage `json:"content"`
 	}
 	if json.Unmarshal(message, &m) != nil {
 		return nil
 	}
 	out := map[string]taskUse{}
-	for _, c := range m.Content {
+	for _, raw := range m.Content {
+		// Block by block, so one input that does not decode drops only itself.
+		var c struct {
+			Type  string  `json:"type"`
+			ID    string  `json:"id"`
+			Name  string  `json:"name"`
+			Input taskUse `json:"input"`
+		}
+		if json.Unmarshal(raw, &c) != nil {
+			continue
+		}
 		switch c.Name {
 		case "Bash", "Monitor", "Agent", "Task":
 			if c.Type == "tool_use" {

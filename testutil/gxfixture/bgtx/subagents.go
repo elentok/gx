@@ -46,6 +46,15 @@ const (
 	SubStartingDesc   = "Warm up the new worker"
 	SubMarkedDesc     = "Summarise the config files"
 
+	// The string-background shape's subagent and the shell launched beside it.
+	SubStringCall      = "toolu_sub_string"
+	SubStringShellCall = "toolu_sub_string_shell"
+	SubStringAgent     = "a5ub0010"
+	SubStringDesc      = "Audit the string flags"
+	SubStringShellDesc = "Lint in the background"
+	SubStringFileKey   = "subagent-string-file"
+	SubStringMetaKey   = "subagent-string-meta"
+
 	// SubMarkedLast is the last assistant message of the marked-finished subagent,
 	// which has no handback.
 	SubMarkedLast = "The config files only set paths."
@@ -105,6 +114,7 @@ var SubagentShapes = map[string]Subagent{
 	"nested":               {Build: func(b *Lines) { b.subNested(3 * minute) }, Calls: map[string]string{"nested": SubNestedCall, "grandchild": SubGrandchildCall}, Ready: []string{SubNestedDesc}},
 	"starting":             {Build: func(b *Lines) { b.subStarting(20 * sec) }, Calls: map[string]string{"starting": SubStartingCall}, Ready: []string{SubStartingDesc}},
 	"finished-no-handback": {Build: func(b *Lines) { b.subMarked(5 * minute) }, Calls: map[string]string{"marked": SubMarkedCall}, Ready: []string{SubMarkedDesc}},
+	"string-background":    {Build: func(b *Lines) { b.subStringBackground(3 * minute) }, Calls: map[string]string{"string": SubStringCall}, Ready: []string{SubStringDesc}},
 	"parent-gone":          {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 	"exited":               {Build: func(b *Lines) { b.subRunning(3 * minute) }, Calls: runningCalls, Ready: []string{SubRunningDesc}},
 }
@@ -175,11 +185,29 @@ func (b *Lines) subStopped(ago time.Duration) {
 // ago, with the symlink in the tasks folder; nothing ended it.
 func (b *Lines) subBackground(ago time.Duration) {
 	b.subCall(ago, SubBackgroundCall, SubBackgroundDesc)
-	file, link := b.p.Subagents+"/agent-"+SubBackgroundAgent+".jsonl", b.outputPath(SubBackgroundAgent)
-	b.result(ago-time.Second, SubBackgroundCall, "Async agent launched successfully.\nagentId: "+SubBackgroundAgent,
-		map[string]any{"status": "async_launched", "agentId": SubBackgroundAgent, "resolvedModel": model, "outputFile": link})
-	b.subFiles(ago, SubBackgroundAgent, meta{Description: SubBackgroundDesc, ToolUseID: SubBackgroundCall, SpawnDepth: 1, RequestShape: "background"}, surveyFile(), SubBackgroundFileKey, SubBackgroundMetaKey)
+	b.subLaunched(ago, SubBackgroundCall, SubBackgroundAgent, SubBackgroundDesc, SubBackgroundFileKey, SubBackgroundMetaKey)
+}
+
+// subLaunched is everything a background Agent call started at ago leaves
+// behind: its async_launched result, file, meta.json and tasks-folder symlink.
+func (b *Lines) subLaunched(ago time.Duration, useID, id, desc, fileKey, metaKey string) {
+	file, link := b.p.Subagents+"/agent-"+id+".jsonl", b.outputPath(id)
+	b.result(ago-time.Second, useID, "Async agent launched successfully.\nagentId: "+id,
+		map[string]any{"status": "async_launched", "agentId": id, "description": desc, "resolvedModel": model, "outputFile": link})
+	b.subFiles(ago, id, meta{Description: desc, ToolUseID: useID, SpawnDepth: 1, RequestShape: "background"}, surveyFile(), fileKey, metaKey)
 	b.file(File{Path: link, Link: file})
+}
+
+// subStringBackground is one assistant line that launches a background subagent
+// and a background shell, both with run_in_background as a string, as Claude
+// Code often writes it.
+func (b *Lines) subStringBackground(ago time.Duration) {
+	b.add(ago, map[string]any{"type": "assistant", "message": map[string]any{"id": "msg_" + SubStringCall, "role": "assistant", "content": []any{
+		toolUse(SubStringCall, "Agent", map[string]any{"description": SubStringDesc, "subagent_type": "Explore", "prompt": SubStringDesc + " and report back.", "run_in_background": "true"}),
+		toolUse(SubStringShellCall, "Bash", map[string]any{"description": SubStringShellDesc, "command": "make lint", "run_in_background": "true"}),
+	}}})
+	b.subLaunched(ago, SubStringCall, SubStringAgent, SubStringDesc, SubStringFileKey, SubStringMetaKey)
+	b.shellLaunched(ago, SubStringShellCall, "b5ub0001", outputText("lint", 3, 40), ago-time.Second)
 }
 
 // subNested is a subagent whose file has an open Agent call; the grandchild's

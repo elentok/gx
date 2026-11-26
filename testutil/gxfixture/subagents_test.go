@@ -49,7 +49,8 @@ func TestSubagents_Shapes(t *testing.T) {
 		check func(t *testing.T, r *running, chat wire.SessionChatResponse)
 	}
 	descs := map[string]string{"running": bgtx.SubRunningDesc, "finished": bgtx.SubFinishedDesc, "missing": bgtx.SubMissingDesc,
-		"stopped": bgtx.SubStoppedDesc, "background": bgtx.SubBackgroundDesc, "nested": bgtx.SubNestedDesc, "starting": bgtx.SubStartingDesc, "marked": bgtx.SubMarkedDesc}
+		"stopped": bgtx.SubStoppedDesc, "background": bgtx.SubBackgroundDesc, "nested": bgtx.SubNestedDesc, "starting": bgtx.SubStartingDesc, "marked": bgtx.SubMarkedDesc,
+		"string": bgtx.SubStringDesc}
 	checkRunning := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
 		var row *wire.SessionTask
 		for i := range chat.Tasks {
@@ -175,6 +176,16 @@ func TestSubagents_Shapes(t *testing.T) {
 	runningMeta := func(t *testing.T, r *running, _ wire.SessionChatResponse) {
 		metaOf(t, r, bgtx.SubRunningMetaKey, "running", false)
 	}
+	stringBackground := func(t *testing.T, r *running, chat wire.SessionChatResponse) {
+		metaOf(t, r, bgtx.SubStringMetaKey, "string", false)
+		rows := map[string]wire.SessionTask{}
+		for _, row := range chat.Tasks {
+			rows[row.Label] = row
+		}
+		if len(chat.Tasks) != 2 || rows[bgtx.SubStringDesc].CallID != r.Subagents.Calls["string"] || rows[bgtx.SubStringShellDesc].Kind != "shell" {
+			t.Fatalf("task rows = %+v, want the subagent row with its call id and the shell row", chat.Tasks)
+		}
+	}
 	cases := []shape{
 		{"claude", []string{"running", "finished", "missing"}, func(t *testing.T, r *running, c wire.SessionChatResponse) {
 			checkRunning(t, r, c)
@@ -186,6 +197,7 @@ func TestSubagents_Shapes(t *testing.T) {
 		{"stopped-no-handback", []string{"stopped"}, stopped},
 		{"background-returned", []string{"background"}, background},
 		{"nested", []string{"nested"}, nested},
+		{"string-background", []string{"string"}, stringBackground},
 		{"starting", []string{"starting"}, starting},
 		{"finished-no-handback", []string{"marked"}, marked},
 		// The parent's transcript is deleted: the chat read has no tools entry, but reads.

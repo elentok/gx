@@ -17,7 +17,7 @@
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <two-blockers|blocker-not-queued|blocker-paused|picker-open|cycle-refusal|release> picks the Waiting epics and blockers of the epic-waiting scenario (default two-blockers).
 // --shape <claude|single-task|subagent-with-inner-task|many|timed-out-shell|growing-output> picks the background tasks of the bg-progress scenario (default claude).
-// --shape <claude|foreground-running|finished-handback|file-gone|stopped-no-handback|background-returned|nested|starting|finished-no-handback|parent-gone|exited|codex-starting|codex-child|codex-null-role|codex-compressed|codex-nested> picks the subagents of the subagents scenario (default claude).
+// --shape <claude|foreground-running|finished-handback|file-gone|stopped-no-handback|background-returned|nested|starting|finished-no-handback|string-background|parent-gone|exited|codex-starting|codex-child|codex-null-role|codex-compressed|codex-nested> picks the subagents of the subagents scenario (default claude).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
 // `gxfixture stop <scenario|pid>` sends SIGTERM to a fixture started from the same worktree and refuses another worktree's.

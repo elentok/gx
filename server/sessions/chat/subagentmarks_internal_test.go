@@ -1,11 +1,34 @@
 package chat
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/wire"
 )
+
+func TestRead_StringRunInBackgroundKeepsTaskRowsNamed(t *testing.T) {
+	t.Parallel()
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	use := fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"description":"Survey","run_in_background":"true"}},{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"make","description":"build","run_in_background":"true"}}]}}`, ts)
+	result := func(id, res string) string {
+		return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"ok"}]},"toolUseResult":%s}`, ts, id, res)
+	}
+	got := chatOf(t, use,
+		result("t1", `{"status":"async_launched","agentId":"ag1","description":"Survey"}`),
+		result("t2", `{"backgroundTaskId":"b1"}`),
+	).Tasks
+
+	rows := map[string]wire.SessionTask{}
+	for _, row := range got {
+		rows[row.Label] = row
+	}
+	if len(got) != 2 || rows["Survey"].CallID != "t1" || rows["build"].Kind != "shell" {
+		t.Errorf("tasks = %+v, want Survey with call_id t1 and the build shell", got)
+	}
+}
 
 func TestRead_MarksSubagentCallsOnTheWire(t *testing.T) {
 	t.Parallel()
