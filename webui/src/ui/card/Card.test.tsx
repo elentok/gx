@@ -31,6 +31,25 @@ describe("Card", () => {
     expect(container.querySelector("[data-live]")).toBeNull()
   })
 
+  it.each([true, false])("caps its height only when maxHeight is set (live=%s)", (live) => {
+    const { container } = renderThemed(
+      <>
+        <Card live={live} maxHeight="100px" data-mock-part="capped">
+          body
+        </Card>
+        <Card live={live} data-mock-part="free">
+          body
+        </Card>
+      </>,
+    )
+    const part = (name: string) =>
+      getComputedStyle(container.querySelector(`[data-mock-part='${name}']`)!)
+    expect(part("capped").maxHeight).toBe("100px")
+    expect(part("capped").flexDirection).toBe("column")
+    expect(part("free").maxHeight).toBe("")
+    expect(part("free").flexDirection).toBe("")
+  })
+
   it("renders without a title", () => {
     const { getByText } = renderThemed(<Card>only body</Card>)
     expect(getByText("only body")).toBeTruthy()

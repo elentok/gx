@@ -376,3 +376,97 @@ test("218. Working card shapes", async ({ page, start }) => {
     await noSideScroll(page)
   }
 })
+
+/** Two Claude transcript lines: a background shell and its launch result. */
+function longShell(command: string): string {
+  const timestamp = new Date().toISOString()
+  const id = "toolu_long"
+  return [
+    {
+      type: "assistant",
+      uuid: "long-use",
+      timestamp,
+      message: {
+        id: "msg_long",
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id,
+            name: "Bash",
+            input: { command, description: "Run a long script", run_in_background: true },
+          },
+        ],
+      },
+    },
+    {
+      type: "user",
+      uuid: "long-result",
+      timestamp,
+      message: {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: id,
+            content: "Command running in background with ID: blong0001.",
+          },
+        ],
+      },
+      toolUseResult: { backgroundTaskId: "blong0001" },
+    },
+  ]
+    .map((line) => `${JSON.stringify(line)}\n`)
+    .join("")
+}
+
+// Why a flow: the cap, the scrolling rows and the header that stays put are real layout and scroll, which jsdom
+// (WorkingCard.test.tsx, Card.test.tsx) cannot see.
+test("219. Working card height cap", async ({ page, start }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const fixture = await start("bg-progress", { shape: "many" })
+  const claude = (await sessions(fixture)).find((s) => s.harness !== "codex")!
+  await go(page, `#/agents/${claude.id}`)
+  const working = page.locator("[data-mock-part='card']")
+  const header = working.getByRole("status")
+  await expect(rows(working)).toHaveCount(50)
+  await expect(header).toContainText("Working")
+  await expect(list(working)).toBeVisible()
+
+  const layout = () =>
+    expect
+      .poll(async () => {
+        const box = await working.boundingBox()
+        // The scrolling log is the card's previous sibling.
+        const log = await working.locator("xpath=preceding-sibling::*[1]").boundingBox()
+        const scrolls = await list(working).evaluate((el) => el.scrollHeight > el.clientHeight)
+        return {
+          capped: !!box && box.height <= 844 * 0.4 + 0.5,
+          scrolls,
+          log: !!box && !!log && log.height > 100 && log.y + log.height <= box.y + 0.5,
+        }
+      })
+      .toEqual({ capped: true, scrolls: true, log: true })
+  await layout()
+
+  await rows(working).last().scrollIntoViewIfNeeded()
+  await expect(rows(working).last()).toBeInViewport()
+  await expect(header).toBeInViewport({ ratio: 1 })
+  await layout()
+
+  // An open shell row's long command scrolls inside the card too. The shape's commands are one short line, so the
+  // transcript gets a long one.
+  appendFileSync(
+    fixture.transcripts.many,
+    longShell(Array.from({ length: 60 }, (_, i) => `echo line-${i}`).join("\n")),
+  )
+  const shell = rowOf(working, "Run a long script")
+  await shell.getByRole("button").first().click()
+  await shell.getByRole("button", { name: "Show all (60 lines)" }).click()
+  await layout()
+  await shell.getByText("echo line-59").scrollIntoViewIfNeeded()
+  await expect(shell.getByText("echo line-59")).toBeInViewport()
+  await expect(header).toBeInViewport({ ratio: 1 })
+  await layout()
+  await noSideScroll(page)
+})

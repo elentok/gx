@@ -114,7 +114,9 @@ import (
 //
 // Working card shapes flow (+1): Codex rollouts and Claude fixture files through the server, and real path shortening
 // at two widths; webui/src/design/WorkingCard.test.tsx renders given props in jsdom and sees neither.
-const maxFlows = 175
+//
+// Working card height cap flow (+1): jsdom cannot see real layout and scroll.
+const maxFlows = 176
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

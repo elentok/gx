@@ -238,29 +238,40 @@ export function WorkingCard({
     return t.kind === "subagent" ? `subagent-row-${++subagents}` : undefined
   }
   return (
-    <Card tone="muted" live={!!working} data-mock-part="card">
+    <Card tone="muted" live={!!working} maxHeight="40dvh" data-mock-part="card">
       {working && <WorkingRow {...working} current={current} others={others} inCard />}
       {tasks.length > 0 && (
         <Box
-          role="list"
-          aria-label="Tasks"
           display="flex"
           flexDirection="column"
-          gap="2"
-          fontSize="sm"
+          minH="0"
           {...(working && { mt: "2", pt: "2", borderTopWidth: "1px", borderColor: "border" })}
         >
-          {orderRows(withKeys(tasks, taskKey)).map(({ key, item: t }) => (
-            <TaskRow
-              key={key}
-              task={t}
-              sessionId={sessionId}
-              now={now}
-              open={openRows.has(key)}
-              onToggle={() => toggleRow(key)}
-              mockPart={mockPart(t)}
-            />
-          ))}
+          {/* The padding and equal negative margin keep an open row's bleed and the focus rings unclipped. */}
+          <Box
+            role="list"
+            aria-label="Tasks"
+            display="flex"
+            flexDirection="column"
+            gap="2"
+            fontSize="sm"
+            minH="0"
+            overflowY="auto"
+            p="2"
+            m="-2"
+          >
+            {orderRows(withKeys(tasks, taskKey)).map(({ key, item: t }) => (
+              <TaskRow
+                key={key}
+                task={t}
+                sessionId={sessionId}
+                now={now}
+                open={openRows.has(key)}
+                onToggle={() => toggleRow(key)}
+                mockPart={mockPart(t)}
+              />
+            ))}
+          </Box>
         </Box>
       )}
     </Card>
