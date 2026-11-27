@@ -64,6 +64,43 @@ func waitFakeKeys(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, want
 	}
 }
 
+// pressAsPerson presses x on a until the child reads it. The child shows gx's
+// keys before gx's batch ends, and until then the holder drops a's keys and
+// reports them blocked. It takes over reading a.
+func pressAsPerson(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, a *holder.HolderAttach) {
+	t.Helper()
+	blocked := make(chan struct{}, 1)
+	go func() {
+		for {
+			m, err := a.Next()
+			if err != nil {
+				return
+			}
+			if m.Type == holder.StreamBlocked {
+				blocked <- struct{}{}
+			}
+		}
+	}()
+	deadline := time.After(10 * time.Second)
+	for {
+		if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
+			t.Fatal(err)
+		}
+		for dropped := false; !dropped; {
+			if strings.HasSuffix(fakeKeysTyped(t, p, s), "x") {
+				return
+			}
+			select {
+			case <-blocked:
+				dropped = true
+			case <-deadline:
+				t.Fatalf("keys typed = %q; want the person's key", fakeKeysTyped(t, p, s))
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}
+}
+
 func TestPty_PersonInputAfterGxTypedEndsNudgesWithoutError(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
@@ -76,9 +113,7 @@ func TestPty_PersonInputAfterGxTypedEndsNudgesWithoutError(t *testing.T) {
 	start := time.Now()
 	go func() { done <- p.Prompt(s, "do it") }()
 	waitFakeKeys(t, p, s, "do it\r")
-	if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
-		t.Fatal(err)
-	}
+	pressAsPerson(t, p, s, a)
 
 	select {
 	case err := <-done:

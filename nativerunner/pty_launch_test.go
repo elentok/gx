@@ -14,7 +14,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/deliver"
-	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
@@ -217,9 +216,7 @@ func TestPty_LaunchPromptPersonTypingWithNoProofIsUnconfirmed(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil) }()
 	waitFakeKeys(t, p, s, "/gx-implement x/1\r")
-	if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
-		t.Fatal(err)
-	}
+	pressAsPerson(t, p, s, a)
 
 	select {
 	case err := <-done:

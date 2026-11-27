@@ -33,6 +33,8 @@ const (
 	signalFirstIdle = "first Idle"
 	// holderPollInterval is how often a holder-backed prompt waits between turn checks.
 	holderPollInterval = 50 * time.Millisecond
+	// clearConfirmWait caps the wait for the screen to show a cleared input.
+	clearConfirmWait = time.Second
 	// clearInputHint ends a reason when the input may still hold gx's text.
 	clearInputHint = " Clear the input first."
 )
@@ -169,8 +171,16 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 		f.log.Warn("clear leftover first prompt", "err", err)
 		return false, false
 	}
-	empty, known, err := p.InputEmpty()
-	return err == nil && known && empty, false
+	// A read in the middle of a redraw can't decide, so it reads again.
+	for deadline := time.Now().Add(clearConfirmWait); ; time.Sleep(holderPollInterval) {
+		empty, known, err := p.InputEmpty()
+		if err != nil || known && empty {
+			return err == nil, false
+		}
+		if !time.Now().Before(deadline) {
+			return false, false
+		}
+	}
 }
 
 // Observe takes each status while the prompt is pending and returns the signal

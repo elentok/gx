@@ -16,8 +16,13 @@ func autoSendOnce(t *testing.T, f *grillingFixture) {
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
-	// The box fake's /clear moves the session to a new conversation, whose
-	// transcript the next run-end line must be written to.
+	writeClearedRunEnd(t, f)
+}
+
+// writeClearedRunEnd writes the next run-end line after a /clear: the box fake
+// moves the session to a new conversation with its own transcript.
+func writeClearedRunEnd(t *testing.T, f *grillingFixture) {
+	t.Helper()
 	cleared := filepath.Join(filepath.Dir(f.Path), f.Conv+agentfake.ProgramClearedSuffix+".jsonl")
 	writeAssistantMessage(t, cleared, runEndText)
 }
@@ -53,10 +58,20 @@ func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
 		"switch flip": func(t *testing.T, f *grillingFixture) { setSwitch(t, f, false) },
 	} {
 		t.Run(name, func(t *testing.T) {
-			f := startAdvancing(t, storeWithMapStep(t, "spec"))
+			// Held: a countdown that ends mid-test sends again, and gx's typing
+			// blocks the input.
+			f := startHeldAdvancing(t, storeWithMapStep(t, "spec"))
 			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 			writeAssistantMessage(t, f.Path, runEndText)
-			autoSendOnce(t, f)
+			endTurn(t, f)
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			if !f.H.Server.Prompt().ReleaseAutoAdvance(f.ID) {
+				t.Fatal("no countdown to release")
+			}
+			// The countdown clears before gx types, and gx blocks the input while
+			// it does.
+			waitForSent(t, f, "/clear", "/gx-design map")
+			writeClearedRunEnd(t, f)
 			endTurn(t, f)
 			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 			if n := autoSends(t, f); n != 1 {
