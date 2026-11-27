@@ -30,6 +30,18 @@ func ticketPushes(h *servertest.Harness) []servertest.Push {
 	return out
 }
 
+// pausedTicketPushes drops the pushes about other tickets: an unmatched pause
+// queues an investigate ticket, which pushes on its own when its agent stops.
+func pausedTicketPushes(pushes []servertest.Push) []servertest.Push {
+	var out []servertest.Push
+	for _, p := range pushes {
+		if p.Tag == "ticket:proj:epic-a/01" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // waitTicketPushes polls for want pushes, then waits for a wrong extra one.
 func waitTicketPushes(t *testing.T, h *servertest.Harness, want int) []servertest.Push {
 	t.Helper()
@@ -82,7 +94,7 @@ func TestRecoveryPush_PauseSendsChatWordsWithOrWithoutChat(t *testing.T) {
 			if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 				t.Fatal(err)
 			}
-			got := waitTicketPushes(t, h, 1)
+			got := pausedTicketPushes(waitTicketPushes(t, h, 1))
 			if len(got) != 1 {
 				t.Fatalf("pushes = %+v, want one", got)
 			}
@@ -187,7 +199,7 @@ func TestRecoveryPush_SentWhileSessionOnScreen(t *testing.T) {
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	if got := waitTicketPushes(t, h, 1); len(got) != 1 {
+	if got := pausedTicketPushes(waitTicketPushes(t, h, 1)); len(got) != 1 {
 		t.Fatalf("pushes = %+v, want one while the session is on screen", got)
 	}
 }
