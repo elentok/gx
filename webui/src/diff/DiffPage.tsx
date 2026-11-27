@@ -1,5 +1,13 @@
 import { Box, chakra } from "@chakra-ui/react"
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { useSearchParams } from "react-router"
 import { fetchArchivedEpicDetail, fetchEpicDetail, type FetchEpicDetail } from "../epic/detail"
 import { DiffNoDiff, type DiffFile } from "../generated/server"
@@ -316,7 +324,8 @@ function FilesBrowser({
   useEffect(() => {
     if (focusTick > 0) filterRef.current?.focus()
   }, [focusTick])
-  useEffect(() => {
+  // A layout effect, so the keys work as soon as the files are on screen.
+  useLayoutEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTextTarget(e.target)) return
       if (e.key === "n") stepRef.current(1)
