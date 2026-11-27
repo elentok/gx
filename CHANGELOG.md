@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.53.0 - 2026-11-27
+
+- **Breaking:** Vi mode is now stored per device in the browser, so a phone no longer follows the desktop's setting. `gx vimode`, `POST /v1/vimode`, the `vimode-changed` event and the snapshot's `vi_mode` field are removed. The old server-side setting is not carried over. Vi mode starts off, so turn it on again in the web menu on each device that needs it.
+- **Breaking:** Changed the vi mappings in the web UI. `gh` and `gl` go to the line start and end, and `gs` is removed. `ge` now jumps to the end of the text, like `G`, instead of the line end.
+- Added a read-only chat page for each Claude and Codex subagent, with a header, the prompt, messages, tool calls, the result, nested subagents and live updates. It also covers starting, missing, compressed and archived-parent states. `gx agents chat <session> --subagent <call-id>` prints the same page, and a 404 now prints the server's message.
+- Changed the block below the chat into one working card, which replaces the Working row and the task list on the chat, Design and Triage pages. Running subagents show a linked name, the elapsed time and the current call, and finished tasks follow in grey. The card's height is capped and its rows scroll. The chat log links a subagent only after it finishes, and "Back to parent chat" returns to the page the link came from.
+- Changed current-call labels for Read, Edit and Write to name the file, cutting a long path from its start. Running Codex subagents now show their current call, and the current call updates while a page of the session is visible.
+- Fixed background subagent rows losing their name and link when Claude writes `run_in_background` as a string. One unreadable tool call no longer drops the other calls on the same line.
+- Fixed a chat page missing transcript writes made before the first poll.
+- Added Back and Forward buttons to the sidebar header, shown in browsers that have the Navigation API. Added Leader chords `,` (back), `.` (forward), `j` (next sidebar item) and `k` (previous sidebar item). All four header buttons have tooltips.
+- Changed the web UI so that the root address, unknown addresses and the end of first-run setup replace the history entry, so Back no longer leads to them.
+- Changed the sidebar. The version line moved from the header to the footer menu, where a click copies it. The footer no longer shows a health warning, which the health tray already covers. The paused and offline button now takes the Stats icon's place on every device, and its menu links to Stats and health.
+- Changed every text box in the web UI to one shared `TextBox` with consistent labels, focus styles and AutoFill settings. Title boxes are labelled "Title", an option's answer box is "Answer to question N", and the Design draft prompt has no border. Lint now fails on a raw text box, and `docs/text-boxes.md` records the rules.
+- Added broken rule reports. A production web UI that finds one of its text box rules broken sends `POST /v1/broken-rules`, and gx files it as a follow-up.
+- Changed follow-ups so that a repeat from the same source on the same day raises a count on its "Seen again" line instead of adding a line. The check and the write now happen under the epic lock.
+- Fixed iOS offering AutoFill Contact over the chat draft and composer keyboards.
+- Fixed full-width toasts on tablets and capped the toast height. Setting rows now fit a phone.
+- Fixed a failed first prompt saying "Clear the input first" when gx read the screen in the middle of a redraw.
+- Fixed Diff page keys that did not respond right after the files appeared.
+- Changed gx to log a held rename that it drops.
+- Added the `subagents` and `card-pages` fixture scenarios and Playwright flows for the subagent page, working card and navigation. `make web-e2e`, CI and the check setup now install WebKit as well as Chromium.
+- Changed tests and housekeeping: fixed flaky tests, and moved code into smaller packages to stay within the size limits.
+
 ## v0.52.2 - 2026-11-25
 
 - Added a calmer Diff page and a "Worktree diff" mode. The Diff page can now show a worktree's uncommitted changes, plus an "Uncommitted changes" row, an untracked-file cap notice and empty states. Chat, Design, ticket and Queue agent targets all get a Worktree diff route (`SnapshotWorktree` on the server). Chat and ticket responses carry new availability fields.
