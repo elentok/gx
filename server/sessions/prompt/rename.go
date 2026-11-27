@@ -140,6 +140,7 @@ func (p namer) holdRename(dir string) {
 				}
 			default:
 				p.dropHeldRename(id)
+				p.log.Info("held rename dropped", "session", id, "state", state)
 				return
 			}
 		}

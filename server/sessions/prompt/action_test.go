@@ -3,6 +3,7 @@ package prompt_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -267,6 +268,9 @@ func TestRenameHold_DroppedWhenBlockedClosesIntoRateLimited(t *testing.T) {
 	f.rename(t, id, "new name")
 	report(t, conv, agentfake.Control{State: "ratelimited"})
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionRateLimited })
+	// The hold's own watch only gets the latest status: Idle sent before it saw
+	// Rate-limited would hide that state from it.
+	servertest.Await(t, func() bool { return strings.Contains(f.h.LogTail(200), "held rename dropped") })
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	time.Sleep(2 * actionWatchSettle) // negative wait: a release would type within this window

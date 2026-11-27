@@ -201,8 +201,11 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, err := f.H.Client.Queue.Remove(ctx, "proj:"+schedEpic+"/01"); err != nil {
-		t.Fatal(err)
+	// root-paused streams before the finishing run is dropped, and Remove refuses
+	// a ticket with a live run.
+	servertest.Await(t, func() bool { return len(f.H.Server.Runs()) == 0 })
+	if res, err := f.H.Client.Queue.Remove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
+		t.Fatalf("remove: %+v, %v", res, err)
 	}
 	// Reopen the ticket, so its second finish runs the merge step again.
 	path := f.TicketFile(t, "01")
